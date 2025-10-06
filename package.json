@@ -3,10 +3,29 @@
   "module": "index.ts",
   "type": "module",
   "private": true,
+  "scripts": {
+    "dev": "bun --watch index.ts",
+    "db:migrate": "drizzle-kit migrate",
+    "db:generate": "drizzle-kit generate",
+    "db:push": "drizzle-kit push",
+    "start": "bun run index.ts"
+  },
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "@types/pg": "^8.15.5",
+    "drizzle-kit": "^0.31.4",
+    "tsx": "^4.20.5"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^5.9.2"
+  },
+  "dependencies": {
+    "@hono/zod-validator": "^0.7.2",
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.2",
+    "drizzle-orm": "^0.44.5",
+    "hono": "^4.9.6",
+    "pg": "^8.16.3",
+    "zod": "^4.1.5"
   }
 }
