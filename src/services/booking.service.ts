@@ -10,8 +10,8 @@ class BookingService {
     }
 
     initRoutes() {
-        this.router.post("/", ...this.controllers.createBooking);
         this.router.get("/", ...this.controllers.getAll);
+        this.router.post("/:id", ...this.controllers.createBooking);
         this.router.get("/:id", ...this.controllers.getById);
         this.router.put("/:id", ...this.controllers.updateBooking);
         this.router.delete("/:id", ...this.controllers.deleteBooking);
