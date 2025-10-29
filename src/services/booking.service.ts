@@ -3,18 +3,19 @@ import BookingsController from "../controllers/booking.controller";
 
 class BookingService {
     protected readonly router = new Hono();
-    private readonly controllers = new BookingsController();
+    private readonly bookingsController = new BookingsController();
 
     constructor() {
         this.initRoutes();
     }
 
     initRoutes() {
-        this.router.get("/", ...this.controllers.getAll);
-        this.router.post("/:id", ...this.controllers.createBooking);
-        this.router.get("/:id", ...this.controllers.getById);
-        this.router.put("/:id", ...this.controllers.updateBooking);
-        this.router.delete("/:id", ...this.controllers.deleteBooking);
+        // User booking operations
+        this.router.get("/", ...this.bookingsController.getAll); // Get all bookings (or user's bookings with ?userName=)
+        this.router.post("/:id", ...this.bookingsController.createBooking); // Create a booking at venue :id
+        this.router.get("/:id", ...this.bookingsController.getById); // Get specific booking by ID
+        this.router.put("/:id", ...this.bookingsController.updateBooking); // Update a booking
+        this.router.delete("/:id", ...this.bookingsController.deleteBooking); // Cancel/delete a booking
     }
 
     get getRouter() {
