@@ -9,7 +9,7 @@ const CreateVenueSchema = z.object({
     lng: z.number(),
     address: z.string(),
     capacity: z.number().int().positive(),
-    maxSimultaneousBroadcasts: z.number().int().positive().optional()
+    maxSimultaneousBroadcasts: z.number().int().positive().optional(),
 });
 
 const UpdateVenueSchema = z.object({
@@ -18,7 +18,7 @@ const UpdateVenueSchema = z.object({
     lng: z.number().optional(),
     address: z.string().optional(),
     capacity: z.number().int().positive().optional(),
-    maxSimultaneousBroadcasts: z.number().int().positive().optional()
+    maxSimultaneousBroadcasts: z.number().int().positive().optional(),
 });
 
 const AddBroadcastSchema = z.object({
@@ -26,7 +26,7 @@ const AddBroadcastSchema = z.object({
     sport: z.string(),
     startTime: z.string(),
     endTime: z.string(),
-    screen: z.number().int().positive().optional()
+    screen: z.number().int().positive().optional(),
 });
 
 class VenuesController {
@@ -60,7 +60,7 @@ class VenuesController {
                 address: v.address,
                 capacity: v.capacity,
                 maxSimultaneousBroadcasts: v.maxSimultaneousBroadcasts,
-                broadcasts: v.broadcasts
+                broadcasts: v.broadcasts,
             }));
 
             return ctx.json(list);
@@ -99,7 +99,7 @@ class VenuesController {
             const body = ctx.req.valid("json");
             const venue = this.venueService.createVenue(body);
             return ctx.json(venue, 201);
-        }
+        },
     );
 
     // Update venue details
@@ -125,7 +125,7 @@ class VenuesController {
             }
 
             return ctx.json(venue);
-        }
+        },
     );
 
     // Delete a venue
@@ -188,7 +188,7 @@ class VenuesController {
             }
 
             return ctx.json(result.broadcast, 201);
-        }
+        },
     );
 
     // Remove a broadcast from venue's schedule

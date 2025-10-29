@@ -18,10 +18,10 @@ export const venues: Venue[] = [
                 sport: "Football",
                 startTime: new Date(Date.now() + 3600000).toISOString(), // 1 hour from now
                 endTime: new Date(Date.now() + 9000000).toISOString(), // 2.5 hours from now
-                screen: 1
-            }
+                screen: 1,
+            },
         ],
-        reservedSeatsByTime: {}
+        reservedSeatsByTime: {},
     },
     {
         id: "v2",
@@ -38,11 +38,11 @@ export const venues: Venue[] = [
                 sport: "Basketball",
                 startTime: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
                 endTime: new Date(Date.now() + 14400000).toISOString(), // 4 hours from now
-                screen: 1
-            }
+                screen: 1,
+            },
         ],
-        reservedSeatsByTime: {}
-    }
+        reservedSeatsByTime: {},
+    },
 ]
 
 export class VenueRepository {
@@ -60,7 +60,7 @@ export class VenueRepository {
             ...input,
             maxSimultaneousBroadcasts: input.maxSimultaneousBroadcasts ?? 2,
             broadcasts: [],
-            reservedSeatsByTime: {}
+            reservedSeatsByTime: {},
         }
         venues.push(newVenue)
         return newVenue
@@ -109,7 +109,7 @@ export class VenueRepository {
 
         const broadcast: GameBroadcast = {
             id: nanoid(),
-            ...input
+            ...input,
         }
 
         venue.broadcasts.push(broadcast)
@@ -178,7 +178,7 @@ export class VenueRepository {
         if (overlappingBroadcasts.length >= venue.maxSimultaneousBroadcasts) {
             return { 
                 canAdd: false, 
-                reason: `Maximum ${venue.maxSimultaneousBroadcasts} simultaneous broadcasts reached for this time slot` 
+                reason: `Maximum ${venue.maxSimultaneousBroadcasts} simultaneous broadcasts reached for this time slot`, 
             }
         }
 

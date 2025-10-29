@@ -17,7 +17,7 @@ export class VenueManagementService {
         return allVenues.filter(v => {
             const dist = getDistance(
                 { latitude: lat, longitude: lng },
-                { latitude: v.lat, longitude: v.lng }
+                { latitude: v.lat, longitude: v.lng },
             );
             return dist <= radius;
         });

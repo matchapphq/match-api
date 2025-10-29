@@ -20,7 +20,7 @@ export class BookingLogicService {
         venueId: string,
         userName: string,
         seats: number,
-        time: string
+        time: string,
     ): Promise<ReservationResult> {
         const venue = this.venueRepository.findById(venueId);
         if (!venue) {
@@ -34,7 +34,7 @@ export class BookingLogicService {
             if (reserved + seats > venue.capacity) {
                 return {
                     ok: false,
-                    available: Math.max(0, venue.capacity - reserved)
+                    available: Math.max(0, venue.capacity - reserved),
                 };
             }
 
@@ -48,7 +48,7 @@ export class BookingLogicService {
                 userName,
                 seats,
                 time,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
             };
 
             // Store the booking
@@ -78,7 +78,7 @@ export class BookingLogicService {
     async updateBooking(
         bookingId: string,
         seats: number,
-        time: string
+        time: string,
     ): Promise<ReservationResult> {
         const existingBooking = this.bookingRepository.findById(bookingId);
         if (!existingBooking) {
@@ -96,7 +96,7 @@ export class BookingLogicService {
             this.venueRepository.updateReservedSeats(
                 existingBooking.venueId,
                 existingBooking.time,
-                oldReserved - existingBooking.seats
+                oldReserved - existingBooking.seats,
             );
 
             // Check new availability
@@ -106,11 +106,11 @@ export class BookingLogicService {
                 this.venueRepository.updateReservedSeats(
                     existingBooking.venueId,
                     existingBooking.time,
-                    oldReserved
+                    oldReserved,
                 );
                 return {
                     ok: false,
-                    available: Math.max(0, venue.capacity - reserved)
+                    available: Math.max(0, venue.capacity - reserved),
                 };
             }
 
@@ -139,7 +139,7 @@ export class BookingLogicService {
             this.venueRepository.updateReservedSeats(
                 booking.venueId,
                 booking.time,
-                reserved - booking.seats
+                reserved - booking.seats,
             );
 
             // Delete the booking
