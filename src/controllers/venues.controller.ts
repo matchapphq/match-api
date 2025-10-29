@@ -9,7 +9,7 @@ const CreateVenueSchema = z.object({
     lng: z.number(),
     address: z.string(),
     capacity: z.number().int().positive(),
-    broadcasting: z.array(z.string())
+    maxSimultaneousBroadcasts: z.number().int().positive().optional()
 });
 
 const UpdateVenueSchema = z.object({
@@ -18,7 +18,15 @@ const UpdateVenueSchema = z.object({
     lng: z.number().optional(),
     address: z.string().optional(),
     capacity: z.number().int().positive().optional(),
-    broadcasting: z.array(z.string()).optional()
+    maxSimultaneousBroadcasts: z.number().int().positive().optional()
+});
+
+const AddBroadcastSchema = z.object({
+    name: z.string(),
+    sport: z.string(),
+    startTime: z.string(),
+    endTime: z.string(),
+    screen: z.number().int().positive().optional()
 });
 
 class VenuesController {
@@ -50,8 +58,9 @@ class VenuesController {
                 lat: v.lat,
                 lng: v.lng,
                 address: v.address,
-                broadcasting: v.broadcasting,
-                capacity: v.capacity
+                capacity: v.capacity,
+                maxSimultaneousBroadcasts: v.maxSimultaneousBroadcasts,
+                broadcasts: v.broadcasts
             }));
 
             return ctx.json(list);
@@ -156,26 +165,86 @@ class VenuesController {
         return ctx.json({ message: "Capacity updated successfully" });
     });
 
-    // Update what's being broadcasted
-    readonly updateBroadcasting = this.factory.createHandlers(async (ctx) => {
+    // Add a broadcast to venue's schedule
+    readonly addBroadcast = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const parsed = AddBroadcastSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const venueId = ctx.req.param("id");
+            if (!venueId) {
+                return ctx.json({ error: "Venue ID required" }, 400);
+            }
+
+            const body = ctx.req.valid("json");
+            const result = this.venueService.addBroadcast(venueId, body);
+            
+            if (!result.success) {
+                return ctx.json({ error: result.error }, 409);
+            }
+
+            return ctx.json(result.broadcast, 201);
+        }
+    );
+
+    // Remove a broadcast from venue's schedule
+    readonly removeBroadcast = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("id");
+        const broadcastId = ctx.req.param("broadcastId");
+        
+        if (!venueId || !broadcastId) {
+            return ctx.json({ error: "Venue ID and Broadcast ID required" }, 400);
+        }
+
+        const removed = this.venueService.removeBroadcast(venueId, broadcastId);
+        if (!removed) {
+            return ctx.json({ error: "Venue or broadcast not found" }, 404);
+        }
+
+        return ctx.json({ message: "Broadcast removed successfully" });
+    });
+
+    // Update a broadcast
+    readonly updateBroadcast = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("id");
+        const broadcastId = ctx.req.param("broadcastId");
+        
+        if (!venueId || !broadcastId) {
+            return ctx.json({ error: "Venue ID and Broadcast ID required" }, 400);
+        }
+
+        const body = await ctx.req.json();
+        const broadcast = this.venueService.updateBroadcast(venueId, broadcastId, body);
+        
+        if (!broadcast) {
+            return ctx.json({ error: "Venue or broadcast not found" }, 404);
+        }
+
+        return ctx.json(broadcast);
+    });
+
+    // Get all broadcasts for a venue
+    readonly getBroadcasts = this.factory.createHandlers(async (ctx) => {
         const venueId = ctx.req.param("id");
         if (!venueId) {
             return ctx.json({ error: "Venue ID required" }, 400);
         }
 
-        const body = await ctx.req.json();
-        const { broadcasting } = body;
-
-        if (!Array.isArray(broadcasting) || !broadcasting.every(item => typeof item === "string")) {
-            return ctx.json({ error: "Invalid broadcasting array" }, 400);
+        const time = ctx.req.query("time");
+        
+        if (time) {
+            // Get broadcasts at specific time
+            const broadcasts = this.venueService.getBroadcastsAtTime(venueId, time);
+            return ctx.json(broadcasts);
+        } else {
+            // Get all broadcasts
+            const broadcasts = this.venueService.getVenueBroadcasts(venueId);
+            return ctx.json(broadcasts);
         }
-
-        const updated = this.venueService.updateBroadcasting(venueId, broadcasting);
-        if (!updated) {
-            return ctx.json({ error: "Venue not found" }, 404);
-        }
-
-        return ctx.json({ message: "Broadcasting updated successfully" });
     });
 
     // Get available seats for a venue at a specific time

@@ -1,5 +1,5 @@
 import { getDistance } from "geolib";
-import type { Venue, CreateVenueInput, UpdateVenueInput } from "../types/venue.types";
+import type { Venue, CreateVenueInput, UpdateVenueInput, GameBroadcast, AddBroadcastInput } from "../types/venue.types";
 import { VenueRepository } from "../repository/venue.repository";
 
 export class VenueManagementService {
@@ -66,10 +66,49 @@ export class VenueManagementService {
     }
 
     /**
-     * Update what's being broadcasted at a venue
+     * Add a game broadcast to a venue's schedule
      */
-    updateBroadcasting(venueId: string, broadcasting: string[]): boolean {
-        return this.venueRepository.updateBroadcasting(venueId, broadcasting);
+    addBroadcast(venueId: string, input: AddBroadcastInput): { success: boolean; broadcast?: GameBroadcast; error?: string } {
+        // Check if venue can add another broadcast at this time
+        const canAdd = this.venueRepository.canAddBroadcast(venueId, input.startTime, input.endTime);
+        if (!canAdd.canAdd) {
+            return { success: false, error: canAdd.reason };
+        }
+
+        const broadcast = this.venueRepository.addBroadcast(venueId, input);
+        if (!broadcast) {
+            return { success: false, error: "Venue not found" };
+        }
+
+        return { success: true, broadcast };
+    }
+
+    /**
+     * Remove a broadcast from a venue's schedule
+     */
+    removeBroadcast(venueId: string, broadcastId: string): boolean {
+        return this.venueRepository.removeBroadcast(venueId, broadcastId);
+    }
+
+    /**
+     * Update a broadcast
+     */
+    updateBroadcast(venueId: string, broadcastId: string, updates: Partial<AddBroadcastInput>): GameBroadcast | null {
+        return this.venueRepository.updateBroadcast(venueId, broadcastId, updates);
+    }
+
+    /**
+     * Get all broadcasts for a venue
+     */
+    getVenueBroadcasts(venueId: string): GameBroadcast[] {
+        return this.venueRepository.getAllBroadcasts(venueId);
+    }
+
+    /**
+     * Get broadcasts happening at a specific time
+     */
+    getBroadcastsAtTime(venueId: string, time: string): GameBroadcast[] {
+        return this.venueRepository.getBroadcastsAtTime(venueId, time);
     }
 
     /**
@@ -81,5 +120,23 @@ export class VenueManagementService {
 
         const reserved = this.venueRepository.getReservedSeats(venueId, time);
         return venue.capacity - reserved;
+    }
+
+    /**
+     * Find venues broadcasting a specific sport
+     */
+    findVenuesBySport(sport: string, time?: string): Venue[] {
+        const allVenues = this.venueRepository.findAll();
+        
+        return allVenues.filter(venue => {
+            if (time) {
+                // Filter by sport and time
+                const broadcasts = this.venueRepository.getBroadcastsAtTime(venue.id, time);
+                return broadcasts.some(b => b.sport.toLowerCase() === sport.toLowerCase());
+            } else {
+                // Filter by sport only (any time)
+                return venue.broadcasts.some(b => b.sport.toLowerCase() === sport.toLowerCase());
+            }
+        });
     }
 }
