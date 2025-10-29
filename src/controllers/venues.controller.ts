@@ -1,51 +1,202 @@
 import { createFactory } from "hono/factory";
-import { BookingLogicService } from "../services/booking-logic.service";
+import { validator } from "hono/validator";
+import { VenueManagementService } from "../services/venue-management.service";
+import z from "zod";
+
+const CreateVenueSchema = z.object({
+    name: z.string(),
+    lat: z.number(),
+    lng: z.number(),
+    address: z.string(),
+    capacity: z.number().int().positive(),
+    broadcasting: z.array(z.string())
+});
+
+const UpdateVenueSchema = z.object({
+    name: z.string().optional(),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+    address: z.string().optional(),
+    capacity: z.number().int().positive().optional(),
+    broadcasting: z.array(z.string()).optional()
+});
 
 class VenuesController {
-    private readonly bookingLogicService: BookingLogicService;
+    private readonly factory = createFactory();
+    private readonly venueService: VenueManagementService;
 
     constructor() {
-        this.bookingLogicService = new BookingLogicService();
+        this.venueService = new VenueManagementService();
     }
 
-    readonly getVenues = createFactory().createHandlers(async (ctx) => {
-        const lat = parseFloat(ctx.req.query("lat") ?? "")
-        const lng = parseFloat(ctx.req.query("lng") ?? "")
-        const radius = parseInt(ctx.req.query("radius_m") ?? "2000")
-        if (isNaN(lat) || isNaN(lng)) return ctx.json({ error: "lat & lng required" }, 400)
+    // Get venues nearby (with optional lat/lng query params)
+    readonly getVenues = this.factory.createHandlers(async (ctx) => {
+        const lat = ctx.req.query("lat");
+        const lng = ctx.req.query("lng");
 
-        const list = this.bookingLogicService.findNearbyVenues(lat, lng, radius).map(v => ({
-            id: v.id,
-            name: v.name,
-            lat: v.lat,
-            lng: v.lng,
-            address: v.address,
-            broadcasting: v.broadcasting,
-            capacity: v.capacity
-        }))
+        // If lat/lng provided, find nearby venues
+        if (lat && lng) {
+            const latNum = parseFloat(lat);
+            const lngNum = parseFloat(lng);
+            const radius = parseInt(ctx.req.query("radius_m") ?? "2000");
+            
+            if (isNaN(latNum) || isNaN(lngNum)) {
+                return ctx.json({ error: "Invalid lat or lng" }, 400);
+            }
 
-        return ctx.json(list)
-    });
+            const list = this.venueService.findNearbyVenues(latNum, lngNum, radius).map(v => ({
+                id: v.id,
+                name: v.name,
+                lat: v.lat,
+                lng: v.lng,
+                address: v.address,
+                broadcasting: v.broadcasting,
+                capacity: v.capacity
+            }));
 
-    readonly getVenue = createFactory().createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Get venue" });
-    });
-
-    readonly reserveVenue = createFactory().createHandlers(async (ctx) => {
-        const venueId = ctx.req.param("id")
-        const body = await ctx.req.json()
-        const { name, seats, time } = body
-        if (typeof name !== "string" || !Number.isInteger(seats) || seats <= 0 || typeof time !== "string") {
-            return ctx.json({ error: "invalid payload" }, 400)
+            return ctx.json(list);
         }
 
-        try {
-            const result = await this.bookingLogicService.reserveSeats(venueId as string, name, seats, time)
-            if (!result.ok) return ctx.json({ error: "not_enough_seats", available: result.available }, 409)
-            return ctx.json(result.reservation, 201)
-        } catch (e) {
-            return ctx.json({ error: (e as Error).message }, 500)
+        // Otherwise return all venues
+        const venues = this.venueService.getAllVenues();
+        return ctx.json(venues);
+    });
+
+    // Get a specific venue by ID
+    readonly getVenue = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("id");
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
         }
+
+        const venue = this.venueService.getVenueById(venueId);
+        if (!venue) {
+            return ctx.json({ error: "Venue not found" }, 404);
+        }
+
+        return ctx.json(venue);
+    });
+
+    // Create a new venue
+    readonly createVenue = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const parsed = CreateVenueSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const body = ctx.req.valid("json");
+            const venue = this.venueService.createVenue(body);
+            return ctx.json(venue, 201);
+        }
+    );
+
+    // Update venue details
+    readonly updateVenue = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const parsed = UpdateVenueSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const venueId = ctx.req.param("id");
+            if (!venueId) {
+                return ctx.json({ error: "Venue ID required" }, 400);
+            }
+
+            const body = ctx.req.valid("json");
+            const venue = this.venueService.updateVenue(venueId, body);
+            
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+
+            return ctx.json(venue);
+        }
+    );
+
+    // Delete a venue
+    readonly deleteVenue = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("id");
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
+        }
+
+        const deleted = this.venueService.deleteVenue(venueId);
+        if (!deleted) {
+            return ctx.json({ error: "Venue not found" }, 404);
+        }
+
+        return ctx.json({ message: "Venue deleted successfully" });
+    });
+
+    // Update venue capacity
+    readonly updateCapacity = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("id");
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
+        }
+
+        const body = await ctx.req.json();
+        const { capacity } = body;
+
+        if (!Number.isInteger(capacity) || capacity <= 0) {
+            return ctx.json({ error: "Invalid capacity" }, 400);
+        }
+
+        const updated = this.venueService.updateVenueCapacity(venueId, capacity);
+        if (!updated) {
+            return ctx.json({ error: "Venue not found" }, 404);
+        }
+
+        return ctx.json({ message: "Capacity updated successfully" });
+    });
+
+    // Update what's being broadcasted
+    readonly updateBroadcasting = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("id");
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
+        }
+
+        const body = await ctx.req.json();
+        const { broadcasting } = body;
+
+        if (!Array.isArray(broadcasting) || !broadcasting.every(item => typeof item === "string")) {
+            return ctx.json({ error: "Invalid broadcasting array" }, 400);
+        }
+
+        const updated = this.venueService.updateBroadcasting(venueId, broadcasting);
+        if (!updated) {
+            return ctx.json({ error: "Venue not found" }, 404);
+        }
+
+        return ctx.json({ message: "Broadcasting updated successfully" });
+    });
+
+    // Get available seats for a venue at a specific time
+    readonly getAvailability = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("id");
+        const time = ctx.req.query("time");
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
+        }
+
+        if (!time) {
+            return ctx.json({ error: "Time query parameter required" }, 400);
+        }
+
+        const available = this.venueService.getAvailableSeats(venueId, time);
+        if (available === undefined) {
+            return ctx.json({ error: "Venue not found" }, 404);
+        }
+
+        return ctx.json({ venueId, time, availableSeats: available });
     });
 }
 
