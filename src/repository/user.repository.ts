@@ -10,7 +10,7 @@ class UserRepository {
         return (await db.select({
             id: userTable.id,
             email: userTable.email,
-            password_hash: userTable.password_hash
+            password_hash: userTable.password_hash,
         }).from(userTable).where(eq(userTable.email, email)))[0];
     }
 
@@ -27,10 +27,10 @@ class UserRepository {
             username: userData.username,
             lastName: userData.lastName,
             firstName: userData.firstName,
-            phone: userData.phone
+            phone: userData.phone,
         }).returning({ 
             id: userTable.id, 
-            email: userTable.email 
+            email: userTable.email, 
         });
         
         // Handle failed user creation
@@ -45,7 +45,7 @@ class UserRepository {
                 homeLat: userData.homeLat,
                 homeLng: userData.homeLng,
                 favSports: userData.favSports,
-                favTeamIds: userData.favTeamIds
+                favTeamIds: userData.favTeamIds,
             });
         }
     

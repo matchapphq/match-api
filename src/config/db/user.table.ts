@@ -18,7 +18,7 @@ export const userTable = pgTable("user", {
         .$onUpdate(() => new Date()),
 }, (table) => [
     uniqueIndex("users_id_idx").on(table.id),
-    uniqueIndex("user_email_idx").on(table.email)
+    uniqueIndex("user_email_idx").on(table.email),
 ]);
 
 export const user_preferences = pgTable("user_preferences", {
@@ -33,5 +33,5 @@ export const user_preferences = pgTable("user_preferences", {
 
 export const userRolesTables = pgTable("user_roles", {
     user_id: uuid("userID").references(() => userTable.id).notNull().unique(),
-    roles_id: uuid("rolesID").references(() => rolesTable.id).notNull().unique()
+    roles_id: uuid("rolesID").references(() => rolesTable.id).notNull().unique(),
 })

@@ -15,9 +15,9 @@ class AuthService {
 
     initRoutes() {
         this.router.post("/register", ...this.authController.register);
-        this.router.post("/login", );
-        this.router.post("/logout", );
-        this.router.post("/reset", );
+        this.router.post("/login" );
+        this.router.post("/logout" );
+        this.router.post("/reset" );
     }
 }
 
