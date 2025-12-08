@@ -5,6 +5,10 @@ import type { userRegisterData } from "../utils/userData";
 import UserRepository from "../repository/user.repository";
 import { RegisterRequestSchema, LoginRequestSchema } from "../utils/auth.valid";
 
+/**
+ * Controller for Authentication operations.
+ * Handles user registration, login, token refreshing, and profile management.
+ */
 class AuthController {
     private readonly factory = createFactory();
     private readonly userRepository = new UserRepository();
@@ -12,7 +16,7 @@ class AuthController {
     readonly register = this.factory.createHandlers(validator("json", (value, ctx) => {
         const parsed = RegisterRequestSchema.safeParse(value);
         if (!parsed.success) {
-            return ctx.json({error: "Invalid request body", details: parsed.error}, 401);
+            return ctx.json({ error: "Invalid request body", details: parsed.error }, 401);
         }
         return parsed.data;
     }), async (ctx) => {
@@ -28,13 +32,13 @@ class AuthController {
         if (!user) {
             return ctx.json({ msg: "User not created" }, 401)
         }
-        return ctx.json({msg: "User created", data: user});
+        return ctx.json({ msg: "User created", data: user });
     })
 
     readonly login = this.factory.createHandlers(validator('json', (value, ctx) => {
         const parsed = LoginRequestSchema.safeParse(value);
         if (!parsed.success) {
-            return ctx.json({error: "Invalid request body", details: parsed.error})
+            return ctx.json({ error: "Invalid request body", details: parsed.error })
         }
         return parsed.data;
     }), async (ctx) => {
@@ -50,11 +54,27 @@ class AuthController {
         if (!passwordMatch) {
             return ctx.json({ msg: "Invalid password" }, 401)
         }
-        return ctx.json({msg: "User logged in"});
+        return ctx.json({ msg: "User logged in" });
     });
 
     readonly logout = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({msg: "User logged out"});
+        return ctx.json({ msg: "User logged out" });
+    });
+
+    readonly refreshToken = this.factory.createHandlers(async (ctx) => {
+        return ctx.json({ msg: "Token refreshed" });
+    });
+
+    readonly getMe = this.factory.createHandlers(async (ctx) => {
+        return ctx.json({ msg: "Current user profile" });
+    });
+
+    readonly updateMe = this.factory.createHandlers(async (ctx) => {
+        return ctx.json({ msg: "Profile updated" });
+    });
+
+    readonly deleteMe = this.factory.createHandlers(async (ctx) => {
+        return ctx.json({ msg: "Account deleted" });
     });
 }
 
