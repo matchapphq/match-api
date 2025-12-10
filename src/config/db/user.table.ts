@@ -1,4 +1,4 @@
-import { pgTable, varchar, boolean, timestamp, uuid, index, text, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, boolean, timestamp, uuid, index, text, jsonb, doublePrecision } from 'drizzle-orm/pg-core';
 import { userRoleEnum } from './enums';
 
 // ============================================
@@ -58,6 +58,14 @@ export const userPreferencesTable = pgTable(
         language: varchar('language', { length: 10 }).default('en'),
         timezone: varchar('timezone', { length: 50 }).default('UTC'),
         theme: varchar('theme', { length: 20 }).default('system'),
+
+        // Location
+        home_lat: doublePrecision('home_lat'),
+        home_lng: doublePrecision('home_lng'),
+
+        // Interests
+        fav_sports: jsonb('fav_sports').$type<string[] | null>(),
+        fav_team_ids: jsonb('fav_team_ids').$type<string[] | null>(),
 
         // Notifications
         notification_settings: jsonb('notification_settings').default({

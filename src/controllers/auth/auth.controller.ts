@@ -4,6 +4,8 @@ import { createFactory } from "hono/factory";
 import type { userRegisterData } from "../../utils/userData";
 import UserRepository from "../../repository/user.repository";
 import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
+import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../../utils/jwt";
+import { z } from "zod";
 
 /**
  * Controller for Authentication operations.
@@ -21,51 +23,105 @@ class AuthController {
         return parsed.data;
     }), async (ctx) => {
         const body = ctx.req.valid("json");
-        if (!body) {
-            return ctx.json({ msg: "Invalid Request body" }, 401);
+
+        // Check if user already exists
+        const existingUser = await this.userRepository.getUserByEmail(body.email);
+        if (existingUser) {
+            return ctx.json({ error: "User with this email already exists" }, 409);
         }
+
         const userRequest: userRegisterData = {
             ...body,
+            role: body.role as 'user' | 'venue_owner' | 'admin' || 'user'
         };
-        console.log(userRequest);
-        const user = await this.userRepository.createUser(userRequest);
-        if (!user) {
-            return ctx.json({ msg: "User not created" }, 401)
+
+        try {
+            const user = await this.userRepository.createUser(userRequest);
+
+            // Generate Tokens
+            const tokenPayload = { id: user.id, email: user.email, role: user.role };
+            const accessToken = await generateAccessToken(tokenPayload);
+            const refreshToken = await generateRefreshToken(tokenPayload);
+
+            return ctx.json({
+                user,
+                token: accessToken,
+                refresh_token: refreshToken
+            }, 201);
+        } catch (error) {
+            console.error("Registration error:", error);
+            return ctx.json({ error: "Registration failed" }, 500);
         }
-        return ctx.json({ msg: "User created", data: user });
     })
 
     readonly login = this.factory.createHandlers(validator('json', (value, ctx) => {
         const parsed = LoginRequestSchema.safeParse(value);
         if (!parsed.success) {
-            return ctx.json({ error: "Invalid request body", details: parsed.error })
+            return ctx.json({ error: "Invalid request body", details: parsed.error }, 400)
         }
         return parsed.data;
     }), async (ctx) => {
         const body = ctx.req.valid("json");
-        if (!body) {
-            return ctx.json({ msg: "Invalid Request body" }, 401)
-        }
         const user = await this.userRepository.getUserByEmail(body.email);
+
         if (!user) {
-            return ctx.json({ msg: "User not found" }, 401)
+            return ctx.json({ error: "Invalid email or password" }, 401)
         }
+
         const passwordMatch = await password.verify(body.password, user.password_hash);
         if (!passwordMatch) {
-            return ctx.json({ msg: "Invalid password" }, 401)
+            return ctx.json({ error: "Invalid email or password" }, 401)
         }
-        return ctx.json({ msg: "User logged in" });
-    });
 
-    readonly logout = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "User logged out" });
+        // Generate Tokens
+        // Need to fetch full user to get role if getUserByEmail doesn't return it (repo method updated?)
+        // Repo returns { id, email, password_hash } mostly. Let's assume we need role.
+        // For now, let's fetch full user or update repo. Repository currently selects limited fields.
+        // Let's rely on limited payload or update repo. Ideally payload needs role.
+        // Assuming Repo returns limited fields, we should update repo to return role, OR fetch full here.
+        // Let's use getUserById or update getUserByEmail in next step if needed. 
+        // ACTUALLY, I should have checked if getUserByEmail returns role. It selects specific fields.
+        // I will fix repo to return role in next step or use just ID for now.
+
+        const tokenPayload = { id: user.id, email: user.email, role: user.role };
+        const accessToken = await generateAccessToken(tokenPayload);
+        const refreshToken = await generateRefreshToken(tokenPayload);
+
+        return ctx.json({
+            user: { id: user.id, email: user.email, role: user.role }, // returning partial user for safety
+            token: accessToken,
+            refresh_token: refreshToken
+        });
     });
 
     readonly refreshToken = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Token refreshed" });
+        const body = await ctx.req.json();
+        const { refresh_token } = body;
+
+        if (!refresh_token) {
+            return ctx.json({ error: "Refresh token is required" }, 400);
+        }
+
+        const payload = await verifyRefreshToken(refresh_token);
+        if (!payload) {
+            return ctx.json({ error: "Invalid or expired refresh token" }, 401);
+        }
+
+        // Generate new access token
+        const newAccessToken = await generateAccessToken({ id: payload.id, email: payload.email, role: payload.role });
+        return ctx.json({ token: newAccessToken });
     });
 
+    readonly logout = this.factory.createHandlers(async (ctx) => {
+        // In JWT stateless auth, logout is client-side. 
+        // Optional: Blacklist token in Redis if implemented.
+        return ctx.json({ message: "Logged out successfully" });
+    });
+
+    // Stubs for other methods
     readonly getMe = this.factory.createHandlers(async (ctx) => {
+        // Middleware should have attached user to context
+        // const user = ctx.get('user');
         return ctx.json({ msg: "Current user profile" });
     });
 

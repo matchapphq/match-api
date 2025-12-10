@@ -82,8 +82,8 @@ class PartnerController {
             const body = await c.req.json();
             const { match_id, total_seats, base_price } = body;
 
-            if (!match_id || !total_seats) {
-                return c.json({ error: "match_id and total_seats are required" }, 400);
+            if (!venueId || !match_id || !total_seats) {
+                return c.json({ error: "venueId, match_id and total_seats are required" }, 400);
             }
 
             const [venueMatch] = await db.insert(venueMatchesTable).values({
@@ -113,6 +113,9 @@ class PartnerController {
         const matchId = c.req.param("matchId");
 
         try {
+            if (!venueId || !matchId) {
+                return c.json({ error: "venueId and matchId are required" }, 400);
+            }
             await db.delete(venueMatchesTable)
                 .where(and(
                     eq(venueMatchesTable.venue_id, venueId),
