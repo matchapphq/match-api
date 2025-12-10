@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import DiscoveryController from "../controllers/discovery.controller";
+import DiscoveryController from "../../controllers/discovery/discovery.controller";
 
 /**
  * Service for defining Discovery routes.

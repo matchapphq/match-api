@@ -1,11 +1,11 @@
 import { pgTable, varchar, boolean, timestamp, uuid, index, foreignKey, integer, text } from 'drizzle-orm/pg-core';
-import { venues } from './venues.table';
+import { venuesTable } from './venues.table';
 
 // ============================================
 // 7. VENUE PHOTOS TABLE
 // ============================================
 
-export const venuePhotos = pgTable(
+export const venuePhotosTable = pgTable(
     'venue_photos',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -26,11 +26,11 @@ export const venuePhotos = pgTable(
         index('idx_venue_photos_is_primary').on(table.is_primary),
         foreignKey({
             columns: [table.venue_id],
-            foreignColumns: [venues.id],
+            foreignColumns: [venuesTable.id],
             name: 'fk_venue_photos_venue_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type VenuePhoto = typeof venuePhotos.$inferSelect;
-export type NewVenuePhoto = typeof venuePhotos.$inferInsert;
+export type VenuePhoto = typeof venuePhotosTable.$inferSelect;
+export type NewVenuePhoto = typeof venuePhotosTable.$inferInsert;

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import VenueController from "../controllers/venues.controller";
+import VenueController from "../../controllers/venues/venues.controller";
 
 /**
  * Service for defining Venue routes.

@@ -2,15 +2,16 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
 
-import AuthService from "./services/auth.service";
-import OnboardingService from "./services/onboarding.service";
-import DiscoveryService from "./services/discovery.service";
-import VenueService from "./services/venues.service";
-import MatchesService from "./services/matches.service";
-import SportsService from "./services/sports.service";
-import ReservationsService from "./services/reservations.service";
-import SeatsService from "./services/seats.service";
-import ProfileService from "./services/profile.service";
+import AuthService from "./services/auth/auth.service";
+import OnboardingService from "./services/onboarding/onboarding.service";
+import DiscoveryService from "./services/discovery/discovery.service";
+import VenueService from "./services/venues/venues.service";
+import MatchesService from "./services/matches/matches.service";
+import SportsService from "./services/sports/sports.service";
+import ReservationsService from "./services/reservations/reservations.service";
+import SeatsService from "./services/seats/seats.service";
+import ProfileService from "./services/profile/profile.service";
+import PartnerService from "./services/partner/partner.service";
 
 const app = new Hono();
 
@@ -23,6 +24,7 @@ const sportsRouter = new SportsService();
 const reservationsRouter = new ReservationsService();
 const seatsRouter = new SeatsService();
 const profileRouter = new ProfileService();
+const partnerRouter = new PartnerService();
 
 app.use(logger());
 app.use(prettyJSON());
@@ -45,5 +47,6 @@ app.route("/reservations", reservationsRouter.getRouter);
 // Hono allows `app.route('/venues/:venueId/matches/:matchId/seats', seatsRouter.getRouter)`
 app.route("/venues/:venueId/matches/:matchId/seats", seatsRouter.getRouter);
 app.route("/profile", profileRouter.getRouter);
+app.route("/partners", partnerRouter.getRouter);
 
 export default app;

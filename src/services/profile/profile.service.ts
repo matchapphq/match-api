@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import ProfileController from "../controllers/profile.controller";
+import ProfileController from "../../controllers/profile/profile.controller";
 
 /**
  * Service for defining Profile routes.

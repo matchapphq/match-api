@@ -1,6 +1,6 @@
 import { getDistance } from "geolib";
-import type { Venue, CreateVenueInput, UpdateVenueInput, GameBroadcast, AddBroadcastInput } from "../types/venue.types";
-import { VenueRepository } from "../repository/venue.repository";
+import type { Venue, CreateVenueInput, UpdateVenueInput, GameBroadcast, AddBroadcastInput } from "../../types/venue.types";
+import { VenueRepository } from "../../repository/venue.repository";
 
 export class VenueManagementService {
     private readonly venueRepository: VenueRepository;

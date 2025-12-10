@@ -1,8 +1,8 @@
 import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey, integer, text, date, jsonb } from 'drizzle-orm/pg-core';
-import { users } from './user.table';
+import { usersTable } from './user.table';
 import { paymentMethodTypeEnum, invoiceStatusEnum, transactionTypeEnum, transactionStatusEnum } from './enums';
-import { reservations } from './reservations.table';
-import { subscriptions } from './subscriptions.table';
+import { reservationsTable } from './reservations.table';
+import { subscriptionsTable } from './subscriptions.table';
 
 // ============================================
 // TYPES
@@ -24,7 +24,7 @@ export type InvoiceItems = InvoiceItem[];
 // 21. PAYMENT METHODS TABLE
 // ============================================
 
-export const paymentMethods = pgTable(
+export const paymentMethodsTable = pgTable(
     'payment_methods',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -56,20 +56,20 @@ export const paymentMethods = pgTable(
         index('idx_payment_methods_is_default').on(table.is_default),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_payment_methods_user_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type PaymentMethod = typeof paymentMethods.$inferSelect;
-export type NewPaymentMethod = typeof paymentMethods.$inferInsert;
+export type PaymentMethod = typeof paymentMethodsTable.$inferSelect;
+export type NewPaymentMethod = typeof paymentMethodsTable.$inferInsert;
 
 // ============================================
 // 22. INVOICES TABLE
 // ============================================
 
-export const invoices = pgTable(
+export const invoicesTable = pgTable(
     'invoices',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -104,20 +104,20 @@ export const invoices = pgTable(
         index('idx_invoices_issue_date').on(table.issue_date),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_invoices_user_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Invoice = typeof invoices.$inferSelect;
-export type NewInvoice = typeof invoices.$inferInsert;
+export type Invoice = typeof invoicesTable.$inferSelect;
+export type NewInvoice = typeof invoicesTable.$inferInsert;
 
 // ============================================
 // 23. TRANSACTIONS TABLE
 // ============================================
 
-export const transactions = pgTable(
+export const transactionsTable = pgTable(
     'transactions',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -156,11 +156,12 @@ export const transactions = pgTable(
         index('idx_transactions_created_at').on(table.created_at),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_transactions_user_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Transaction = typeof transactions.$inferSelect;
-export type NewTransaction = typeof transactions.$inferInsert;
+export type Transaction = typeof transactionsTable.$inferSelect;
+export type NewTransaction = typeof transactionsTable.$inferInsert;
+

@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import MatchesController from "../controllers/matches.controller";
+import MatchesController from "../../controllers/matches/matches.controller";
 
 /**
  * Service for defining Matches routes.

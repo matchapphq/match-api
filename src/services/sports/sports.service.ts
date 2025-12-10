@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import SportsController from "../controllers/sports.controller";
+import SportsController from "../../controllers/sports/sports.controller";
 
 /**
  * Service for defining Sports routes.

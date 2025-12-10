@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import ReservationsController from "../controllers/reservations.controller";
+import ReservationsController from "../../controllers/reservations/reservations.controller";
 
 /**
  * Service for defining Reservations routes.

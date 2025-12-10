@@ -1,12 +1,8 @@
 import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey, integer } from 'drizzle-orm/pg-core';
-import { users } from './user.table';
+import { usersTable } from './user.table';
 import { subscriptionPlanEnum, subscriptionStatusEnum } from './enums';
 
-// ============================================
-// 4. SUBSCRIPTIONS TABLE
-// ============================================
-
-export const subscriptions = pgTable(
+export const subscriptionsTable = pgTable(
     'subscriptions',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -31,9 +27,14 @@ export const subscriptions = pgTable(
         price: numeric('price', { precision: 10, scale: 2 }).notNull(),
         currency: varchar('currency', { length: 3 }).default('EUR'),
 
-        // Metadata
-        stripe_subscription_id: varchar('stripe_subscription_id', { length: 255 }).unique(),
+        // Stripe Integration (only store references, never card data)
+        stripe_subscription_id: varchar('stripe_subscription_id', { length: 255 }).unique().notNull(),
+        stripe_payment_method_id: varchar('stripe_payment_method_id', { length: 255 }).notNull(),
+
+        // Auto-renewal
         auto_renew: boolean('auto_renew').default(true),
+
+        // Metadata
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
         updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
         canceled_at: timestamp('canceled_at', { withTimezone: true }),
@@ -44,11 +45,11 @@ export const subscriptions = pgTable(
         index('idx_subscriptions_plan').on(table.plan),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_subscriptions_user_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Subscription = typeof subscriptions.$inferSelect;
-export type NewSubscription = typeof subscriptions.$inferInsert;
+export type Subscription = typeof subscriptionsTable.$inferSelect;
+export type NewSubscription = typeof subscriptionsTable.$inferInsert;

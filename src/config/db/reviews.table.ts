@@ -1,12 +1,12 @@
 import { pgTable, varchar, boolean, timestamp, uuid, index, foreignKey, integer, text, unique } from 'drizzle-orm/pg-core';
-import { users } from './user.table';
-import { venues } from './venues.table';
+import { usersTable } from './user.table';
+import { venuesTable } from './venues.table';
 
 // ============================================
 // 16. REVIEWS TABLE
 // ============================================
 
-export const reviews = pgTable(
+export const reviewsTable = pgTable(
     'reviews',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -41,25 +41,25 @@ export const reviews = pgTable(
         unique('unique_user_venue_review').on(table.user_id, table.venue_id),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_reviews_user_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.venue_id],
-            foreignColumns: [venues.id],
+            foreignColumns: [venuesTable.id],
             name: 'fk_reviews_venue_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Review = typeof reviews.$inferSelect;
-export type NewReview = typeof reviews.$inferInsert;
+export type Review = typeof reviewsTable.$inferSelect;
+export type NewReview = typeof reviewsTable.$inferInsert;
 
 // ============================================
 // 17. REVIEW HELPFUL VOTES
 // ============================================
 
-export const reviewHelpful = pgTable(
+export const reviewHelpfulTable = pgTable(
     'review_helpful',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -76,16 +76,16 @@ export const reviewHelpful = pgTable(
         unique('unique_review_user_helpful').on(table.review_id, table.user_id),
         foreignKey({
             columns: [table.review_id],
-            foreignColumns: [reviews.id],
+            foreignColumns: [reviewsTable.id],
             name: 'fk_review_helpful_review_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_review_helpful_user_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type ReviewHelpful = typeof reviewHelpful.$inferSelect;
-export type NewReviewHelpful = typeof reviewHelpful.$inferInsert;
+export type ReviewHelpful = typeof reviewHelpfulTable.$inferSelect;
+export type NewReviewHelpful = typeof reviewHelpfulTable.$inferInsert;

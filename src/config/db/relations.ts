@@ -1,280 +1,280 @@
 import { relations } from 'drizzle-orm';
-import { users, userPreferences } from './user.table';
-import { userAddresses } from './user-addresses.table';
-import { userFavoriteVenues } from './user-favorites.table';
-import { subscriptions } from './subscriptions.table';
-import { venues } from './venues.table';
-import { venuePhotos } from './venue-photos.table';
-import { sports, leagues, teams } from './sports.table';
-import { matches, venueMatches } from './matches.table';
-import { seats, seatHolds } from './seats.table';
-import { reservations } from './reservations.table';
-import { reviews, reviewHelpful } from './reviews.table';
-import { notifications, conversations, messages } from './notifications.table';
-import { paymentMethods, invoices, transactions } from './billing.table';
-import { analytics, auditLogs, bannedUsers } from './admin.table';
+import { usersTable, userPreferencesTable } from './user.table';
+import { userAddressesTable } from './user-addresses.table';
+import { userFavoriteVenuesTable } from './user-favorites.table';
+import { subscriptionsTable } from './subscriptions.table';
+import { venuesTable } from './venues.table';
+import { venuePhotosTable } from './venue-photos.table';
+import { sportsTable, leaguesTable, teamsTable } from './sports.table';
+import { matchesTable, venueMatchesTable } from './matches.table';
+import { seatsTable, seatHoldsTable } from './seats.table';
+import { reservationsTable } from './reservations.table';
+import { reviewsTable, reviewHelpfulTable } from './reviews.table';
+import { notificationsTable, conversationsTable, messagesTable } from './notifications.table';
+import { paymentMethodsTable, invoicesTable, transactionsTable } from './billing.table';
+import { analyticsTable, auditLogsTable, bannedUsersTable } from './admin.table';
 
-export const usersRelations = relations(users, ({ one, many }) => ({
-    preferences: one(userPreferences, {
-        fields: [users.id],
-        references: [userPreferences.user_id],
+export const usersRelations = relations(usersTable, ({ one, many }) => ({
+    preferences: one(userPreferencesTable, {
+        fields: [usersTable.id],
+        references: [userPreferencesTable.user_id],
     }),
-    addresses: many(userAddresses),
-    favorites: many(userFavoriteVenues),
-    subscriptions: many(subscriptions),
-    venues: many(venues), // Owned venues
-    reservations: many(reservations),
-    notifications: many(notifications),
-    paymentMethods: many(paymentMethods),
+    addresses: many(userAddressesTable),
+    favorites: many(userFavoriteVenuesTable),
+    subscriptions: many(subscriptionsTable),
+    venues: many(venuesTable), // Owned venues
+    reservations: many(reservationsTable),
+    notifications: many(notificationsTable),
+    paymentMethods: many(paymentMethodsTable),
 }));
 
-export const userPreferencesRelations = relations(userPreferences, ({ one }) => ({
-    user: one(users, {
-        fields: [userPreferences.user_id],
-        references: [users.id],
-    }),
-}));
-
-export const userAddressesRelations = relations(userAddresses, ({ one }) => ({
-    user: one(users, {
-        fields: [userAddresses.user_id],
-        references: [users.id],
+export const userPreferencesRelations = relations(userPreferencesTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [userPreferencesTable.user_id],
+        references: [usersTable.id],
     }),
 }));
 
-export const userFavoriteVenuesRelations = relations(userFavoriteVenues, ({ one }) => ({
-    user: one(users, {
-        fields: [userFavoriteVenues.user_id],
-        references: [users.id],
-    }),
-    venue: one(venues, {
-        fields: [userFavoriteVenues.venue_id],
-        references: [venues.id],
+export const userAddressesRelations = relations(userAddressesTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [userAddressesTable.user_id],
+        references: [usersTable.id],
     }),
 }));
 
-export const subscriptionsRelations = relations(subscriptions, ({ one, many }) => ({
-    user: one(users, {
-        fields: [subscriptions.user_id],
-        references: [users.id],
+export const userFavoriteVenuesRelations = relations(userFavoriteVenuesTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [userFavoriteVenuesTable.user_id],
+        references: [usersTable.id],
     }),
-    venues: many(venues),
-}));
-
-export const venuesRelations = relations(venues, ({ one, many }) => ({
-    owner: one(users, {
-        fields: [venues.owner_id],
-        references: [users.id],
-    }),
-    subscription: one(subscriptions, {
-        fields: [venues.subscription_id],
-        references: [subscriptions.id],
-    }),
-    photos: many(venuePhotos),
-    venueMatches: many(venueMatches),
-    reviews: many(reviews),
-}));
-
-export const venuePhotosRelations = relations(venuePhotos, ({ one }) => ({
-    venue: one(venues, {
-        fields: [venuePhotos.venue_id],
-        references: [venues.id],
+    venue: one(venuesTable, {
+        fields: [userFavoriteVenuesTable.venue_id],
+        references: [venuesTable.id],
     }),
 }));
 
-export const sportsRelations = relations(sports, ({ many }) => ({
-    leagues: many(leagues),
+export const subscriptionsRelations = relations(subscriptionsTable, ({ one, many }) => ({
+    user: one(usersTable, {
+        fields: [subscriptionsTable.user_id],
+        references: [usersTable.id],
+    }),
+    venues: many(venuesTable),
 }));
 
-export const leaguesRelations = relations(leagues, ({ one, many }) => ({
-    sport: one(sports, {
-        fields: [leagues.sport_id],
-        references: [sports.id],
+export const venuesRelations = relations(venuesTable, ({ one, many }) => ({
+    owner: one(usersTable, {
+        fields: [venuesTable.owner_id],
+        references: [usersTable.id],
     }),
-    teams: many(teams),
+    subscription: one(subscriptionsTable, {
+        fields: [venuesTable.subscription_id],
+        references: [subscriptionsTable.id],
+    }),
+    photos: many(venuePhotosTable),
+    venueMatches: many(venueMatchesTable),
+    reviews: many(reviewsTable),
 }));
 
-export const teamsRelations = relations(teams, ({ one }) => ({
-    league: one(leagues, {
-        fields: [teams.league_id],
-        references: [leagues.id],
-    }),
-}));
-
-export const matchesRelations = relations(matches, ({ one, many }) => ({
-    league: one(leagues, {
-        fields: [matches.league_id],
-        references: [leagues.id],
-    }),
-    homeTeam: one(teams, {
-        fields: [matches.home_team_id],
-        references: [teams.id],
-    }),
-    awayTeam: one(teams, {
-        fields: [matches.away_team_id],
-        references: [teams.id],
-    }),
-    venueMatches: many(venueMatches),
-}));
-
-export const venueMatchesRelations = relations(venueMatches, ({ one, many }) => ({
-    venue: one(venues, {
-        fields: [venueMatches.venue_id],
-        references: [venues.id],
-    }),
-    match: one(matches, {
-        fields: [venueMatches.match_id],
-        references: [matches.id],
-    }),
-    reservations: many(reservations),
-    seatHolds: many(seatHolds),
-}));
-
-export const seatHoldsRelations = relations(seatHolds, ({ one }) => ({
-    user: one(users, {
-        fields: [seatHolds.user_id],
-        references: [users.id],
-    }),
-    venueMatch: one(venueMatches, {
-        fields: [seatHolds.venue_match_id],
-        references: [venueMatches.id],
+export const venuePhotosRelations = relations(venuePhotosTable, ({ one }) => ({
+    venue: one(venuesTable, {
+        fields: [venuePhotosTable.venue_id],
+        references: [venuesTable.id],
     }),
 }));
 
-export const seatsRelations = relations(seats, ({ one }) => ({
-    venue: one(venues, {
-        fields: [seats.venue_id],
-        references: [venues.id],
+export const sportsRelations = relations(sportsTable, ({ many }) => ({
+    leagues: many(leaguesTable),
+}));
+
+export const leaguesRelations = relations(leaguesTable, ({ one, many }) => ({
+    sport: one(sportsTable, {
+        fields: [leaguesTable.sport_id],
+        references: [sportsTable.id],
     }),
-    venueMatch: one(venueMatches, {
-        fields: [seats.venue_match_id],
-        references: [venueMatches.id],
+    teams: many(teamsTable),
+}));
+
+export const teamsRelations = relations(teamsTable, ({ one }) => ({
+    league: one(leaguesTable, {
+        fields: [teamsTable.league_id],
+        references: [leaguesTable.id],
     }),
 }));
 
-export const reservationsRelations = relations(reservations, ({ one, many }) => ({
-    user: one(users, {
-        fields: [reservations.user_id],
-        references: [users.id],
+export const matchesRelations = relations(matchesTable, ({ one, many }) => ({
+    league: one(leaguesTable, {
+        fields: [matchesTable.league_id],
+        references: [leaguesTable.id],
     }),
-    venueMatch: one(venueMatches, {
-        fields: [reservations.venue_match_id],
-        references: [venueMatches.id],
+    homeTeam: one(teamsTable, {
+        fields: [matchesTable.home_team_id],
+        references: [teamsTable.id],
     }),
-    transactions: many(transactions),
+    awayTeam: one(teamsTable, {
+        fields: [matchesTable.away_team_id],
+        references: [teamsTable.id],
+    }),
+    venueMatches: many(venueMatchesTable),
 }));
 
-export const reviewsRelations = relations(reviews, ({ one, many }) => ({
-    user: one(users, {
-        fields: [reviews.user_id],
-        references: [users.id],
+export const venueMatchesRelations = relations(venueMatchesTable, ({ one, many }) => ({
+    venue: one(venuesTable, {
+        fields: [venueMatchesTable.venue_id],
+        references: [venuesTable.id],
     }),
-    venue: one(venues, {
-        fields: [reviews.venue_id],
-        references: [venues.id],
+    match: one(matchesTable, {
+        fields: [venueMatchesTable.match_id],
+        references: [matchesTable.id],
     }),
-    helpfulVotes: many(reviewHelpful),
+    reservations: many(reservationsTable),
+    seatHolds: many(seatHoldsTable),
 }));
 
-export const reviewHelpfulRelations = relations(reviewHelpful, ({ one }) => ({
-    review: one(reviews, {
-        fields: [reviewHelpful.review_id],
-        references: [reviews.id],
+export const seatHoldsRelations = relations(seatHoldsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [seatHoldsTable.user_id],
+        references: [usersTable.id],
     }),
-    user: one(users, {
-        fields: [reviewHelpful.user_id],
-        references: [users.id],
-    }),
-}));
-
-export const notificationsRelations = relations(notifications, ({ one }) => ({
-    user: one(users, {
-        fields: [notifications.user_id],
-        references: [users.id],
-    }),
-}));
-
-export const conversationsRelations = relations(conversations, ({ one, many }) => ({
-    participant1: one(users, {
-        fields: [conversations.participant_1_id],
-        references: [users.id],
-    }),
-    participant2: one(users, {
-        fields: [conversations.participant_2_id],
-        references: [users.id],
-    }),
-    messages: many(messages),
-}));
-
-export const messagesRelations = relations(messages, ({ one }) => ({
-    conversation: one(conversations, {
-        fields: [messages.conversation_id],
-        references: [conversations.id],
-    }),
-    sender: one(users, {
-        fields: [messages.sender_id],
-        references: [users.id],
+    venueMatch: one(venueMatchesTable, {
+        fields: [seatHoldsTable.venue_match_id],
+        references: [venueMatchesTable.id],
     }),
 }));
 
-export const paymentMethodsRelations = relations(paymentMethods, ({ one }) => ({
-    user: one(users, {
-        fields: [paymentMethods.user_id],
-        references: [users.id],
+export const seatsRelations = relations(seatsTable, ({ one }) => ({
+    venue: one(venuesTable, {
+        fields: [seatsTable.venue_id],
+        references: [venuesTable.id],
+    }),
+    venueMatch: one(venueMatchesTable, {
+        fields: [seatsTable.venue_match_id],
+        references: [venueMatchesTable.id],
     }),
 }));
 
-export const invoicesRelations = relations(invoices, ({ one }) => ({
-    user: one(users, {
-        fields: [invoices.user_id],
-        references: [users.id],
+export const reservationsRelations = relations(reservationsTable, ({ one, many }) => ({
+    user: one(usersTable, {
+        fields: [reservationsTable.user_id],
+        references: [usersTable.id],
+    }),
+    venueMatch: one(venueMatchesTable, {
+        fields: [reservationsTable.venue_match_id],
+        references: [venueMatchesTable.id],
+    }),
+    transactions: many(transactionsTable),
+}));
+
+export const reviewsRelations = relations(reviewsTable, ({ one, many }) => ({
+    user: one(usersTable, {
+        fields: [reviewsTable.user_id],
+        references: [usersTable.id],
+    }),
+    venue: one(venuesTable, {
+        fields: [reviewsTable.venue_id],
+        references: [venuesTable.id],
+    }),
+    helpfulVotes: many(reviewHelpfulTable),
+}));
+
+export const reviewHelpfulRelations = relations(reviewHelpfulTable, ({ one }) => ({
+    review: one(reviewsTable, {
+        fields: [reviewHelpfulTable.review_id],
+        references: [reviewsTable.id],
+    }),
+    user: one(usersTable, {
+        fields: [reviewHelpfulTable.user_id],
+        references: [usersTable.id],
     }),
 }));
 
-export const transactionsRelations = relations(transactions, ({ one }) => ({
-    user: one(users, {
-        fields: [transactions.user_id],
-        references: [users.id],
-    }),
-    reservation: one(reservations, {
-        fields: [transactions.reservation_id],
-        references: [reservations.id],
-    }),
-    subscription: one(subscriptions, {
-        fields: [transactions.subscription_id],
-        references: [subscriptions.id],
-    }),
-    invoice: one(invoices, {
-        fields: [transactions.invoice_id],
-        references: [invoices.id],
-    }),
-    paymentMethod: one(paymentMethods, {
-        fields: [transactions.payment_method_id],
-        references: [paymentMethods.id],
+export const notificationsRelations = relations(notificationsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [notificationsTable.user_id],
+        references: [usersTable.id],
     }),
 }));
 
-export const analyticsRelations = relations(analytics, ({ one }) => ({
-    venue: one(venues, {
-        fields: [analytics.venue_id],
-        references: [venues.id],
+export const conversationsRelations = relations(conversationsTable, ({ one, many }) => ({
+    participant1: one(usersTable, {
+        fields: [conversationsTable.participant_1_id],
+        references: [usersTable.id],
     }),
-    user: one(users, {
-        fields: [analytics.user_id],
-        references: [users.id],
+    participant2: one(usersTable, {
+        fields: [conversationsTable.participant_2_id],
+        references: [usersTable.id],
+    }),
+    messages: many(messagesTable),
+}));
+
+export const messagesRelations = relations(messagesTable, ({ one }) => ({
+    conversation: one(conversationsTable, {
+        fields: [messagesTable.conversation_id],
+        references: [conversationsTable.id],
+    }),
+    sender: one(usersTable, {
+        fields: [messagesTable.sender_id],
+        references: [usersTable.id],
     }),
 }));
 
-export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
-    user: one(users, {
-        fields: [auditLogs.user_id],
-        references: [users.id],
+export const paymentMethodsRelations = relations(paymentMethodsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [paymentMethodsTable.user_id],
+        references: [usersTable.id],
     }),
 }));
 
-export const bannedUsersRelations = relations(bannedUsers, ({ one }) => ({
-    user: one(users, {
-        fields: [bannedUsers.user_id],
-        references: [users.id],
+export const invoicesRelations = relations(invoicesTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [invoicesTable.user_id],
+        references: [usersTable.id],
+    }),
+}));
+
+export const transactionsRelations = relations(transactionsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [transactionsTable.user_id],
+        references: [usersTable.id],
+    }),
+    reservation: one(reservationsTable, {
+        fields: [transactionsTable.reservation_id],
+        references: [reservationsTable.id],
+    }),
+    subscription: one(subscriptionsTable, {
+        fields: [transactionsTable.subscription_id],
+        references: [subscriptionsTable.id],
+    }),
+    invoice: one(invoicesTable, {
+        fields: [transactionsTable.invoice_id],
+        references: [invoicesTable.id],
+    }),
+    paymentMethod: one(paymentMethodsTable, {
+        fields: [transactionsTable.payment_method_id],
+        references: [paymentMethodsTable.id],
+    }),
+}));
+
+export const analyticsRelations = relations(analyticsTable, ({ one }) => ({
+    venue: one(venuesTable, {
+        fields: [analyticsTable.venue_id],
+        references: [venuesTable.id],
+    }),
+    user: one(usersTable, {
+        fields: [analyticsTable.user_id],
+        references: [usersTable.id],
+    }),
+}));
+
+export const auditLogsRelations = relations(auditLogsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [auditLogsTable.user_id],
+        references: [usersTable.id],
+    }),
+}));
+
+export const bannedUsersRelations = relations(bannedUsersTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [bannedUsersTable.user_id],
+        references: [usersTable.id],
     }),
 }));

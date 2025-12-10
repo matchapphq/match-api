@@ -4,7 +4,7 @@ import { pgTable, varchar, boolean, timestamp, uuid, index, foreignKey, integer,
 // 8. SPORTS TABLE
 // ============================================
 
-export const sports = pgTable(
+export const sportsTable = pgTable(
     'sports',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -26,14 +26,14 @@ export const sports = pgTable(
     ]
 );
 
-export type Sport = typeof sports.$inferSelect;
-export type NewSport = typeof sports.$inferInsert;
+export type Sport = typeof sportsTable.$inferSelect;
+export type NewSport = typeof sportsTable.$inferInsert;
 
 // ============================================
 // 9. LEAGUES TABLE
 // ============================================
 
-export const leagues = pgTable(
+export const leaguesTable = pgTable(
     'leagues',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -57,20 +57,20 @@ export const leagues = pgTable(
         index('idx_leagues_is_active').on(table.is_active),
         foreignKey({
             columns: [table.sport_id],
-            foreignColumns: [sports.id],
+            foreignColumns: [sportsTable.id],
             name: 'fk_leagues_sport_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type League = typeof leagues.$inferSelect;
-export type NewLeague = typeof leagues.$inferInsert;
+export type League = typeof leaguesTable.$inferSelect;
+export type NewLeague = typeof leaguesTable.$inferInsert;
 
 // ============================================
 // 10. TEAMS TABLE
 // ============================================
 
-export const teams = pgTable(
+export const teamsTable = pgTable(
     'teams',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -95,11 +95,11 @@ export const teams = pgTable(
         index('idx_teams_is_active').on(table.is_active),
         foreignKey({
             columns: [table.league_id],
-            foreignColumns: [leagues.id],
+            foreignColumns: [leaguesTable.id],
             name: 'fk_teams_league_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Team = typeof teams.$inferSelect;
-export type NewTeam = typeof teams.$inferInsert;
+export type Team = typeof teamsTable.$inferSelect;
+export type NewTeam = typeof teamsTable.$inferInsert;

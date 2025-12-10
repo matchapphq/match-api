@@ -1,5 +1,5 @@
 import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey, integer, text, jsonb, date } from 'drizzle-orm/pg-core';
-import { users } from './user.table';
+import { usersTable } from './user.table';
 import { couponTypeEnum, auditActionEnum } from './enums';
 
 // ============================================
@@ -14,7 +14,7 @@ export type AuditLogValues = Record<string, unknown>;
 // 24. ANALYTICS TABLE
 // ============================================
 
-export const analytics = pgTable(
+export const analyticsTable = pgTable(
     'analytics',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -40,14 +40,14 @@ export const analytics = pgTable(
     ]
 );
 
-export type Analytics = typeof analytics.$inferSelect;
-export type NewAnalytics = typeof analytics.$inferInsert;
+export type Analytics = typeof analyticsTable.$inferSelect;
+export type NewAnalytics = typeof analyticsTable.$inferInsert;
 
 // ============================================
 // 25. COUPONS TABLE
 // ============================================
 
-export const coupons = pgTable(
+export const couponsTable = pgTable(
     'coupons',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -83,14 +83,14 @@ export const coupons = pgTable(
     ]
 );
 
-export type Coupon = typeof coupons.$inferSelect;
-export type NewCoupon = typeof coupons.$inferInsert;
+export type Coupon = typeof couponsTable.$inferSelect;
+export type NewCoupon = typeof couponsTable.$inferInsert;
 
 // ============================================
 // 26. AUDIT LOGS TABLE
 // ============================================
 
-export const auditLogs = pgTable(
+export const auditLogsTable = pgTable(
     'audit_logs',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -118,14 +118,14 @@ export const auditLogs = pgTable(
     ]
 );
 
-export type AuditLog = typeof auditLogs.$inferSelect;
-export type NewAuditLog = typeof auditLogs.$inferInsert;
+export type AuditLog = typeof auditLogsTable.$inferSelect;
+export type NewAuditLog = typeof auditLogsTable.$inferInsert;
 
 // ============================================
 // 27. BANNED USERS TABLE
 // ============================================
 
-export const bannedUsers = pgTable(
+export const bannedUsersTable = pgTable(
     'banned_users',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -146,11 +146,12 @@ export const bannedUsers = pgTable(
         index('idx_banned_users_banned_at').on(table.banned_at),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_banned_users_user_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type BannedUser = typeof bannedUsers.$inferSelect;
-export type NewBannedUser = typeof bannedUsers.$inferInsert;
+export type BannedUser = typeof bannedUsersTable.$inferSelect;
+export type NewBannedUser = typeof bannedUsersTable.$inferInsert;
+

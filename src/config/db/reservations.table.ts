@@ -1,13 +1,13 @@
 import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey, integer, text } from 'drizzle-orm/pg-core';
-import { users } from './user.table';
-import { venueMatches } from './matches.table';
+import { usersTable } from './user.table';
+import { venueMatchesTable } from './matches.table';
 import { reservationStatusEnum } from './enums';
 
 // ============================================
 // 15. RESERVATIONS TABLE
 // ============================================
 
-export const reservations = pgTable(
+export const reservationsTable = pgTable(
     'reservations',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -52,16 +52,16 @@ export const reservations = pgTable(
         index('idx_reservations_created_at').on(table.created_at),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_reservations_user_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.venue_match_id],
-            foreignColumns: [venueMatches.id],
+            foreignColumns: [venueMatchesTable.id],
             name: 'fk_reservations_venue_match_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Reservation = typeof reservations.$inferSelect;
-export type NewReservation = typeof reservations.$inferInsert;
+export type Reservation = typeof reservationsTable.$inferSelect;
+export type NewReservation = typeof reservationsTable.$inferInsert;

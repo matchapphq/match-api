@@ -1,13 +1,13 @@
 import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey, integer, text, unique } from 'drizzle-orm/pg-core';
-import { leagues, teams } from './sports.table';
-import { venues } from './venues.table';
+import { leaguesTable, teamsTable } from './sports.table';
+import { venuesTable } from './venues.table';
 import { matchStatusEnum, venuePricingTypeEnum } from './enums';
 
 // ============================================
 // 11. MATCHES TABLE
 // ============================================
 
-export const matches = pgTable(
+export const matchesTable = pgTable(
     'matches',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -45,30 +45,30 @@ export const matches = pgTable(
         index('idx_matches_away_team_id').on(table.away_team_id),
         foreignKey({
             columns: [table.league_id],
-            foreignColumns: [leagues.id],
+            foreignColumns: [leaguesTable.id],
             name: 'fk_matches_league_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.home_team_id],
-            foreignColumns: [teams.id],
+            foreignColumns: [teamsTable.id],
             name: 'fk_matches_home_team_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.away_team_id],
-            foreignColumns: [teams.id],
+            foreignColumns: [teamsTable.id],
             name: 'fk_matches_away_team_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Match = typeof matches.$inferSelect;
-export type NewMatch = typeof matches.$inferInsert;
+export type Match = typeof matchesTable.$inferSelect;
+export type NewMatch = typeof matchesTable.$inferInsert;
 
 // ============================================
 // 12. VENUE MATCHES TABLE
 // ============================================
 
-export const venueMatches = pgTable(
+export const venueMatchesTable = pgTable(
     'venue_matches',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -109,16 +109,16 @@ export const venueMatches = pgTable(
         unique('unique_venue_match').on(table.venue_id, table.match_id),
         foreignKey({
             columns: [table.venue_id],
-            foreignColumns: [venues.id],
+            foreignColumns: [venuesTable.id],
             name: 'fk_venue_matches_venue_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.match_id],
-            foreignColumns: [matches.id],
+            foreignColumns: [matchesTable.id],
             name: 'fk_venue_matches_match_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type VenueMatch = typeof venueMatches.$inferSelect;
-export type NewVenueMatch = typeof venueMatches.$inferInsert;
+export type VenueMatch = typeof venueMatchesTable.$inferSelect;
+export type NewVenueMatch = typeof venueMatchesTable.$inferInsert;

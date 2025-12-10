@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import SeatsController from "../controllers/seats.controller";
+import SeatsController from "../../controllers/seats/seats.controller";
 
 /**
  * Service for defining Seat routes.

@@ -1,12 +1,12 @@
 import { pgTable, varchar, boolean, timestamp, uuid, index, foreignKey, text, unique } from 'drizzle-orm/pg-core';
-import { users } from './user.table';
+import { usersTable } from './user.table';
 import { notificationTypeEnum, messageTypeEnum } from './enums';
 
 // ============================================
 // 18. NOTIFICATIONS TABLE
 // ============================================
 
-export const notifications = pgTable(
+export const notificationsTable = pgTable(
     'notifications',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -38,20 +38,20 @@ export const notifications = pgTable(
         index('idx_notifications_created_at').on(table.created_at),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_notifications_user_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Notification = typeof notifications.$inferSelect;
-export type NewNotification = typeof notifications.$inferInsert;
+export type Notification = typeof notificationsTable.$inferSelect;
+export type NewNotification = typeof notificationsTable.$inferInsert;
 
 // ============================================
 // 19. CONVERSATIONS TABLE
 // ============================================
 
-export const conversations = pgTable(
+export const conversationsTable = pgTable(
     'conversations',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -72,25 +72,25 @@ export const conversations = pgTable(
         unique('unique_conversation').on(table.participant_1_id, table.participant_2_id),
         foreignKey({
             columns: [table.participant_1_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_conversations_participant_1_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.participant_2_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_conversations_participant_2_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Conversation = typeof conversations.$inferSelect;
-export type NewConversation = typeof conversations.$inferInsert;
+export type Conversation = typeof conversationsTable.$inferSelect;
+export type NewConversation = typeof conversationsTable.$inferInsert;
 
 // ============================================
 // 20. MESSAGES TABLE
 // ============================================
 
-export const messages = pgTable(
+export const messagesTable = pgTable(
     'messages',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -120,16 +120,16 @@ export const messages = pgTable(
         index('idx_messages_created_at').on(table.created_at),
         foreignKey({
             columns: [table.conversation_id],
-            foreignColumns: [conversations.id],
+            foreignColumns: [conversationsTable.id],
             name: 'fk_messages_conversation_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.sender_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_messages_sender_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type Message = typeof messages.$inferSelect;
-export type NewMessage = typeof messages.$inferInsert;
+export type Message = typeof messagesTable.$inferSelect;
+export type NewMessage = typeof messagesTable.$inferInsert;

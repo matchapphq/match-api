@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import OnboardingController from "../controllers/onboarding.controller";
+import OnboardingController from "../../controllers/onboarding/onboarding.controller";
 
 /**
  * Service for defining Onboarding routes.

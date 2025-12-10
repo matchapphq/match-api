@@ -1,9 +1,9 @@
 import { password } from "bun";
 import { validator } from "hono/validator";
 import { createFactory } from "hono/factory";
-import type { userRegisterData } from "../utils/userData";
-import UserRepository from "../repository/user.repository";
-import { RegisterRequestSchema, LoginRequestSchema } from "../utils/auth.valid";
+import type { userRegisterData } from "../../utils/userData";
+import UserRepository from "../../repository/user.repository";
+import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
 
 /**
  * Controller for Authentication operations.

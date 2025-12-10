@@ -1,14 +1,14 @@
 import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey, integer, text, unique } from 'drizzle-orm/pg-core';
-import { users } from './user.table';
-import { venueMatches } from './matches.table';
-import { venues } from './venues.table';
+import { usersTable } from './user.table';
+import { venueMatchesTable } from './matches.table';
+import { venuesTable } from './venues.table';
 import { seatTypeEnum, seatStatusEnum } from './enums';
 
 // ============================================
 // 13. SEAT HOLDS TABLE
 // ============================================
 
-export const seatHolds = pgTable(
+export const seatHoldsTable = pgTable(
     'seat_holds',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -36,25 +36,25 @@ export const seatHolds = pgTable(
         index('idx_seat_holds_expires_at').on(table.expires_at),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_seat_holds_user_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.venue_match_id],
-            foreignColumns: [venueMatches.id],
+            foreignColumns: [venueMatchesTable.id],
             name: 'fk_seat_holds_venue_match_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type SeatHold = typeof seatHolds.$inferSelect;
-export type NewSeatHold = typeof seatHolds.$inferInsert;
+export type SeatHold = typeof seatHoldsTable.$inferSelect;
+export type NewSeatHold = typeof seatHoldsTable.$inferInsert;
 
 // ============================================
 // 14. SEATS TABLE
 // ============================================
 
-export const seats = pgTable(
+export const seatsTable = pgTable(
     'seats',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -90,16 +90,16 @@ export const seats = pgTable(
         unique('unique_seat_per_venue').on(table.venue_id, table.seat_number),
         foreignKey({
             columns: [table.venue_id],
-            foreignColumns: [venues.id],
+            foreignColumns: [venuesTable.id],
             name: 'fk_seats_venue_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.venue_match_id],
-            foreignColumns: [venueMatches.id],
+            foreignColumns: [venueMatchesTable.id],
             name: 'fk_seats_venue_match_id',
         }).onDelete('set null'),
     ]
 );
 
-export type Seat = typeof seats.$inferSelect;
-export type NewSeat = typeof seats.$inferInsert;
+export type Seat = typeof seatsTable.$inferSelect;
+export type NewSeat = typeof seatsTable.$inferInsert;

@@ -1,11 +1,11 @@
 import { pgTable, varchar, boolean, timestamp, uuid, index, foreignKey } from 'drizzle-orm/pg-core';
-import { users } from './user.table';
+import { usersTable } from './user.table';
 
 // ============================================
 // 5. USER ADDRESSES TABLE
 // ============================================
 
-export const userAddresses = pgTable(
+export const userAddressesTable = pgTable(
     'user_addresses',
     {
         id: uuid('id').primaryKey().defaultRandom(),
@@ -26,11 +26,11 @@ export const userAddresses = pgTable(
         index('idx_user_addresses_user_id').on(table.user_id),
         foreignKey({
             columns: [table.user_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_user_addresses_user_id',
         }).onDelete('cascade'),
     ]
 );
 
-export type UserAddress = typeof userAddresses.$inferSelect;
-export type NewUserAddress = typeof userAddresses.$inferInsert;
+export type UserAddress = typeof userAddressesTable.$inferSelect;
+export type NewUserAddress = typeof userAddressesTable.$inferInsert;

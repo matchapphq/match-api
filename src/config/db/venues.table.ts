@@ -14,8 +14,8 @@ import {
     geometry
 } from 'drizzle-orm/pg-core';
 import { sql as drizzleSql } from 'drizzle-orm';
-import { users } from './user.table';
-import { subscriptions } from './subscriptions.table';
+import { usersTable } from './user.table';
+import { subscriptionsTable } from './subscriptions.table';
 import { venueTypeEnum, venueStatusEnum, accessLevelEnum, subscriptionStatusEnum } from './enums';
 
 // ============================================
@@ -62,9 +62,7 @@ export type VerificationDocuments = VerificationDocument[];
 // 6. VENUES TABLE
 // ============================================
 
-export const venues = pgTable(
-    'venues',
-    {
+export const venuesTable = pgTable('venues', {
         id: uuid('id').primaryKey().defaultRandom(),
         owner_id: uuid('owner_id').notNull(),
         subscription_id: uuid('subscription_id').notNull(),
@@ -128,8 +126,7 @@ export const venues = pgTable(
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
         updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
         deleted_at: timestamp('deleted_at', { withTimezone: true }),
-    },
-    (table) => [
+    }, (table) => [
         index('idx_venues_owner_id').on(table.owner_id),
         index('idx_venues_subscription_id').on(table.subscription_id),
         index('idx_venues_status').on(table.status),
@@ -137,16 +134,17 @@ export const venues = pgTable(
         index('idx_venues_is_active').on(table.is_active),
         foreignKey({
             columns: [table.owner_id],
-            foreignColumns: [users.id],
+            foreignColumns: [usersTable.id],
             name: 'fk_venues_owner_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.subscription_id],
-            foreignColumns: [subscriptions.id],
+            foreignColumns: [subscriptionsTable.id],
             name: 'fk_venues_subscription_id',
+            // .onDelete('restrict') might be cleaner, keeping original logic
         }).onDelete('restrict'),
     ]
 );
 
-export type Venue = typeof venues.$inferSelect;
-export type NewVenue = typeof venues.$inferInsert;
+export type Venue = typeof venuesTable.$inferSelect;
+export type NewVenue = typeof venuesTable.$inferInsert;
