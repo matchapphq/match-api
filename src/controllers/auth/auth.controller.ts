@@ -4,8 +4,10 @@ import { createFactory } from "hono/factory";
 import type { userRegisterData } from "../../utils/userData";
 import UserRepository from "../../repository/user.repository";
 import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
-import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from "../../utils/jwt";
+import { JwtUtils } from "../../utils/jwt";
 import { z } from "zod";
+import TokenRepository from "../../repository/token.repository";
+import { setCookie } from "hono/cookie";
 
 /**
  * Controller for Authentication operations.
@@ -14,6 +16,7 @@ import { z } from "zod";
 class AuthController {
     private readonly factory = createFactory();
     private readonly userRepository = new UserRepository();
+    private readonly tokenRepository = new TokenRepository();
 
     readonly register = this.factory.createHandlers(validator("json", (value, ctx) => {
         const parsed = RegisterRequestSchema.safeParse(value);
@@ -40,8 +43,23 @@ class AuthController {
 
             // Generate Tokens
             const tokenPayload = { id: user.id, email: user.email, role: user.role };
-            const accessToken = await generateAccessToken(tokenPayload);
-            const refreshToken = await generateRefreshToken(tokenPayload);
+
+            const deviceId = ctx.req.header("User-Agent") || "Unknown";
+
+            const [accessToken, refreshToken] = await Promise.all([
+                JwtUtils.generateAccessToken(tokenPayload),
+                JwtUtils.generateRefreshToken(tokenPayload)
+            ]);
+
+            await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
+            
+            setCookie(ctx, "refresh_token", refreshToken, {
+                httpOnly: true,
+                secure: true,
+                sameSite: "lax",
+                path: "/auth/refresh",
+                maxAge: JwtUtils.REFRESH_TOKEN_EXP
+            });
 
             return ctx.json({
                 user,
@@ -84,9 +102,10 @@ class AuthController {
         // I will fix repo to return role in next step or use just ID for now.
 
         const tokenPayload = { id: user.id, email: user.email, role: user.role };
-        const accessToken = await generateAccessToken(tokenPayload);
-        const refreshToken = await generateRefreshToken(tokenPayload);
-
+        const [accessToken, refreshToken] = await Promise.all([
+            JwtUtils.generateAccessToken(tokenPayload),
+            JwtUtils.generateRefreshToken(tokenPayload)
+        ])
         return ctx.json({
             user: { id: user.id, email: user.email, role: user.role }, // returning partial user for safety
             token: accessToken,
@@ -102,13 +121,13 @@ class AuthController {
             return ctx.json({ error: "Refresh token is required" }, 400);
         }
 
-        const payload = await verifyRefreshToken(refresh_token);
+        const payload = await JwtUtils.verifyRefreshToken(refresh_token);
         if (!payload) {
             return ctx.json({ error: "Invalid or expired refresh token" }, 401);
         }
 
         // Generate new access token
-        const newAccessToken = await generateAccessToken({ id: payload.id, email: payload.email, role: payload.role });
+        const newAccessToken = await JwtUtils.generateAccessToken({ id: payload.id, email: payload.email, role: payload.role });
         return ctx.json({ token: newAccessToken });
     });
 
