@@ -2,99 +2,123 @@
 
 ## 🏗️ Overview
 
-This project is a high-performance API built with [Hono](https://hono.dev/) for the Match Project. It follows a modular architecture separating concerns into **Services** and **Controllers**.
+This project is a high-performance API built with [Hono](https://hono.dev/) for the Match Project. It follows a clean, modular architecture separating concerns into **Services** (Route Definitions), **Controllers** (Business Logic & Request Handling), and **Repositories** (Data Access).
 
 ## 🚀 Technology Stack
 
-- **Framework**: Hono (Ultra-fast web framework)
-- **Runtime**: Bun (Fast JavaScript runtime)
+- **Framework**: [Hono](https://hono.dev/) (Ultra-fast web framework)
+- **Runtime**: [Bun](https://bun.sh/) (Fast JavaScript runtime)
 - **Language**: TypeScript
+- **Database**: PostgreSQL
+- **ORM**: [Drizzle ORM](https://orm.drizzle.team/)
+- **Validation**: [Zod](https://zod.dev/) & [Hono Zod Validator](https://github.com/honojs/middleware/tree/main/packages/zod-validator)
 
 ## 📂 Project Structure
 
 ```
 src/
-├── controllers/       # Handle HTTP requests, input validation, and responses
-├── services/          # Define route definitions and business logic binding
+├── config/            # Configuration (DB schema, etc.)
+│   └── db/            # Drizzle table definitions
+├── controllers/       # Business logic and request handlers (Class-based)
+├── services/          # Route definitions (binds Controllers to Hono Router)
+├── repository/        # Data access layer (DB interaction abstraction)
 ├── server.ts          # Main entry point, application setup, and route mounting
 └── ...
 ```
 
 ## 🧩 Architecture Components
 
-### 1. Controllers (`src/controllers/`)
-Controllers are responsible for handling the incoming HTTP requests and returning responses. They do not define routes themselves but provide the handler functions.
+### 1. Services (`src/services/`)
+Services in this architecture primarily serve as **Route Definitions**. They are responsible for creating a `Hono` router instance and binding HTTP paths to Controller methods.
 
 **Key Responsibilities:**
-- Parse request bodies, query parameters, and path parameters.
-- Validate input data (e.g., using Zod or Hono validator).
-- Call business logic (Repositories/Services).
-- Return JSON responses.
+- Define routes (GET, POST, PUT, DELETE).
+- Bind Controller handlers to routes.
+- Expose the router via `getRouter`.
 
-Example Pattern:
+**Example:**
 ```typescript
-class ExampleController {
-    readonly getItems = this.factory.createHandlers(async (ctx) => {
-        // Logic here
-        return ctx.json({ data: [] });
+class AuthService {
+    private readonly router = new Hono();
+    private readonly controller = new AuthController();
+
+    constructor() {
+        // Definitions
+        this.router.post("/login", ...this.controller.login);
+    }
+}
+```
+
+### 2. Controllers (`src/controllers/`)
+Controllers contain the actual business logic and request handling code. They validate input, orchestrate logic (often calling Repositories), and return JSON responses.
+
+**Key Responsibilities:**
+- Request validation (using Zod schemas).
+- Logic orchestration.
+- Calling Repository methods.
+- Sending Responses.
+
+**Example:**
+```typescript
+class AuthController {
+    readonly login = this.factory.createHandlers(validator('json', ...), async (ctx) => {
+        // Logic
+        return ctx.json({ token: "..." });
     });
 }
 ```
 
-### 2. Services (`src/services/`)
-Services in this architecture primarily serve as **Route Definitions**. They bind the Controller handlers to specific HTTP paths using Hono's router instance.
+### 3. Repositories (`src/repository/`)
+Repositories abstract the database layer. They use Drizzle ORM to interact with the PostgreSQL database. This keeps SQL/ORM logic out of controllers.
+
+**Structure:**
+- Flat files in `src/repository/` (e.g., `user.repository.ts`, `venue.repository.ts`).
 
 **Key Responsibilities:**
-- create a new `Hono` router instance.
-- Define HTTP methods (`get`, `post`, `put`, `delete`).
-- Bind Controller methods to these paths.
-- Expose the router via `getRouter` for the main server to mount.
+- Querying the database (select, insert, update, delete).
+- Returning typed data objects.
 
-Example Pattern:
-```typescript
-class ExampleService {
-    private readonly router = new Hono();
-    private readonly controller = new ExampleController();
-
-    constructor() {
-        this.router.get("/", ...this.controller.getItems);
-    }
-
-    public get getRouter() {
-        return this.router;
-    }
-}
-```
-
-### 3. Server (`src/server.ts`)
-The `server.ts` file is the entry point where all Services are instantiated and mounted to the main Hono application.
-
-**Routing Strategy:**
-- **Root-Level Routes**: Mounted directly (e.g., `/auth`, `/matches`, `/sports`).
-- **Nested Routes**: Mounted with full path prefixes (e.g., `/venues/:venueId/matches/:matchId/seats`).
+### 4. Database Schema (`src/config/db/`)
+The database schema is defined using Drizzle ORM's schema builder. Tables are defined in individual files and exported in `schema.ts` (or aggregated).
 
 ## 🛣️ API Modules
 
-- **Auth**: Authentication and session management.
-- **Onboarding**: User onboarding flow (preferences, initial setup).
-- **Discovery**: Map and venue discovery/search.
-- **Venues**: Venue details (read-only for users).
-- **Matches**: Match schedules and details.
-- **Sports**: List of available sports.
-- **Reservations**: Booking flow.
-- **Seats**: Seat selection and pricing (nested under Venues).
-- **Profile**: User profile and favorites.
+The application is structured into the following domains (mounted in `server.ts`):
+
+| Module | Route Prefix | Description |
+| :--- | :--- | :--- |
+| **Auth** | `/auth` | Authentication (Login, Register, Refresh Token) |
+| **Users** | `/users` | User profile management |
+| **Onboarding** | `/onboarding` | User onboarding flow & preferences |
+| **Discovery** | `/discovery` | Venue/Map discovery endpoints |
+| **Venues** | `/venues` | Venue details and management |
+| **Matches** | `/matches` | Match scheduling and viewing |
+| **Sports** | `/sports` | Available sports master data |
+| **Reservations** | `/reservations` | Booking system |
+| **Partners** | `/partners` | Partner/Restaurateur specific routes |
+| **Reviews** | `/reviews` | User reviews and ratings |
+| **Notifications** | `/notifications` | User notifications |
+| **Webhooks** | `/webhooks` | External service integration |
+| **Coupons** | `/coupons` | Discount and coupon management |
+| **Subscriptions** | `/subscriptions` | Venue owner subscriptions |
+| **Billing** | `/` | Invoices and transactions (mounted at root/globally) |
+| **Analytics** | `/venues/:id/analytics`| Venue performance analytics |
+| **Messaging** | `/` | Chat and conversations (mounted at root) |
 
 ## 🔄 Request Flow
 
-1. **Request** hits `server.ts`.
-2. Hono matches the **Route Path** (e.g., `/auth/login`).
-3. Request is routed to the corresponding **Service** (e.g., `AuthService`).
-4. Service delegates to the specific **Method** in **Controller** (e.g., `AuthController.login`).
-5. Controller processes request and returns **Response**.
+1. **Request**: Incoming HTTP request hits `server.ts`.
+2. **Routing**: `server.ts` delegates to the appropriate **Service** based on the path (e.g., `/auth`).
+3. **Dispatch**: The **Service** matches the specific route (e.g., `/login`) and calls the **Controller** handler.
+4. **Validation**: **Controller** validates input using Zod.
+5. **Logic**: **Controller** calls **Repository** methods to fetch/persist data.
+6. **DB Access**: **Repository** executes queries via Drizzle ORM.
+7. **Response**: Data flows back up, and **Controller** returns a JSON response.
 
-## 🛠️ Adding a New Content
+## 🛠️ Adding a New Feature
 
-1. Create a `NewController` in `src/controllers/`.
-2. Create a `NewService` in `src/services/` and bind controller methods.
-3. specific the path in `src/server.ts` and mount the service.
+1.  **Database**: Define new tables in `src/config/db/`.
+2.  **Repository**: Create `src/repository/feature.repository.ts` for DB access.
+3.  **Controller**: Create `src/controllers/feature/feature.controller.ts` for logic.
+4.  **Service**: Create `src/services/feature/feature.service.ts` to define routes.
+5.  **Mount**: Import and mount the new Service in `src/server.ts`.
