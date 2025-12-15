@@ -36,8 +36,6 @@ class UserRepository {
             throw new Error("User creation failed");
         }
 
-
-
         return newUser;
     }
 }

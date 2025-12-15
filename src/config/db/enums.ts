@@ -17,7 +17,7 @@ export const venueTypeEnum = pgEnum('venue_type', [
     'sports_bar',
 ]);
 export const venueStatusEnum = pgEnum('venue_status', ['pending', 'approved', 'rejected', 'suspended']);
-export const accessLevelEnum = pgEnum('access_level', ['basic', 'pro', 'enterprise']);
+export const subscriptionLevelEnum = pgEnum('subscription_level', ['basic', 'pro', 'enterprise']);
 
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'finished', 'canceled', 'postponed']);
 

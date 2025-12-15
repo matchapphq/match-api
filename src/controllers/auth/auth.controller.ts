@@ -91,21 +91,12 @@ class AuthController {
             return ctx.json({ error: "Invalid email or password" }, 401)
         }
 
-        // Generate Tokens
-        // Need to fetch full user to get role if getUserByEmail doesn't return it (repo method updated?)
-        // Repo returns { id, email, password_hash } mostly. Let's assume we need role.
-        // For now, let's fetch full user or update repo. Repository currently selects limited fields.
-        // Let's rely on limited payload or update repo. Ideally payload needs role.
-        // Assuming Repo returns limited fields, we should update repo to return role, OR fetch full here.
-        // Let's use getUserById or update getUserByEmail in next step if needed. 
-        // ACTUALLY, I should have checked if getUserByEmail returns role. It selects specific fields.
-        // I will fix repo to return role in next step or use just ID for now.
-
         const tokenPayload = { id: user.id, email: user.email, role: user.role };
         const [accessToken, refreshToken] = await Promise.all([
             JwtUtils.generateAccessToken(tokenPayload),
             JwtUtils.generateRefreshToken(tokenPayload)
         ])
+
         return ctx.json({
             user: { id: user.id, email: user.email, role: user.role }, // returning partial user for safety
             token: accessToken,

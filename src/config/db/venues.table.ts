@@ -16,7 +16,7 @@ import {
 import { sql as drizzleSql } from 'drizzle-orm';
 import { usersTable } from './user.table';
 import { subscriptionsTable } from './subscriptions.table';
-import { venueTypeEnum, venueStatusEnum, accessLevelEnum, subscriptionStatusEnum } from './enums';
+import { venueTypeEnum, venueStatusEnum, subscriptionLevelEnum, subscriptionStatusEnum } from './enums';
 
 // ============================================
 // TYPES
@@ -109,7 +109,7 @@ export const venuesTable = pgTable('venues', {
 
         // Subscription & Access
         subscription_status: subscriptionStatusEnum('subscription_status').default('active').notNull(),
-        access_level: accessLevelEnum('access_level').default('basic'),
+        subscription_level: subscriptionLevelEnum('subscription_level').default('basic'),
 
         // Status
         status: venueStatusEnum('status').default('pending').notNull(),

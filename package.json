@@ -5,9 +5,10 @@
   "private": true,
   "scripts": {
     "dev": "bun --watch index.ts",
-    "db:migrate": "drizzle-kit migrate",
+    "db:setup": "bun run src/config/setup.db.ts",
+    "db:migrate": "bun run db:setup && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
+    "db:push": "bun run db:setup && drizzle-kit push",
     "start": "bun run index.ts"
   },
   "devDependencies": {

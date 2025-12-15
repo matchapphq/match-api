@@ -5,11 +5,14 @@ export default defineConfig({
     schema: "./src/config/db",
     dialect: "postgresql",
     dbCredentials: {
-        user: "postgres",
-        password: "postgres",
-        host: "localhost",
-        port: 5432,
-        database: "match",
+      host: process.env.DATABASE_HOST as string,
+      port: parseInt(process.env.DATABASE_PORT as string),
+      user: process.env.DATABASE_USER as string,
+      password: process.env.DATABASE_PASSWORD as string,
+      database: process.env.DATABASE_NAME as string,
+      ssl: process.env.NODE_ENV === 'production' ? {
+        rejectUnauthorized: false
+      } : false
     },
     extensionsFilters: ["postgis"]
 });
