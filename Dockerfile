@@ -8,6 +8,6 @@ RUN bun install
 
 COPY . .
 
-EXPOSE 8080
+EXPOSE 8001
 
 ENTRYPOINT [ "bun", "dev" ]
