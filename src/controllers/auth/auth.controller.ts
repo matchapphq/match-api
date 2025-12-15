@@ -7,7 +7,7 @@ import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.vali
 import { JwtUtils } from "../../utils/jwt";
 import { z } from "zod";
 import TokenRepository from "../../repository/token.repository";
-import { setCookie } from "hono/cookie";
+import { setCookie, getCookie } from "hono/cookie";
 
 /**
  * Controller for Authentication operations.
@@ -52,7 +52,7 @@ class AuthController {
             ]);
 
             await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
-            
+
             setCookie(ctx, "refresh_token", refreshToken, {
                 httpOnly: true,
                 secure: true,
@@ -97,6 +97,18 @@ class AuthController {
             JwtUtils.generateRefreshToken(tokenPayload)
         ])
 
+        const deviceId = ctx.req.header("User-Agent") || "Unknown";
+
+        await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
+
+        setCookie(ctx, "refresh_token", refreshToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "lax",
+            path: "/auth/refresh",
+            maxAge: JwtUtils.REFRESH_TOKEN_EXP
+        });
+
         return ctx.json({
             user: { id: user.id, email: user.email, role: user.role }, // returning partial user for safety
             token: accessToken,
@@ -105,21 +117,65 @@ class AuthController {
     });
 
     readonly refreshToken = this.factory.createHandlers(async (ctx) => {
-        const body = await ctx.req.json();
-        const { refresh_token } = body;
+        const oldRefreshToken = getCookie(ctx, 'refresh_token');
 
-        if (!refresh_token) {
-            return ctx.json({ error: "Refresh token is required" }, 400);
+        if (!oldRefreshToken) {
+            return ctx.json({ error: "Refresh token is required" }, 401);
         }
 
-        const payload = await JwtUtils.verifyRefreshToken(refresh_token);
+        const payload = await JwtUtils.verifyRefreshToken(oldRefreshToken);
         if (!payload) {
             return ctx.json({ error: "Invalid or expired refresh token" }, 401);
         }
 
-        // Generate new access token
-        const newAccessToken = await JwtUtils.generateAccessToken({ id: payload.id, email: payload.email, role: payload.role });
-        return ctx.json({ token: newAccessToken });
+        // Consistency check: Verify token exists in DB and matches
+        // We retrieve all tokens for the user and check if any match the provided refresh token.
+        const dbTokens = await this.tokenRepository.getAllTokensByUserId(payload.id);
+
+        if (!dbTokens || dbTokens.length === 0) {
+            // Token claimed to be valid (signature-wise) but no record in DB -> Revoked or invalid state
+            return ctx.json({ error: "Invalid session" }, 401);
+        }
+
+        let matchedToken = null;
+        for (const t of dbTokens) {
+            const isValid = await password.verify(oldRefreshToken, t.hash_token);
+            if (isValid) {
+                matchedToken = t;
+                break;
+            }
+        }
+
+        if (!matchedToken) {
+            // Security Alert: Token signature valid but hash mismatch against all stored tokens.
+            // Likely token reuse or theft. Revoking all tokens for safety is a good practice here.
+            await this.tokenRepository.deleteTokensByUserId(payload.id);
+            return ctx.json({ error: "Invalid info" }, 401);
+        }
+
+        // Generate new tokens (Rotate)
+        const newPayload = { id: payload.id, email: payload.email, role: payload.role };
+        const [newAccessToken, newRefreshToken] = await Promise.all([
+            JwtUtils.generateAccessToken(newPayload),
+            JwtUtils.generateRefreshToken(newPayload)
+        ]);
+
+        // Update the existing token record (the matched one)
+        const deviceId = ctx.req.header("User-Agent") || matchedToken.device || "Unknown";
+        await this.tokenRepository.updateToken(newRefreshToken, payload.id, deviceId, matchedToken.id);
+
+        setCookie(ctx, "refresh_token", newRefreshToken, {
+            httpOnly: true,
+            secure: true,
+            sameSite: "lax",
+            path: "/auth/refresh",
+            maxAge: JwtUtils.REFRESH_TOKEN_EXP
+        });
+
+        return ctx.json({
+            token: newAccessToken,
+            refresh_token: newRefreshToken
+        });
     });
 
     readonly logout = this.factory.createHandlers(async (ctx) => {
