@@ -8,31 +8,49 @@ import { venuePhotosTable } from "../config/db/venue-photos.table";
 export class VenueRepository {
 
     async create(userId: string, subscriptionId: string, input: CreateVenueInput) {
-        // PostGIS point: SRID 4326 (WGS 84) is standard for GPS
-        const locationSql = sql`ST_SetSRID(ST_MakePoint(${input.lng}, ${input.lat}), 4326)`;
+        return await db.transaction(async (tx) => {
+            // PostGIS point: SRID 4326 (WGS 84) is standard for GPS
+            const locationSql = sql`ST_SetSRID(ST_MakePoint(${input.lng}, ${input.lat}), 4326)`;
 
-        const [newVenue] = await db.insert(venuesTable).values({
-            owner_id: userId,
-            subscription_id: subscriptionId,
-            name: input.name,
-            street_address: input.address, // mapping address to street_address for now, might need split
-            city: input.city ?? "Unknown",
-            postal_code: input.postalCode ?? "00000",
-            country: input.country ?? "Unknown",
-            location: locationSql as any,
-            latitude: input.lat,
-            longitude: input.lng,
-            capacity: input.capacity,
-            // maxSimultaneousBroadcasts: input.maxSimultaneousBroadcasts ?? 2, // Not in DB Schema yet
-            type: input.type ?? "bar",
-            description: input.description,
-            phone: input.phone,
-            email: input.email,
-            website: input.website,
-            status: "pending",
-        }).returning();
+            const [newVenue] = await tx.insert(venuesTable).values({
+                owner_id: userId,
+                subscription_id: subscriptionId,
+                name: input.name,
+                street_address: input.address, // mapping address to street_address for now, might need split
+                city: input.city ?? "Unknown",
+                postal_code: input.postalCode ?? "00000",
+                country: input.country ?? "Unknown",
+                location: locationSql as any,
+                latitude: input.lat,
+                longitude: input.lng,
+                capacity: input.capacity,
+                // maxSimultaneousBroadcasts: input.maxSimultaneousBroadcasts ?? 2, // Not in DB Schema yet
+                type: input.type ?? "bar",
+                description: input.description,
+                phone: input.phone,
+                email: input.email,
+                website: input.website,
+                status: "pending",
+            }).returning();
 
-        return newVenue;
+            if (!newVenue) {
+                throw new Error("Failed to create venue");
+            }
+
+            if (input.photos && input.photos.length > 0) {
+                await tx.insert(venuePhotosTable).values(
+                    input.photos.map(p => ({
+                        venue_id: newVenue.id,
+                        photo_url: p.url,
+                        alt_text: p.altText,
+                        is_primary: p.isPrimary ?? false,
+                        uploaded_by: userId
+                    }))
+                );
+            }
+
+            return newVenue;
+        });
     }
 
     async findById(venueId: string) {

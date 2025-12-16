@@ -37,6 +37,11 @@ export type CreateVenueInput = {
     phone?: string
     email?: string
     website?: string
+    photos?: {
+        url: string
+        altText?: string
+        isPrimary?: boolean
+    }[]
 }
 
 export type UpdateVenueInput = Partial<CreateVenueInput>

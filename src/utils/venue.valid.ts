@@ -12,6 +12,11 @@ export const CreateVenueSchema = z.object({
     phone: z.string().optional(),
     email: z.string().email().optional(),
     website: z.string().url().optional(),
+    photos: z.array(z.object({
+        url: z.string().url(),
+        altText: z.string().optional(),
+        isPrimary: z.boolean().optional()
+    })).optional()
 });
 
 export const UpdateVenueSchema = CreateVenueSchema.partial();
