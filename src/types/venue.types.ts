@@ -13,6 +13,9 @@ export type Venue = {
     lat: number
     lng: number
     address: string
+    city: string
+    country: string
+    postalCode: string
     capacity: number
     maxSimultaneousBroadcasts: number // Max 2 for now
     broadcasts: GameBroadcast[] // Time-based game schedule
@@ -24,8 +27,16 @@ export type CreateVenueInput = {
     lat: number
     lng: number
     address: string
+    city?: string
+    country?: string
+    postalCode?: string
     capacity: number
     maxSimultaneousBroadcasts?: number // Default to 2
+    type?: "bar" | "restaurant" | "fast_food" | "nightclub" | "cafe" | "lounge" | "pub" | "sports_bar"
+    description?: string
+    phone?: string
+    email?: string
+    website?: string
 }
 
 export type UpdateVenueInput = Partial<CreateVenueInput>
