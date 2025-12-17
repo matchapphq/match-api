@@ -20,3 +20,25 @@ export const CreateVenueSchema = z.object({
 });
 
 export const UpdateVenueSchema = CreateVenueSchema.partial();
+
+export const GetVenuesSchema = z.object({
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+    city: z.string().optional(),
+    type: z.string().optional(),
+    is_verified: z.enum(['true', 'false']).transform(v => v === 'true').optional(),
+    search: z.string().optional(),
+    lat: z.coerce.number().min(-90).max(90).optional(),
+    lng: z.coerce.number().min(-180).max(180).optional(),
+    distance_km: z.coerce.number().positive().default(10),
+    sort: z.enum(['distance', 'rating', 'newest']).default('newest')
+}).refine(data => {
+    // If distance sort is requested, lat/lng must be present
+    if (data.sort === 'distance') {
+        return !!data.lat && !!data.lng;
+    }
+    return true;
+}, {
+    message: "Latitude and Longitude are required for distance sorting",
+    path: ["lat", "lng"]
+});

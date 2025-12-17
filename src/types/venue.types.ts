@@ -53,3 +53,16 @@ export type AddBroadcastInput = {
     endTime: string
     screen?: number
 }
+
+export interface GetVenuesQuery {
+    page?: number;
+    limit?: number;
+    city?: string;
+    type?: string;
+    is_verified?: boolean;
+    search?: string;
+    lat?: number;
+    lng?: number;
+    distance_km?: number;
+    sort?: 'distance' | 'rating' | 'newest';
+}
