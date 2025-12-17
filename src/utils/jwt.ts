@@ -4,8 +4,8 @@ const ACCESS_TOKEN_SECRET = process.env.ACCESS_TOKEN_SECRET || "access_secret";
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || "refresh_secret";
 
 // Token expiry times
-const ACCESS_TOKEN_EXPIRY = 60 * 60 * 24; // 24 hours (in seconds)
-const REFRESH_TOKEN_EXPIRY = 60 * 60 * 24 * 7; // 7 days
+const ACCESS_TOKEN_EXPIRY = 60 * 15; // 24 hours (in seconds)
+const REFRESH_TOKEN_EXPIRY = 60 * 60 * 24 * 30; // 7 days
 
 export type TokenPayload = {
     id: string;
@@ -14,8 +14,10 @@ export type TokenPayload = {
 }
 
 export class JwtUtils {
-    private static readonly ACCESS_TOKEN_EXP = 60 * 15;
-    public static readonly REFRESH_TOKEN_EXP = 60 * 60 * 24 * 30;
+    public static readonly ACCESS_TOKEN_EXP = ACCESS_TOKEN_EXPIRY;
+    public static readonly REFRESH_TOKEN_EXP = REFRESH_TOKEN_EXPIRY;
+    public static readonly ACCESS_JWT_SIGN_KEY = process.env.ACCESS_JWT_SIGN_KEY;
+    public static readonly REFRESH_JWT_SIGN_KEY = process.env.REFRESH_JWT_SIGN_KEY;
 
     static async generateAccessToken(payload: TokenPayload): Promise<string> {
         if (!Bun.env.SECRET_KEY) {

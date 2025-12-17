@@ -1,13 +1,12 @@
 import { password } from "bun";
+import { JwtUtils } from "../../utils/jwt";
 import { validator } from "hono/validator";
 import { createFactory } from "hono/factory";
 import type { userRegisterData } from "../../utils/userData";
 import UserRepository from "../../repository/user.repository";
-import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
-import { JwtUtils } from "../../utils/jwt";
-import { z } from "zod";
 import TokenRepository from "../../repository/token.repository";
-import { setCookie, getCookie } from "hono/cookie";
+import { setCookie, getCookie, setSignedCookie } from "hono/cookie";
+import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
 
 /**
  * Controller for Authentication operations.
@@ -52,20 +51,25 @@ class AuthController {
             ]);
 
             await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
-
-            setCookie(ctx, "refresh_token", refreshToken, {
+          
+            await Promise.all([
+              setSignedCookie(ctx, "refresh_token", refreshToken, JwtUtils.REFRESH_JWT_SIGN_KEY, {
                 httpOnly: true,
-                secure: true,
-                sameSite: "lax",
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: "Strict",
                 path: "/auth/refresh",
                 maxAge: JwtUtils.REFRESH_TOKEN_EXP
-            });
+              }),
+              setSignedCookie(ctx, "access_token", accessToken, JwtUtils.ACCESS_JWT_SIGN_KEY, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: "Strict",
+                path: "/",
+                maxAge: JwtUtils.ACCESS_TOKEN_EXP
+              })
+            ])
 
-            return ctx.json({
-                user,
-                token: accessToken,
-                refresh_token: refreshToken
-            }, 201);
+            return ctx.json({ user }, 201);
         } catch (error) {
             console.error("Registration error:", error);
             return ctx.json({ error: "Registration failed" }, 500);
@@ -100,19 +104,26 @@ class AuthController {
         const deviceId = ctx.req.header("User-Agent") || "Unknown";
 
         await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
-
-        setCookie(ctx, "refresh_token", refreshToken, {
+        
+        await Promise.all([
+          setSignedCookie(ctx, "access_token", accessToken, JwtUtils.ACCESS_JWT_SIGN_KEY, {
             httpOnly: true,
-            secure: true,
-            sameSite: "lax",
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: "Strict",
+            path: "/",
+            maxAge: JwtUtils.ACCESS_TOKEN_EXP
+          }),
+          setSignedCookie(ctx, "refresh_token", refreshToken, JwtUtils.REFRESH_JWT_SIGN_KEY, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: "Strict",
             path: "/auth/refresh",
             maxAge: JwtUtils.REFRESH_TOKEN_EXP
-        });
+          })
+        ]);
 
         return ctx.json({
             user: { id: user.id, email: user.email, role: user.role }, // returning partial user for safety
-            token: accessToken,
-            refresh_token: refreshToken
         });
     });
 
@@ -171,6 +182,8 @@ class AuthController {
             path: "/auth/refresh",
             maxAge: JwtUtils.REFRESH_TOKEN_EXP
         });
+
+        ctx.header("Authorization", `Bearer ${newAccessToken}`);
 
         return ctx.json({
             token: newAccessToken,

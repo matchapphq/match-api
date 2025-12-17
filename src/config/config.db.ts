@@ -1,4 +1,5 @@
 import { drizzle } from "drizzle-orm/node-postgres";
+import * as schema from "./db/schema";
 
 const getDatabaseConfig = () => {
     const config = {
@@ -22,4 +23,4 @@ const getDatabaseConfig = () => {
 const config = getDatabaseConfig();
 const connectionString = `postgres://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`;
 
-export const db = drizzle(connectionString);
+export const db = drizzle(connectionString, { schema });
