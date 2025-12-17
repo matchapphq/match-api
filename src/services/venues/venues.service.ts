@@ -1,12 +1,14 @@
 import { Hono } from "hono";
 import VenueController from "../../controllers/venues/venues.controller";
+import { authMiddleware } from "../../middleware/auth.middleware";
+import type { HonoEnv } from "../../types/hono.types";
 
 /**
  * Service for defining Venue routes.
  * Mounts the VenueController handlers to the router.
  */
 class VenueService {
-    private readonly router = new Hono();
+    private readonly router = new Hono<HonoEnv>();
     private readonly controller = new VenueController();
 
     public get getRouter() {
@@ -35,7 +37,7 @@ class VenueService {
         // Wait, I should probably apply auth middleware if available.
         // I'll trust the controller's internal check `getUserId` which throws if no user.
 
-        this.router.post("/", ...this.controller.create);
+        this.router.post("/", authMiddleware, ...this.controller.create);
         this.router.put("/:venueId", ...this.controller.update);
         this.router.delete("/:venueId", ...this.controller.delete);
     }

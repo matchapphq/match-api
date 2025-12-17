@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { logger } from "hono/logger";
 import { prettyJSON } from "hono/pretty-json";
 
+
 import AuthService from "./services/auth/auth.service";
 import UserService from "./services/user/user.service"; // Renamed from ProfileService
 import OnboardingService from "./services/onboarding/onboarding.service";
@@ -48,6 +49,9 @@ const webhooksRouter = new WebhooksService();
 
 app.use(logger());
 app.use(prettyJSON());
+
+// Auth Middleware (Populates user in context if valid token present)
+// app.use("/*", authMiddleware);
 
 // Mount routes
 // Base: /api is usually handled by the entry point or Nginx, but here we assume app is mounted at /api or root. 
