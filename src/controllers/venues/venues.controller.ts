@@ -5,7 +5,7 @@ import { createFactory } from "hono/factory";
  * Handles fetching simple venue details, photos, reviews, and availability.
  */
 import { VenueRepository } from "../../repository/venue.repository";
-import { CreateVenueSchema, UpdateVenueSchema } from "../../utils/venue.valid";
+import { CreateVenueSchema, UpdateVenueSchema, GetVenuesSchema } from "../../utils/venue.valid";
 import { db } from "../../config/config.db";
 import { subscriptionsTable } from "../../config/db/subscriptions.table";
 import { eq, and, gt } from "drizzle-orm";
@@ -48,6 +48,23 @@ class VenueController {
         }
         return sub;
     }
+
+    readonly getAll = this.factory.createHandlers(validator('query', (value, ctx) => {
+        const parsed = GetVenuesSchema.safeParse(value);
+        if (!parsed.success) {
+            return ctx.json({ error: "Invalid query params", details: parsed.error }, 400);
+        }
+        return parsed.data;
+    }), async (ctx) => {
+        try {
+            const query = ctx.req.valid('query');
+            const result = await this.venueRepository.findAll(query);
+            return ctx.json(result);
+        } catch (error) {
+            console.error("Get venues error:", error);
+            return ctx.json({ error: "Failed to fetch venues" }, 500);
+        }
+    });
 
     readonly create = this.factory.createHandlers(validator('json', (value, ctx) => {
         const parsed = CreateVenueSchema.safeParse(value);
@@ -120,7 +137,7 @@ class VenueController {
 
     readonly delete = this.factory.createHandlers(async (ctx) => {
         try {
-            const userId = this.getUserId(ctx); 
+            const userId = this.getUserId(ctx);
             const venueId = ctx.req.param("venueId");
 
             if (!venueId) {

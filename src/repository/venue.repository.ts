@@ -1,8 +1,8 @@
 import { db } from "../config/config.db";
 import { venuesTable } from "../config/db/venues.table";
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, isNull, or, ilike, desc } from "drizzle-orm";
 import { sql } from "drizzle-orm";
-import type { CreateVenueInput, UpdateVenueInput } from "../types/venue.types";
+import type { CreateVenueInput, UpdateVenueInput, GetVenuesQuery } from "../types/venue.types";
 import { venuePhotosTable } from "../config/db/venue-photos.table";
 
 export class VenueRepository {
@@ -98,6 +98,95 @@ export class VenueRepository {
             .set({ deleted_at: new Date() })
             .where(eq(venuesTable.id, venueId));
         return true;
+    }
+
+    async findAll(query: GetVenuesQuery) {
+        const {
+            page = 1,
+            limit = 20,
+            city,
+            type,
+            is_verified,
+            search,
+            lat,
+            lng,
+            distance_km = 10,
+            sort = 'newest'
+        } = query;
+
+        const offset = (page - 1) * limit;
+
+        const conditions = [
+            isNull(venuesTable.deleted_at),
+            eq(venuesTable.is_active, true)
+        ];
+
+        if (city) conditions.push(ilike(venuesTable.city, `%${city}%`));
+        if (type) conditions.push(eq(venuesTable.type, type as any));
+        if (is_verified !== undefined) conditions.push(eq(venuesTable.is_verified, is_verified));
+
+        if (search) {
+            conditions.push(or(
+                ilike(venuesTable.name, `%${search}%`),
+                ilike(venuesTable.description ?? sql`''`, `%${search}%`)
+            )!);
+        }
+
+        if (lat && lng && distance_km) {
+            // PostGIS: ST_DWithin(geography(location), geography(ST_MakePoint(lng, lat)), distance_meters)
+            // Note: locations in DB are SRID 4326 geometry. Casting to geography calculates distance in meters.
+            const distanceMeters = distance_km * 1000;
+            conditions.push(sql`ST_DWithin(
+                ${venuesTable.location}::geography, 
+                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography, 
+                ${distanceMeters}
+            )`);
+        }
+
+        let orderByClause: any = desc(venuesTable.created_at);
+
+        if (sort === 'rating') {
+            orderByClause = desc(venuesTable.average_rating);
+        } else if (sort === 'distance' && lat && lng) {
+            // Order by distance
+            orderByClause = sql`ST_Distance(
+                ${venuesTable.location}::geography, 
+                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
+            )`;
+        }
+
+        // 1. Get total count for pagination metadata
+        // Note: Drizzle doesn't have a simple "count with query" helper yet that preserves all current 'where' without rebuilding
+        // We'll rebuild the where clause for count
+        const whereClause = and(...conditions);
+
+        const [countRes] = await db.select({ count: sql<number>`count(*)` })
+            .from(venuesTable)
+            .where(whereClause);
+
+        const total = Number(countRes?.count ?? 0);
+        const totalPages = Math.ceil(total / limit);
+
+        // 2. Fetch data
+        const data = await db.query.venuesTable.findMany({
+            where: whereClause,
+            limit: limit,
+            offset: offset,
+            orderBy: orderByClause,
+            with: {
+                photos: true
+            }
+        });
+
+        return {
+            data,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages
+            }
+        };
     }
 
     async findByOwnerId(ownerId: string) {
