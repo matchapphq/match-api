@@ -10,17 +10,21 @@ import { db } from "../../config/config.db";
 import { subscriptionsTable } from "../../config/db/subscriptions.table";
 import { eq, and, gt } from "drizzle-orm";
 import { validator } from "hono/validator";
+import { getCookie } from "hono/cookie";
+import { JwtUtils } from "../../utils/jwt";
+import type { HonoEnv } from "../../types/hono.types";
+import type { Context } from "hono";
 
 /**
  * Controller for Venue operations.
  * Handles CRUD for venues with ownership and subscription checks.
  */
 class VenueController {
-    private readonly factory = createFactory();
+    private readonly factory = createFactory<HonoEnv>();
     private readonly venueRepository = new VenueRepository();
 
     // Helper to get user ID from context (assuming auth middleware sets it)
-    private getUserId(ctx: any): string {
+    private getUserId(ctx: Context<HonoEnv>): string {
         const user = ctx.get('user');
         if (!user || !user.id) {
             throw new Error("Unauthorized");
@@ -53,9 +57,13 @@ class VenueController {
         return parsed.data;
     }), async (ctx) => {
         try {
-            const userId = this.getUserId(ctx);
+            const user = ctx.get('user');
             const body = ctx.req.valid('json');
 
+            if (!user || !user.id) {
+                return ctx.json({ error: "User ID not found (Unauthorized)" }, 401);
+            }
+            const userId = user.id;
             // 1. Check Subscription
             const subscription = await this.getActiveSubscription(userId);
             if (!subscription) {
@@ -112,7 +120,7 @@ class VenueController {
 
     readonly delete = this.factory.createHandlers(async (ctx) => {
         try {
-            const userId = this.getUserId(ctx);
+            const userId = this.getUserId(ctx); 
             const venueId = ctx.req.param("venueId");
 
             if (!venueId) {
