@@ -12,6 +12,15 @@ export const HoldTableSchema = z.object({
 
 export const ConfirmReservationSchema = z.object({
     holdId: z.string().uuid(),
+    specialRequests: z.string().max(500).optional(),
+});
+
+export const CancelReservationSchema = z.object({
+    reason: z.string().max(255).optional(),
+});
+
+export const VerifyQRSchema = z.object({
+    qrContent: z.string().min(1),
 });
 
 // ============================================
@@ -20,6 +29,8 @@ export const ConfirmReservationSchema = z.object({
 
 export type HoldTableInput = z.infer<typeof HoldTableSchema>;
 export type ConfirmReservationInput = z.infer<typeof ConfirmReservationSchema>;
+export type CancelReservationInput = z.infer<typeof CancelReservationSchema>;
+export type VerifyQRInput = z.infer<typeof VerifyQRSchema>;
 
 export interface TableWithHoldStatus {
     id: string;
