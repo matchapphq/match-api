@@ -19,7 +19,7 @@ export class TableRepository {
             .from(reservationsTable)
             .where(and(
                 eq(reservationsTable.venue_match_id, matchId),
-                eq(reservationsTable.status, 'confirmed') // or pending
+                eq(reservationsTable.status, 'confirmed')
             ));
 
         const heldTableIds = await db.select({ id: tableHoldsTable.table_id })

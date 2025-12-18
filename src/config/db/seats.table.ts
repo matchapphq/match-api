@@ -5,7 +5,9 @@ import { venuesTable } from './venues.table';
 import { seatTypeEnum, seatStatusEnum } from './enums';
 
 // ============================================
-// 13. SEAT HOLDS TABLE
+// 13. SEAT HOLDS TABLE (LEGACY - Consider using table_holds instead)
+// This was designed for ticketing. For restaurant-style reservations,
+// use the table_holds table which tracks table reservations by party size.
 // ============================================
 
 export const seatHoldsTable = pgTable(
@@ -27,8 +29,6 @@ export const seatHoldsTable = pgTable(
         converted_to_reservation_id: uuid('converted_to_reservation_id'),
         reason_for_release: varchar('reason_for_release', { length: 255 }),
 
-        // Price at time of hold
-        total_price: numeric('total_price', { precision: 10, scale: 2 }),
     },
     (table) => [
         index('idx_seat_holds_user_id').on(table.user_id),
@@ -70,8 +70,6 @@ export const seatsTable = pgTable(
         status: seatStatusEnum('status').default('available').notNull(),
 
         is_accessible: boolean('is_accessible').default(false),
-
-        base_price: numeric('base_price', { precision: 10, scale: 2 }),
 
         // Seat hold tracking
         hold_id: uuid('hold_id'),

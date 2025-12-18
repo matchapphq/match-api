@@ -264,14 +264,11 @@ export const invoicesRelations = relations(invoicesTable, ({ one }) => ({
     }),
 }));
 
+// Transactions are for venue owner subscriptions only - users don't pay for reservations
 export const transactionsRelations = relations(transactionsTable, ({ one }) => ({
     user: one(usersTable, {
         fields: [transactionsTable.user_id],
         references: [usersTable.id],
-    }),
-    reservation: one(reservationsTable, {
-        fields: [transactionsTable.reservation_id],
-        references: [reservationsTable.id],
     }),
     subscription: one(subscriptionsTable, {
         fields: [transactionsTable.subscription_id],

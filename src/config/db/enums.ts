@@ -21,6 +21,8 @@ export const subscriptionLevelEnum = pgEnum('subscription_level', ['basic', 'pro
 
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'finished', 'canceled', 'postponed']);
 
+// DEPRECATED: Pricing type enum - no longer used as reservations are free for users
+// Kept for backwards compatibility with existing migrations
 export const venuePricingTypeEnum = pgEnum('pricing_type', ['per_seat', 'per_table', 'fixed']);
 
 export const seatTypeEnum = pgEnum('seat_type', ['standard', 'premium', 'vip', 'wheelchair', 'couple']);
@@ -68,13 +70,13 @@ export const invoiceStatusEnum = pgEnum('invoice_status', [
     'canceled',
 ]);
 
+// Transaction types - only for venue owner billing (subscriptions)
+// Users do NOT pay for reservations
 export const transactionTypeEnum = pgEnum('transaction_type', [
-    'reservation',
     'subscription',
     'refund',
     'payout',
     'adjustment',
-    'deposit',
 ]);
 export const transactionStatusEnum = pgEnum('transaction_status', [
     'pending',

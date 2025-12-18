@@ -5,7 +5,7 @@ import { createFactory } from "hono/factory";
 import type { userRegisterData } from "../../utils/userData";
 import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
-import { setCookie, getCookie, setSignedCookie } from "hono/cookie";
+import { setCookie, getCookie, setSignedCookie, deleteCookie } from "hono/cookie";
 import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
 
 /**
@@ -194,6 +194,8 @@ class AuthController {
     readonly logout = this.factory.createHandlers(async (ctx) => {
         // In JWT stateless auth, logout is client-side. 
         // Optional: Blacklist token in Redis if implemented.
+        deleteCookie(ctx, "refresh_token");
+        deleteCookie(ctx, "access_token");
         return ctx.json({ message: "Logged out successfully" });
     });
 

@@ -66,6 +66,8 @@ export type NewMatch = typeof matchesTable.$inferInsert;
 
 // ============================================
 // 12. VENUE MATCHES TABLE
+// Links venues to matches they will broadcast. Users can then
+// make FREE table reservations to watch the match at the venue.
 // ============================================
 
 export const venueMatchesTable = pgTable(
@@ -75,11 +77,6 @@ export const venueMatchesTable = pgTable(
         venue_id: uuid('venue_id').notNull(),
         match_id: uuid('match_id').notNull(),
 
-        // Custom pricing for this venue
-        pricing_type: venuePricingTypeEnum('pricing_type').default('per_seat').notNull(),
-        base_price: numeric('base_price', { precision: 10, scale: 2 }).notNull(),
-        vip_price: numeric('vip_price', { precision: 10, scale: 2 }),
-
         // Availability
         total_seats: integer('total_seats').notNull(),
         available_seats: integer('available_seats').notNull(),
@@ -88,8 +85,6 @@ export const venueMatchesTable = pgTable(
 
         // Features
         allows_reservations: boolean('allows_reservations').default(true),
-        requires_deposit: boolean('requires_deposit').default(false),
-        deposit_amount: numeric('deposit_amount', { precision: 10, scale: 2 }),
 
         is_active: boolean('is_active').default(true),
         is_featured: boolean('is_featured').default(false),

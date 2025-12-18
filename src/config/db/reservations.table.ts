@@ -6,6 +6,9 @@ import { tablesTable } from './tables.table';
 
 // ============================================
 // 15. RESERVATIONS TABLE
+// Note: Reservations are FREE for users. Users simply book a table
+// for a match, similar to a restaurant reservation. No payment required.
+// The venue owner pays for the platform subscription, not the users.
 // ============================================
 
 export const reservationsTable = pgTable(
@@ -21,19 +24,9 @@ export const reservationsTable = pgTable(
 
         status: reservationStatusEnum('status').default('pending').notNull(),
 
-        // Seats
+        // Legacy seat_ids field (kept for backwards compatibility, use table_id instead)
         seat_ids: text('seat_ids').array().notNull(),
         quantity: integer('quantity').notNull(),
-
-        // Pricing (Defaults to 0.00 for pay-at-venue)
-        unit_price: numeric('unit_price', { precision: 10, scale: 2 }).default('0.00').notNull(),
-        total_price: numeric('total_price', { precision: 10, scale: 2 }).default('0.00').notNull(),
-        discount_applied: numeric('discount_applied', { precision: 10, scale: 2 }).default('0.00'),
-        final_price: numeric('final_price', { precision: 10, scale: 2 }).default('0.00').notNull(),
-
-        // Deposit (if applicable)
-        deposit_required: numeric('deposit_required', { precision: 10, scale: 2 }),
-        deposit_paid: boolean('deposit_paid').default(false),
 
         // Special requests
         special_requests: text('special_requests'),
