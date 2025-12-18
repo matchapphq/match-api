@@ -13,4 +13,6 @@ export * from './reviews.table';
 export * from './notifications.table';
 export * from './billing.table';
 export * from './admin.table';
+export * from './tables.table';
+export * from './table-holds.table';
 export * from './relations';

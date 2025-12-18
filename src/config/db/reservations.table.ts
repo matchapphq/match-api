@@ -2,6 +2,7 @@ import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey,
 import { usersTable } from './user.table';
 import { venueMatchesTable } from './matches.table';
 import { reservationStatusEnum } from './enums';
+import { tablesTable } from './tables.table';
 
 // ============================================
 // 15. RESERVATIONS TABLE
@@ -14,17 +15,21 @@ export const reservationsTable = pgTable(
         user_id: uuid('user_id').notNull(),
         venue_match_id: uuid('venue_match_id').notNull(),
 
+        // Table Reservation
+        table_id: uuid('table_id'), // Nullable if seat-based, but we are moving to table-based primarily? Or hybrid? Plan says "Restaurant Style".
+        party_size: integer('party_size'),
+
         status: reservationStatusEnum('status').default('pending').notNull(),
 
         // Seats
         seat_ids: text('seat_ids').array().notNull(),
         quantity: integer('quantity').notNull(),
 
-        // Pricing
-        unit_price: numeric('unit_price', { precision: 10, scale: 2 }).notNull(),
-        total_price: numeric('total_price', { precision: 10, scale: 2 }).notNull(),
+        // Pricing (Defaults to 0.00 for pay-at-venue)
+        unit_price: numeric('unit_price', { precision: 10, scale: 2 }).default('0.00').notNull(),
+        total_price: numeric('total_price', { precision: 10, scale: 2 }).default('0.00').notNull(),
         discount_applied: numeric('discount_applied', { precision: 10, scale: 2 }).default('0.00'),
-        final_price: numeric('final_price', { precision: 10, scale: 2 }).notNull(),
+        final_price: numeric('final_price', { precision: 10, scale: 2 }).default('0.00').notNull(),
 
         // Deposit (if applicable)
         deposit_required: numeric('deposit_required', { precision: 10, scale: 2 }),
@@ -60,6 +65,11 @@ export const reservationsTable = pgTable(
             foreignColumns: [venueMatchesTable.id],
             name: 'fk_reservations_venue_match_id',
         }).onDelete('cascade'),
+        foreignKey({
+            columns: [table.table_id],
+            foreignColumns: [tablesTable.id],
+            name: 'fk_reservations_table_id',
+        }).onDelete('set null'),
     ]
 );
 
