@@ -1,12 +1,10 @@
 import { Hono } from "hono";
 import ReservationsController from "../../controllers/reservations/reservations.controller";
+import { authMiddleware } from "../../middleware/auth.middleware";
+import type { HonoEnv } from "../../types/hono.types";
 
-/**
- * Service for defining Reservations routes.
- * Mounts the ReservationsController handlers to the router.
- */
 class ReservationsService {
-    private readonly router = new Hono();
+    private readonly router = new Hono<HonoEnv>();
     private readonly controller = new ReservationsController();
 
     public get getRouter() {
@@ -18,12 +16,12 @@ class ReservationsService {
     }
 
     initRoutes() {
-        this.router.post("/", ...this.controller.createReservation);
-        this.router.get("/", ...this.controller.getReservations);
-        this.router.get("/:reservationId", ...this.controller.getReservationDetails);
-        this.router.put("/:reservationId", ...this.controller.updateReservation);
-        this.router.delete("/:reservationId", ...this.controller.cancelReservation);
-        this.router.post("/:reservationId/check-in", ...this.controller.checkIn);
+        // Protected routes
+        this.router.use("/*", authMiddleware);
+
+        this.router.get("/", ...this.controller.list);
+        this.router.post("/hold", ...this.controller.holdTable);
+        this.router.post("/confirm", ...this.controller.confirmReservation);
     }
 }
 
