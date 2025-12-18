@@ -1,6 +1,12 @@
 # Match Project — Complete API Routes Documentation
 
-**Production-ready API routes for Match platform (Stripe-integrated, venue owner subscriptions only)**
+**Production-ready API routes for Match platform**
+
+## 💼 Business Model
+
+- **Venue owners pay** for subscriptions (Stripe-integrated)
+- **Users don't pay** — reservations are completely FREE (like booking a restaurant table)
+- Users book a table by party size, receive a QR code, venue owner scans to verify
 
 ---
 
@@ -774,7 +780,7 @@ Response: 200
 ```
 
 ### POST /api/venues/:venueId/matches
-**Add match to venue (owner only)**
+**Add match to venue for broadcasting (owner only)**
 
 ```typescript
 Headers: Authorization: Bearer <token>
@@ -782,13 +788,8 @@ Headers: Authorization: Bearer <token>
 Request body:
 {
   match_id: uuid;
-  pricing_type: 'per_seat' | 'per_table' | 'fixed';
-  base_price: number;
-  vip_price?: number;
-  total_seats: number;
-  allows_reservations?: boolean;
-  requires_deposit?: boolean;
-  deposit_amount?: number;
+  total_seats: number;           // Total capacity for this match
+  allows_reservations?: boolean; // Whether users can book tables (default: true)
   estimated_crowd_level?: string;
   notes?: string;
 }
@@ -807,14 +808,9 @@ Headers: Authorization: Bearer <token>
 
 Request body:
 {
-  pricing_type?: 'per_seat' | 'per_table' | 'fixed';
-  base_price?: number;
-  vip_price?: number;
   total_seats?: number;
   available_seats?: number;
   allows_reservations?: boolean;
-  requires_deposit?: boolean;
-  deposit_amount?: number;
   is_active?: boolean;
   is_featured?: boolean;
   estimated_crowd_level?: string;
@@ -859,7 +855,7 @@ Response: 200
 ```
 
 ### POST /api/venues/:venueId/seats
-**Create seats (owner only)**
+**Create seats (owner only) - Legacy, prefer using tables**
 
 ```typescript
 Headers: Authorization: Bearer <token>
@@ -873,7 +869,6 @@ Request body:
     column?: string;
     seat_type?: 'standard' | 'premium' | 'vip' | 'wheelchair' | 'couple';
     is_accessible?: boolean;
-    base_price?: number;
   }[];
 }
 
@@ -893,7 +888,6 @@ Request body:
 {
   seat_type?: 'standard' | 'premium' | 'vip' | 'wheelchair' | 'couple';
   status?: seat_status;
-  base_price?: number;
   blocked_reason?: string;
   blocked_until?: timestamp;
 }
@@ -972,10 +966,16 @@ Response: 200
 
 ---
 
-## 🎟️ Reservations Routes
+## � Reservations Routes (FREE for Users)
 
-### POST /api/reservations
-**Create reservation**
+Reservations are completely free for users. They work like restaurant table bookings:
+1. User specifies venue, match, and party size
+2. System finds best available table
+3. User receives QR code
+4. Venue owner scans QR to verify on match day
+
+### POST /api/reservations/hold
+**Hold a table (15 min temporary hold)**
 
 ```typescript
 Headers: Authorization: Bearer <token>
@@ -983,14 +983,37 @@ Headers: Authorization: Bearer <token>
 Request body:
 {
   venue_match_id: uuid;
-  seat_ids: uuid[];
+  party_size: number;           // How many people in your group
+  requires_accessibility?: boolean;
+}
+
+Response: 201
+{
+  hold_id: uuid;
+  expires_at: timestamp;
+  table: {
+    name: string;
+    capacity: number;
+  }
+}
+```
+
+### POST /api/reservations/confirm
+**Confirm reservation from hold**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  hold_id: uuid;
   special_requests?: string;
 }
 
 Response: 201
 {
   reservation: Reservation;
-  qr_code: string;
+  qr_code: string;              // Base64 QR code image for check-in
 }
 ```
 
