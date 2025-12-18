@@ -15,4 +15,5 @@ export * from './billing.table';
 export * from './admin.table';
 export * from './tables.table';
 export * from './table-holds.table';
+export * from './waitlist.table';
 export * from './relations';

@@ -11,6 +11,7 @@ import { seatsTable, seatHoldsTable } from './seats.table';
 import { reservationsTable } from './reservations.table';
 import { tablesTable } from './tables.table';
 import { tableHoldsTable } from './table-holds.table';
+import { waitlistTable } from './waitlist.table';
 import { reviewsTable, reviewHelpfulTable } from './reviews.table';
 import { notificationsTable, conversationsTable, messagesTable } from './notifications.table';
 import { paymentMethodsTable, invoicesTable, transactionsTable } from './billing.table';
@@ -306,5 +307,20 @@ export const bannedUsersRelations = relations(bannedUsersTable, ({ one }) => ({
     user: one(usersTable, {
         fields: [bannedUsersTable.user_id],
         references: [usersTable.id],
+    }),
+}));
+
+// ============================================
+// WAITLIST RELATIONS
+// ============================================
+
+export const waitlistRelations = relations(waitlistTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [waitlistTable.user_id],
+        references: [usersTable.id],
+    }),
+    venueMatch: one(venueMatchesTable, {
+        fields: [waitlistTable.venue_match_id],
+        references: [venueMatchesTable.id],
     }),
 }));
