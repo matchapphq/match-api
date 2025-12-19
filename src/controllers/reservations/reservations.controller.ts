@@ -6,6 +6,7 @@ import { ReservationRepository } from "../../repository/reservation.repository";
 import { WaitlistRepository } from "../../repository/waitlist.repository";
 import { HoldTableSchema, ConfirmReservationSchema, CancelReservationSchema, VerifyQRSchema } from "../../utils/reservation.valid";
 import { createQRPayload, generateQRCodeImage, parseQRContent, verifyQRPayload } from "../../utils/qr.utils";
+import { randomUUIDv7 } from "bun";
 
 class ReservationsController {
     private readonly factory = createFactory<HonoEnv>();
@@ -97,7 +98,7 @@ class ReservationsController {
             hold.table_id, 
             hold.venue_match_id, 
             hold.party_size, 
-            "" // Placeholder, will update with signed QR
+            "", // Placeholder, will update with signed QR
         );
 
         if (!reservation) {
@@ -105,20 +106,24 @@ class ReservationsController {
         }
 
         // Generate signed QR code payload
-        const qrPayload = createQRPayload(
+      const qrPayload = createQRPayload(
             reservation.id,
             user.id,
             hold.venue_match_id,
             hold.table_id,
             matchStartTime
         );
-
+      
         // Generate QR code image
         const qrCodeImage = await generateQRCodeImage(qrPayload);
-
-        // Delete hold (table is now reserved)
-        await this.tableRepo.deleteHold(hold.id);
-
+        
+        const [updatedReservation, deletedHold] = await Promise.all([
+          this.reservationRepo.updateReservationqrCode(reservation.id, qrCodeImage),
+          this.tableRepo.deleteHold(hold.id)
+        ]);
+        
+        console.log(updatedReservation, deletedHold);
+        
         return c.json({
             message: "Reservation confirmed! Show this QR code at the venue.",
             reservation: {

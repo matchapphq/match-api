@@ -38,7 +38,7 @@ export const reservationsTable = pgTable(
         canceled_reason: varchar('canceled_reason', { length: 255 }),
 
         // QR Code for check-in
-        qr_code: varchar('qr_code', { length: 255 }).unique(),
+        qr_code: text('qr_code').unique(),
 
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
         updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

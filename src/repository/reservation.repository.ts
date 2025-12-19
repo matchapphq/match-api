@@ -29,7 +29,7 @@ export class ReservationRepository {
 
         return reservation;
     }
-
+  
     /**
      * Find reservation by ID
      */
@@ -164,6 +164,18 @@ export class ReservationRepository {
         const [updated] = await db.update(reservationsTable)
             .set({
                 status,
+                updated_at: new Date()
+            })
+            .where(eq(reservationsTable.id, reservationId))
+            .returning();
+
+        return updated;
+    }
+    
+    async updateReservationqrCode(reservationId: string, qrCodeContent: string) {
+        const [updated] = await db.update(reservationsTable)
+            .set({
+                qr_code: qrCodeContent,
                 updated_at: new Date()
             })
             .where(eq(reservationsTable.id, reservationId))
