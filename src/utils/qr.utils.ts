@@ -104,3 +104,41 @@ export function parseQRContent(content: string): SignedQRPayload | null {
         return null;
     }
 }
+
+// /**
+//  * Mock main function to test QR code generation
+//  */
+// async function main() {
+//     const mockReservationId = "550e8400-e29b-41d4-a716-446655440000";
+//     const mockUserId = "550e8400-e29b-41d4-a716-446655440001";
+//     const mockVenueMatchId = "550e8400-e29b-41d4-a716-446655440002";
+//     const mockTableId = "550e8400-e29b-41d4-a716-446655440003";
+//     const mockMatchStartTime = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+//     console.log("Creating QR payload...");
+//     const payload = createQRPayload(
+//         mockReservationId,
+//         mockUserId,
+//         mockVenueMatchId,
+//         mockTableId,
+//         mockMatchStartTime
+//     );
+//     console.log("Payload:", payload);
+
+//     console.log("\nVerifying payload...");
+//     const verification = verifyQRPayload(payload);
+//     console.log("Verification result:", verification);
+
+//     console.log("\nGenerating QR code image...");
+//     const qrImage = await generateQRCodeImage(payload);
+//     console.log("QR code generated (base64 length):", qrImage.length);
+//     console.log("QR code image:", );
+
+//     console.log("\nParsing QR content...");
+//     const jsonContent = JSON.stringify(payload);
+//     const parsed = parseQRContent(jsonContent);
+//     console.log("Parsed payload:", parsed);
+// }
+
+// // Run if executed directly
+// main().catch(console.error);
