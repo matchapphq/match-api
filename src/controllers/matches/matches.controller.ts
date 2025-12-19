@@ -90,7 +90,17 @@ class MatchesController {
                     eq(venueMatchesTable.allows_reservations, true)
                 ),
                 with: {
-                    venue: true,
+                    venue: {
+                        columns: {
+                            id: true,
+                            name: true,
+                            city: true,
+                            street_address: true,
+                            phone: true,
+                            latitude: true,
+                            longitude: true,
+                        }
+                    },
                 },
             });
 
@@ -98,8 +108,9 @@ class MatchesController {
             const venues = venueMatches.map(vm => ({
                 venueMatchId: vm.id,
                 venue: vm.venue,
-                totalSeats: vm.total_seats,
-                availableSeats: vm.available_seats,
+                totalCapacity: vm.total_capacity,
+                availableCapacity: vm.available_capacity,
+                maxGroupSize: vm.max_group_size,
                 isFeatured: vm.is_featured,
                 allowsReservations: vm.allows_reservations,
             }));
@@ -128,7 +139,15 @@ class MatchesController {
                     eq(venueMatchesTable.allows_reservations, true)
                 ),
                 with: {
-                    venue: true,
+                    venue: {
+                        columns: {
+                            id: true,
+                            name: true,
+                            city: true,
+                            latitude: true,
+                            longitude: true,
+                        }
+                    },
                     match: {
                         with: {
                             homeTeam: true,
@@ -152,7 +171,7 @@ class MatchesController {
                         name: vm.venue?.name,
                         city: vm.venue?.city,
                     },
-                    availableSeats: vm.available_seats,
+                    availableCapacity: vm.available_capacity,
                     isFeatured: vm.is_featured,
                 }))
                 .sort((a, b) => 

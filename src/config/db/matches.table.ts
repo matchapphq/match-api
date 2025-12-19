@@ -77,11 +77,14 @@ export const venueMatchesTable = pgTable(
         venue_id: uuid('venue_id').notNull(),
         match_id: uuid('match_id').notNull(),
 
-        // Availability
-        total_seats: integer('total_seats').notNull(),
-        available_seats: integer('available_seats').notNull(),
-        reserved_seats: integer('reserved_seats').default(0),
-        held_seats: integer('held_seats').default(0),
+        // Capacity Management
+        total_capacity: integer('total_capacity').notNull(), // Total people the venue can hold for this match
+        available_capacity: integer('available_capacity').notNull(), // Remaining spots
+        reserved_capacity: integer('reserved_capacity').default(0), // Confirmed reservations
+        held_capacity: integer('held_capacity').default(0), // Temporary holds (15 min)
+        
+        // Group size limit (e.g., max 10 people per reservation)
+        max_group_size: integer('max_group_size').default(10).notNull(),
 
         // Features
         allows_reservations: boolean('allows_reservations').default(true),
