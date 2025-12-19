@@ -7,24 +7,54 @@ import { eq, and, inArray } from "drizzle-orm";
 export class ReservationRepository {
 
     /**
-     * Create reservation from a confirmed hold
+     * Create reservation with QR code (preferred method)
+     * Generates ID upfront to include in QR payload
+     */
+    async createWithQR(
+        reservationId: string,
+        userId: string,
+        venueMatchId: string,
+        partySize: number,
+        specialRequests: string,
+        qrCode: string
+    ) {
+        const [reservation] = await db.insert(reservationsTable).values({
+            id: reservationId,
+            user_id: userId,
+            venue_match_id: venueMatchId,
+            table_id: null,
+            party_size: partySize,
+            status: 'confirmed',
+            seat_ids: [], // Legacy field
+            quantity: partySize,
+            special_requests: specialRequests || null,
+            qr_code: qrCode
+        }).returning();
+
+        return reservation;
+    }
+
+    /**
+     * Create reservation from a confirmed hold (legacy)
+     * Note: table_id is optional - capacity-based system doesn't use physical tables
      */
     async createFromHold(
         userId: string,
-        tableId: string,
-        matchId: string,
+        tableId: string | null,
+        venueMatchId: string,
         partySize: number,
-        qrCodeContent: string
+        specialRequests: string = ""
     ) {
         const [reservation] = await db.insert(reservationsTable).values({
             user_id: userId,
-            venue_match_id: matchId,
+            venue_match_id: venueMatchId,
             table_id: tableId,
             party_size: partySize,
             status: 'confirmed',
             seat_ids: [], // Legacy field
-            quantity: 1,
-            qr_code: qrCodeContent
+            quantity: partySize,
+            special_requests: specialRequests || null,
+            qr_code: crypto.randomUUID() // Unique placeholder
         }).returning();
 
         return reservation;
@@ -32,6 +62,7 @@ export class ReservationRepository {
   
     /**
      * Find reservation by ID
+     * Note: Excludes venue.location (PostGIS geometry) to avoid parsing issues
      */
     async findById(reservationId: string) {
         return await db.query.reservationsTable.findFirst({
@@ -40,7 +71,15 @@ export class ReservationRepository {
                 table: true,
                 venueMatch: {
                     with: {
-                        venue: true,
+                        venue: {
+                            columns: {
+                                id: true,
+                                name: true,
+                                city: true,
+                                street_address: true,
+                                phone: true,
+                            }
+                        },
                         match: true
                     }
                 }
@@ -58,7 +97,14 @@ export class ReservationRepository {
                 table: true,
                 venueMatch: {
                     with: {
-                        venue: true,
+                        venue: {
+                            columns: {
+                                id: true,
+                                name: true,
+                                city: true,
+                                street_address: true,
+                            }
+                        },
                         match: true
                     }
                 }
@@ -76,7 +122,14 @@ export class ReservationRepository {
                 table: true,
                 venueMatch: {
                     with: {
-                        venue: true,
+                        venue: {
+                            columns: {
+                                id: true,
+                                name: true,
+                                city: true,
+                                street_address: true,
+                            }
+                        },
                         match: true
                     }
                 }
