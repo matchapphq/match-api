@@ -1,27 +1,33 @@
 import { createFactory } from "hono/factory";
+import { validator } from "hono/validator";
+import { z } from "zod";
+import { eq, and, gt } from "drizzle-orm";
+import type { Context } from "hono";
 
-/**
- * Controller for Venue operations (Read-Only/User Facing).
- * Handles fetching simple venue details, photos, reviews, and availability.
- */
 import { VenueRepository } from "../../repository/venue.repository";
+import { FavoritesRepository } from "../../repository/favorites.repository";
 import { CreateVenueSchema, UpdateVenueSchema, GetVenuesSchema } from "../../utils/venue.valid";
 import { db } from "../../config/config.db";
 import { subscriptionsTable } from "../../config/db/subscriptions.table";
-import { eq, and, gt } from "drizzle-orm";
-import { validator } from "hono/validator";
-import { getCookie } from "hono/cookie";
-import { JwtUtils } from "../../utils/jwt";
 import type { HonoEnv } from "../../types/hono.types";
-import type { Context } from "hono";
 
 /**
  * Controller for Venue operations.
  * Handles CRUD for venues with ownership and subscription checks.
  */
+// Validation schemas for favorites
+const AddFavoriteSchema = z.object({
+    note: z.string().max(500).optional(),
+});
+
+const UpdateFavoriteNoteSchema = z.object({
+    note: z.string().max(500).nullable(),
+});
+
 class VenueController {
     private readonly factory = createFactory<HonoEnv>();
     private readonly venueRepository = new VenueRepository();
+    private readonly favoritesRepository = new FavoritesRepository();
 
     // Helper to get user ID from context (assuming auth middleware sets it)
     private getUserId(ctx: Context<HonoEnv>): string {
@@ -202,6 +208,145 @@ class VenueController {
     readonly getAvailability = this.factory.createHandlers(async (ctx) => {
         // TODO: Implement
         return ctx.json({ msg: "Venue availability" });
+    });
+
+    // =============================================
+    // FAVORITES ENDPOINTS
+    // =============================================
+
+    /**
+     * POST /venues/:venueId/favorite - Add venue to favorites
+     */
+    readonly addFavorite = this.factory.createHandlers(validator('json', (value, ctx) => {
+        const parsed = AddFavoriteSchema.safeParse(value);
+        if (!parsed.success) {
+            return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+        }
+        return parsed.data;
+    }), async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const venueId = ctx.req.param("venueId");
+
+            if (!venueId) {
+                return ctx.json({ error: "Venue ID is required" }, 400);
+            }
+
+            const { note } = ctx.req.valid('json');
+
+            const result = await this.favoritesRepository.addFavorite(userId, venueId, note);
+
+            if (!result.success) {
+                if (result.error === 'venue_not_found') {
+                    return ctx.json({ error: "Venue not found" }, 404);
+                }
+                if (result.error === 'already_favorited') {
+                    return ctx.json({ error: "Venue is already in your favorites" }, 409);
+                }
+                return ctx.json({ error: "Failed to add favorite" }, 500);
+            }
+
+            return ctx.json({
+                message: result.restored ? "Venue restored to favorites" : "Venue added to favorites",
+                favorite: result.favorite
+            }, 201);
+
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Add favorite error:", error);
+            return ctx.json({ error: "Failed to add favorite" }, 500);
+        }
+    });
+
+    /**
+     * DELETE /venues/:venueId/favorite - Remove venue from favorites
+     */
+    readonly removeFavorite = this.factory.createHandlers(async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const venueId = ctx.req.param("venueId");
+
+            if (!venueId) {
+                return ctx.json({ error: "Venue ID is required" }, 400);
+            }
+
+            const deleted = await this.favoritesRepository.removeFavorite(userId, venueId);
+
+            if (!deleted) {
+                return ctx.json({ error: "Favorite not found" }, 404);
+            }
+
+            return ctx.json({ message: "Venue removed from favorites" });
+
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Remove favorite error:", error);
+            return ctx.json({ error: "Failed to remove favorite" }, 500);
+        }
+    });
+
+    /**
+     * PATCH /venues/:venueId/favorite - Update note on a favorite
+     */
+    readonly updateFavoriteNote = this.factory.createHandlers(validator('json', (value, ctx) => {
+        const parsed = UpdateFavoriteNoteSchema.safeParse(value);
+        if (!parsed.success) {
+            return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+        }
+        return parsed.data;
+    }), async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const venueId = ctx.req.param("venueId");
+
+            if (!venueId) {
+                return ctx.json({ error: "Venue ID is required" }, 400);
+            }
+
+            const { note } = ctx.req.valid('json');
+
+            const updated = await this.favoritesRepository.updateNote(userId, venueId, note);
+
+            if (!updated) {
+                return ctx.json({ error: "Favorite not found" }, 404);
+            }
+
+            return ctx.json({
+                message: "Favorite note updated",
+                favorite: updated
+            });
+
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Update favorite note error:", error);
+            return ctx.json({ error: "Failed to update favorite" }, 500);
+        }
+    });
+
+    /**
+     * GET /venues/:venueId/favorite - Check if venue is favorited
+     */
+    readonly checkFavorite = this.factory.createHandlers(async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const venueId = ctx.req.param("venueId");
+
+            if (!venueId) {
+                return ctx.json({ error: "Venue ID is required" }, 400);
+            }
+
+            const favorite = await this.favoritesRepository.getFavorite(userId, venueId);
+
+            return ctx.json({
+                isFavorited: !!favorite,
+                favorite: favorite ?? null
+            });
+
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Check favorite error:", error);
+            return ctx.json({ error: "Failed to check favorite" }, 500);
+        }
     });
 }
 

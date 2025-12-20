@@ -1,10 +1,32 @@
 import { createFactory } from "hono/factory";
+import { z } from "zod";
+import { validator } from "hono/validator";
+import type { Context } from "hono";
+
+import { FavoritesRepository } from "../../repository/favorites.repository";
+import type { HonoEnv } from "../../types/hono.types";
+
+// Validation schema for pagination
+const PaginationSchema = z.object({
+    page: z.coerce.number().int().min(1).optional().default(1),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+});
 
 /**
  * Controller for User operations.
  */
 class UserController {
-    private readonly factory = createFactory();
+    private readonly factory = createFactory<HonoEnv>();
+    private readonly favoritesRepository = new FavoritesRepository();
+
+    // Helper to get user ID from context
+    private getUserId(ctx: Context<HonoEnv>): string {
+        const user = ctx.get('user');
+        if (!user || !user.id) {
+            throw new Error("Unauthorized");
+        }
+        return user.id;
+    }
 
     readonly getMe = this.factory.createHandlers(async (ctx) => {
         return ctx.json({ msg: "Get current user profile" });
@@ -46,8 +68,29 @@ class UserController {
         return ctx.json({ msg: "Mark onboarding as complete" });
     });
 
-    readonly getFavorites = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Get user's favorite venues" });
+    /**
+     * GET /users/me/favorite-venues - List user's favorite venues with pagination
+     */
+    readonly getFavorites = this.factory.createHandlers(validator('query', (value, ctx) => {
+        const parsed = PaginationSchema.safeParse(value);
+        if (!parsed.success) {
+            return ctx.json({ error: "Invalid query params", details: parsed.error }, 400);
+        }
+        return parsed.data;
+    }), async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const { page, limit } = ctx.req.valid('query');
+
+            const result = await this.favoritesRepository.getFavorites(userId, { page, limit });
+
+            return ctx.json(result);
+
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Get favorites error:", error);
+            return ctx.json({ error: "Failed to fetch favorites" }, 500);
+        }
     });
 }
 
