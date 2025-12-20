@@ -2,9 +2,13 @@ import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey,
 import { usersTable } from './user.table';
 import { venueMatchesTable } from './matches.table';
 import { reservationStatusEnum } from './enums';
+import { tablesTable } from './tables.table';
 
 // ============================================
 // 15. RESERVATIONS TABLE
+// Note: Reservations are FREE for users. Users simply book a table
+// for a match, similar to a restaurant reservation. No payment required.
+// The venue owner pays for the platform subscription, not the users.
 // ============================================
 
 export const reservationsTable = pgTable(
@@ -14,21 +18,15 @@ export const reservationsTable = pgTable(
         user_id: uuid('user_id').notNull(),
         venue_match_id: uuid('venue_match_id').notNull(),
 
+        // Table Reservation
+        table_id: uuid('table_id'), // Nullable if seat-based, but we are moving to table-based primarily? Or hybrid? Plan says "Restaurant Style".
+        party_size: integer('party_size'),
+
         status: reservationStatusEnum('status').default('pending').notNull(),
 
-        // Seats
+        // Legacy seat_ids field (kept for backwards compatibility, use table_id instead)
         seat_ids: text('seat_ids').array().notNull(),
         quantity: integer('quantity').notNull(),
-
-        // Pricing
-        unit_price: numeric('unit_price', { precision: 10, scale: 2 }).notNull(),
-        total_price: numeric('total_price', { precision: 10, scale: 2 }).notNull(),
-        discount_applied: numeric('discount_applied', { precision: 10, scale: 2 }).default('0.00'),
-        final_price: numeric('final_price', { precision: 10, scale: 2 }).notNull(),
-
-        // Deposit (if applicable)
-        deposit_required: numeric('deposit_required', { precision: 10, scale: 2 }),
-        deposit_paid: boolean('deposit_paid').default(false),
 
         // Special requests
         special_requests: text('special_requests'),
@@ -40,7 +38,7 @@ export const reservationsTable = pgTable(
         canceled_reason: varchar('canceled_reason', { length: 255 }),
 
         // QR Code for check-in
-        qr_code: varchar('qr_code', { length: 255 }).unique(),
+        qr_code: text('qr_code').unique(),
 
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
         updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
@@ -60,6 +58,11 @@ export const reservationsTable = pgTable(
             foreignColumns: [venueMatchesTable.id],
             name: 'fk_reservations_venue_match_id',
         }).onDelete('cascade'),
+        foreignKey({
+            columns: [table.table_id],
+            foreignColumns: [tablesTable.id],
+            name: 'fk_reservations_table_id',
+        }).onDelete('set null'),
     ]
 );
 

@@ -4,6 +4,17 @@
 
 This project is a high-performance API built with [Hono](https://hono.dev/) for the Match Project. It follows a clean, modular architecture separating concerns into **Services** (Route Definitions), **Controllers** (Business Logic & Request Handling), and **Repositories** (Data Access).
 
+## 💼 Business Model
+
+**Match is NOT a ticketing platform.** It's a free reservation system for sports fans:
+
+- **Venue owners pay** a subscription fee to list their venues on the platform
+- **Users don't pay anything** — reservations are completely FREE (like booking a restaurant table)
+- Users simply select a match, choose a venue broadcasting it, specify party size, and get a QR code
+- Venue owners scan the QR code to verify reservations on match day
+
+Think of it as "OpenTable for watching sports" — not "Ticketmaster for bars".
+
 ## 🚀 Technology Stack
 
 - **Framework**: [Hono](https://hono.dev/) (Ultra-fast web framework)
@@ -94,14 +105,14 @@ The application is structured into the following domains (mounted in `server.ts`
 | **Venues** | `/venues` | Venue details and management |
 | **Matches** | `/matches` | Match scheduling and viewing |
 | **Sports** | `/sports` | Available sports master data |
-| **Reservations** | `/reservations` | Booking system |
+| **Reservations** | `/reservations` | FREE table booking system |
 | **Partners** | `/partners` | Partner/Restaurateur specific routes |
 | **Reviews** | `/reviews` | User reviews and ratings |
 | **Notifications** | `/notifications` | User notifications |
 | **Webhooks** | `/webhooks` | External service integration |
 | **Coupons** | `/coupons` | Discount and coupon management |
 | **Subscriptions** | `/subscriptions` | Venue owner subscriptions |
-| **Billing** | `/` | Invoices and transactions (mounted at root/globally) |
+| **Billing** | `/` | Invoices and transactions for venue owners (subscriptions only) |
 | **Analytics** | `/venues/:id/analytics`| Venue performance analytics |
 | **Messaging** | `/` | Chat and conversations (mounted at root) |
 

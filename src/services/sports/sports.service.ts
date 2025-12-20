@@ -19,6 +19,8 @@ class SportsService {
 
     initRoutes() {
         this.router.get("/", ...this.controller.getSports);
+        this.router.get("/:sportId/leagues", ...this.controller.getLeagues);
+        this.router.get("/leagues/:leagueId/teams", ...this.controller.getTeams);
     }
 }
 

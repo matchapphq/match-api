@@ -75,12 +75,13 @@ class PartnerController {
     });
 
     // POST /partners/venues/:venueId/matches
+    // Schedule a match to be broadcast at this venue (users can then make FREE reservations)
     readonly scheduleMatch = this.factory.createHandlers(async (c) => {
         const venueId = c.req.param("venueId");
 
         try {
             const body = await c.req.json();
-            const { match_id, total_seats, base_price } = body;
+            const { match_id, total_seats } = body;
 
             if (!venueId || !match_id || !total_seats) {
                 return c.json({ error: "venueId, match_id and total_seats are required" }, 400);
@@ -91,8 +92,6 @@ class PartnerController {
                 match_id: match_id,
                 total_seats: total_seats,
                 available_seats: total_seats, // Initially all available
-                base_price: base_price || "0.00",
-                pricing_type: "per_seat",
                 is_active: true
             }).returning();
 

@@ -56,7 +56,8 @@ export class JwtUtils {
             throw new Error("SECRET_KEY environment variable is not defined");
         }
         try {
-            return await verify(token, Bun.env.SECRET_KEY, "HS256") as TokenPayload;
+            const payload = await verify(token, Bun.env.SECRET_KEY, "HS256") as TokenPayload;
+            return payload;
         } catch (error) {
             console.error("Error verifying access token:", error);
             return null;

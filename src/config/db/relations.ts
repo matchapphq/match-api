@@ -9,6 +9,9 @@ import { sportsTable, leaguesTable, teamsTable } from './sports.table';
 import { matchesTable, venueMatchesTable } from './matches.table';
 import { seatsTable, seatHoldsTable } from './seats.table';
 import { reservationsTable } from './reservations.table';
+import { tablesTable } from './tables.table';
+import { tableHoldsTable } from './table-holds.table';
+import { waitlistTable } from './waitlist.table';
 import { reviewsTable, reviewHelpfulTable } from './reviews.table';
 import { notificationsTable, conversationsTable, messagesTable } from './notifications.table';
 import { paymentMethodsTable, invoicesTable, transactionsTable } from './billing.table';
@@ -152,6 +155,33 @@ export const seatsRelations = relations(seatsTable, ({ one }) => ({
     }),
 }));
 
+// ... existing relations ...
+
+export const tablesRelations = relations(tablesTable, ({ one, many }) => ({
+    venue: one(venuesTable, {
+        fields: [tablesTable.venue_id],
+        references: [venuesTable.id],
+    }),
+    reservations: many(reservationsTable),
+    holds: many(tableHoldsTable),
+}));
+
+export const tableHoldsRelations = relations(tableHoldsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [tableHoldsTable.user_id],
+        references: [usersTable.id],
+    }),
+    table: one(tablesTable, {
+        fields: [tableHoldsTable.table_id],
+        references: [tablesTable.id],
+    }),
+    venueMatch: one(venueMatchesTable, {
+        fields: [tableHoldsTable.venue_match_id],
+        references: [venueMatchesTable.id],
+    }),
+}));
+
+// Update reservationsRelations
 export const reservationsRelations = relations(reservationsTable, ({ one, many }) => ({
     user: one(usersTable, {
         fields: [reservationsTable.user_id],
@@ -160,6 +190,10 @@ export const reservationsRelations = relations(reservationsTable, ({ one, many }
     venueMatch: one(venueMatchesTable, {
         fields: [reservationsTable.venue_match_id],
         references: [venueMatchesTable.id],
+    }),
+    table: one(tablesTable, {
+        fields: [reservationsTable.table_id],
+        references: [tablesTable.id],
     }),
     transactions: many(transactionsTable),
 }));
@@ -231,14 +265,11 @@ export const invoicesRelations = relations(invoicesTable, ({ one }) => ({
     }),
 }));
 
+// Transactions are for venue owner subscriptions only - users don't pay for reservations
 export const transactionsRelations = relations(transactionsTable, ({ one }) => ({
     user: one(usersTable, {
         fields: [transactionsTable.user_id],
         references: [usersTable.id],
-    }),
-    reservation: one(reservationsTable, {
-        fields: [transactionsTable.reservation_id],
-        references: [reservationsTable.id],
     }),
     subscription: one(subscriptionsTable, {
         fields: [transactionsTable.subscription_id],
@@ -276,5 +307,20 @@ export const bannedUsersRelations = relations(bannedUsersTable, ({ one }) => ({
     user: one(usersTable, {
         fields: [bannedUsersTable.user_id],
         references: [usersTable.id],
+    }),
+}));
+
+// ============================================
+// WAITLIST RELATIONS
+// ============================================
+
+export const waitlistRelations = relations(waitlistTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [waitlistTable.user_id],
+        references: [usersTable.id],
+    }),
+    venueMatch: one(venueMatchesTable, {
+        fields: [waitlistTable.venue_match_id],
+        references: [venueMatchesTable.id],
     }),
 }));

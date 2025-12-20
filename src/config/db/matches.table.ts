@@ -66,6 +66,8 @@ export type NewMatch = typeof matchesTable.$inferInsert;
 
 // ============================================
 // 12. VENUE MATCHES TABLE
+// Links venues to matches they will broadcast. Users can then
+// make FREE table reservations to watch the match at the venue.
 // ============================================
 
 export const venueMatchesTable = pgTable(
@@ -75,21 +77,17 @@ export const venueMatchesTable = pgTable(
         venue_id: uuid('venue_id').notNull(),
         match_id: uuid('match_id').notNull(),
 
-        // Custom pricing for this venue
-        pricing_type: venuePricingTypeEnum('pricing_type').default('per_seat').notNull(),
-        base_price: numeric('base_price', { precision: 10, scale: 2 }).notNull(),
-        vip_price: numeric('vip_price', { precision: 10, scale: 2 }),
-
-        // Availability
-        total_seats: integer('total_seats').notNull(),
-        available_seats: integer('available_seats').notNull(),
-        reserved_seats: integer('reserved_seats').default(0),
-        held_seats: integer('held_seats').default(0),
+        // Capacity Management
+        total_capacity: integer('total_capacity').notNull(), // Total people the venue can hold for this match
+        available_capacity: integer('available_capacity').notNull(), // Remaining spots
+        reserved_capacity: integer('reserved_capacity').default(0), // Confirmed reservations
+        held_capacity: integer('held_capacity').default(0), // Temporary holds (15 min)
+        
+        // Group size limit (e.g., max 10 people per reservation)
+        max_group_size: integer('max_group_size').default(10).notNull(),
 
         // Features
         allows_reservations: boolean('allows_reservations').default(true),
-        requires_deposit: boolean('requires_deposit').default(false),
-        deposit_amount: numeric('deposit_amount', { precision: 10, scale: 2 }),
 
         is_active: boolean('is_active').default(true),
         is_featured: boolean('is_featured').default(false),

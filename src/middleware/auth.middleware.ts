@@ -1,10 +1,13 @@
 import { createMiddleware } from "hono/factory";
 import { JwtUtils } from "../utils/jwt";
-import { getCookie } from "hono/cookie";
+import { getCookie, getSignedCookie } from "hono/cookie";
 
 export const authMiddleware = createMiddleware(async (c, next) => {
-    const cookie = getCookie(c, "access_token");
+    if (!Bun.env.ACCESS_JWT_SIGN_KEY) {
+        return c.json({ error: "JWT signing key not found" }, 500);
+    }
     
+    const cookie = await getSignedCookie(c, Bun.env.ACCESS_JWT_SIGN_KEY, "access_token");
     if (!cookie) {
         return c.json({ error: "Unauthorized" }, 401);
     }
