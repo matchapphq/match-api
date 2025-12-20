@@ -37,3 +37,5 @@ drizzle/
 .agent/
 .zed/
 .vscode/
+postman/
+scripts/seed.ts

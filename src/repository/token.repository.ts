@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { password } from "bun";
 
 class TokenRepository {
-    async createToken(token: string, userId: string, device: string): Promise<{ user_id: string }[]> {
+    async createToken(token: string, userId: string, device: string): Promise<{ user_id: string }[]> {   
         let _tokenReturn
         const hashedToken = await password.hash(token, 'bcrypt');
 
