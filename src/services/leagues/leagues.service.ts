@@ -2,10 +2,10 @@ import { Hono } from "hono";
 import SportsController from "../../controllers/sports/sports.controller";
 
 /**
- * Service for defining Sports routes.
+ * Service for defining League routes.
  * Mounts the SportsController handlers to the router.
  */
-class SportsService {
+class LeaguesService {
     private readonly router = new Hono();
     private readonly controller = new SportsController();
 
@@ -18,11 +18,10 @@ class SportsService {
     }
 
     initRoutes() {
-        // Sports
-        this.router.get("/", ...this.controller.getSports);
-        this.router.get("/:sportId", ...this.controller.getSportById);
-        this.router.get("/:sportId/leagues", ...this.controller.getLeaguesBySport);
+        // Leagues
+        this.router.get("/:leagueId", ...this.controller.getLeagueById);
+        this.router.get("/:leagueId/teams", ...this.controller.getTeamsByLeague);
     }
 }
 
-export default SportsService;
+export default LeaguesService;
