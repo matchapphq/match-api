@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import VenueController from "../../controllers/venues/venues.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
+import { venueOwnerMiddleware } from "../../middleware/role.middleware";
 import type { HonoEnv } from "../../types/hono.types";
 
 /**
@@ -28,19 +29,16 @@ class VenueService {
         this.router.get("/:venueId/matches", ...this.controller.getMatches);
         this.router.get("/:venueId/availability", ...this.controller.getAvailability);
 
-        // Protected (Owner)
-        // Assuming authenticate middleware populates 'user' in context
-        // We don't import the middleware here but assume it's applied at a higher level or we wrap these specific routes
-        // For now, I'll wrap them here if possible, or assume the controller handles the "missing user" error internally 
-        // (which it does via getUserId -> throw Unauthorized).
-        // However, standard Hono pattern is to use middleware. 
-        // Since I don't see middleware imports in other services files easily, I'll assume global auth or controller-level checks are sufficient for now.
-        // Wait, I should probably apply auth middleware if available.
-        // I'll trust the controller's internal check `getUserId` which throws if no user.
+        // Venue Owner Only (requires venue_owner or admin role)
+        this.router.post("/", authMiddleware, venueOwnerMiddleware, ...this.controller.create);
+        this.router.put("/:venueId", authMiddleware, venueOwnerMiddleware, ...this.controller.update);
+        this.router.delete("/:venueId", authMiddleware, venueOwnerMiddleware, ...this.controller.delete);
 
-        this.router.post("/", authMiddleware, ...this.controller.create);
-        this.router.put("/:venueId", ...this.controller.update);
-        this.router.delete("/:venueId", ...this.controller.delete);
+        // Favorites (Any authenticated user)
+        this.router.post("/:venueId/favorite", authMiddleware, ...this.controller.addFavorite);
+        this.router.delete("/:venueId/favorite", authMiddleware, ...this.controller.removeFavorite);
+        this.router.patch("/:venueId/favorite", authMiddleware, ...this.controller.updateFavoriteNote);
+        this.router.get("/:venueId/favorite", authMiddleware, ...this.controller.checkFavorite);
     }
 }
 

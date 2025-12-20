@@ -1,12 +1,14 @@
 import { Hono } from "hono";
 import UserController from "../../controllers/user/user.controller";
+import { authMiddleware } from "../../middleware/auth.middleware";
+import type { HonoEnv } from "../../types/hono.types";
 
 /**
  * Service for defining User routes.
  * Mounts the UserController handlers to the router.
  */
 class UserService {
-    private readonly router = new Hono();
+    private readonly router = new Hono<HonoEnv>();
     private readonly controller = new UserController();
 
     public get getRouter() {
@@ -18,25 +20,25 @@ class UserService {
     }
 
     initRoutes() {
-        // Me routes
-        this.router.get("/me", ...this.controller.getMe);
-        this.router.put("/me", ...this.controller.updateMe);
-        this.router.delete("/me", ...this.controller.deleteMe);
+        // Me routes (Protected)
+        this.router.get("/me", authMiddleware, ...this.controller.getMe);
+        this.router.put("/me", authMiddleware, ...this.controller.updateMe);
+        this.router.delete("/me", authMiddleware, ...this.controller.deleteMe);
 
-        // Notification Preferences
-        this.router.put("/me/notification-preferences", ...this.controller.updateNotificationPreferences);
+        // Notification Preferences (Protected)
+        this.router.put("/me/notification-preferences", authMiddleware, ...this.controller.updateNotificationPreferences);
 
-        // Onboarding
-        this.router.put("/me/onboarding-complete", ...this.controller.completeOnboarding);
+        // Onboarding (Protected)
+        this.router.put("/me/onboarding-complete", authMiddleware, ...this.controller.completeOnboarding);
 
-        // Addresses
-        this.router.get("/me/addresses", ...this.controller.getAddresses);
-        this.router.post("/me/addresses", ...this.controller.addAddress);
-        this.router.put("/me/addresses/:addressId", ...this.controller.updateAddress);
-        this.router.delete("/me/addresses/:addressId", ...this.controller.deleteAddress);
+        // Addresses (Protected)
+        this.router.get("/me/addresses", authMiddleware, ...this.controller.getAddresses);
+        this.router.post("/me/addresses", authMiddleware, ...this.controller.addAddress);
+        this.router.put("/me/addresses/:addressId", authMiddleware, ...this.controller.updateAddress);
+        this.router.delete("/me/addresses/:addressId", authMiddleware, ...this.controller.deleteAddress);
 
-        // Favorites
-        this.router.get("/me/favorite-venues", ...this.controller.getFavorites);
+        // Favorites (Protected)
+        this.router.get("/me/favorite-venues", authMiddleware, ...this.controller.getFavorites);
 
         // Public Profile
         this.router.get("/:userId", ...this.controller.getUserProfile);
