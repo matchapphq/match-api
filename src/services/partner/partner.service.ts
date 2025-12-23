@@ -18,10 +18,20 @@ class PartnerService {
     }
 
     initRoutes() {
+        // Venues
         this.router.get("/venues", ...this.controller.getMyVenues);
         this.router.post("/venues", ...this.controller.createVenue);
+        
+        // Venue Matches (must be before :venueId routes to avoid conflict)
+        this.router.get("/venues/matches", ...this.controller.getMyMatches);
         this.router.post("/venues/:venueId/matches", ...this.controller.scheduleMatch);
         this.router.delete("/venues/:venueId/matches/:matchId", ...this.controller.cancelMatch);
+        
+        // Venue Clients
+        this.router.get("/venues/:venueId/clients", ...this.controller.getVenueClients);
+        
+        // Analytics
+        this.router.get("/analytics/summary", ...this.controller.getAnalyticsSummary);
     }
 }
 

@@ -1,6 +1,6 @@
 import { createMiddleware } from "hono/factory";
 import { JwtUtils } from "../utils/jwt";
-import { getCookie, getSignedCookie } from "hono/cookie";
+import { getSignedCookie } from "hono/cookie";
 
 export const authMiddleware = createMiddleware(async (c, next) => {
     if (!Bun.env.ACCESS_JWT_SIGN_KEY) {

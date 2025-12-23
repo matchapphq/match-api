@@ -1,6 +1,7 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { logger } from "hono/logger";
-import { prettyJSON } from "hono/pretty-json";
+import { authMiddleware } from "./middleware/auth.middleware";
 
 
 import AuthService from "./services/auth/auth.service";
@@ -26,8 +27,6 @@ import AnalyticsService from "./services/analytics/analytics.service";
 import CouponsService from "./services/coupons/coupons.service";
 import WebhooksService from "./services/webhooks/webhooks.service";
 
-const app = new Hono();
-
 const authRouter = new AuthService();
 const userRouter = new UserService();
 const onboardingRouter = new OnboardingService();
@@ -51,11 +50,22 @@ const analyticsRouter = new AnalyticsService();
 const couponsRouter = new CouponsService();
 const webhooksRouter = new WebhooksService();
 
-app.use(logger());
-app.use(prettyJSON());
+const app = new Hono().basePath("/api");
 
-// Auth Middleware (Populates user in context if valid token present)
-// app.use("/*", authMiddleware);
+// CORS - must be first (with credentials for cookies)
+app.use('*', cors({
+  origin: 'http://localhost:3000',
+  credentials: true,
+}));
+
+app.use(logger());
+app.get("/health", (c) => c.text("OK"));
+
+// Auth Middleware for protected routes
+
+app.use('/partners/*', authMiddleware);
+app.use('/users/*', authMiddleware);
+app.use('/reservations/*', authMiddleware);
 
 // Mount routes
 // Base: /api is usually handled by the entry point or Nginx, but here we assume app is mounted at /api or root. 

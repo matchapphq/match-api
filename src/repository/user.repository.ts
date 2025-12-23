@@ -5,13 +5,25 @@ import type { userRegisterData } from "../utils/userData";
 import { password } from "bun";
 
 class UserRepository {
-
-    async getUserByEmail(email: string): Promise<{ id: string; email: string; password_hash: string; role: 'user' | 'venue_owner' | 'admin' } | undefined> {
+    
+    async getMe(user: { id: string }) {
+      return await db.select({
+        id: usersTable.id,
+        email: usersTable.email,
+        role: usersTable.role,
+        first_name: usersTable.first_name,
+        last_name: usersTable.last_name,
+        phone: usersTable.phone
+      }).from(usersTable).where(eq(usersTable.id, user.id));
+    }
+    
+    async getUserByEmail(email: string): Promise<{ id: string; email: string; password_hash: string; role: 'user' | 'venue_owner' | 'admin'; first_name: string | null; } | undefined> {
         return (await db.select({
             id: usersTable.id,
             email: usersTable.email,
             password_hash: usersTable.password_hash,
             role: usersTable.role,
+            first_name: usersTable.first_name
         }).from(usersTable).where(eq(usersTable.email, email)))[0];
     }
 

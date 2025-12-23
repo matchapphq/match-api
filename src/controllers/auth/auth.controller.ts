@@ -5,7 +5,7 @@ import { createFactory } from "hono/factory";
 import type { userRegisterData } from "../../utils/userData";
 import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
-import { setCookie, getCookie, setSignedCookie, deleteCookie } from "hono/cookie";
+import { setCookie, getCookie, setSignedCookie, deleteCookie, getSignedCookie } from "hono/cookie";
 import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
 
 /**
@@ -39,9 +39,12 @@ class AuthController {
 
         try {
             const user = await this.userRepository.createUser(userRequest);
+            if (!user || !user.first_name) {
+                return ctx.json({ error: "Failed to create user" }, 500);
+            }
 
             // Generate Tokens
-            const tokenPayload = { id: user.id, email: user.email, role: user.role };
+            const tokenPayload = { id: user.id, email: user.email, role: user.role, firstName: user.first_name };
 
             const deviceId = ctx.req.header("User-Agent") || "Unknown";
 
@@ -86,7 +89,7 @@ class AuthController {
         const body = ctx.req.valid("json");
         const user = await this.userRepository.getUserByEmail(body.email);
 
-        if (!user) {
+        if (!user ||!user.first_name) {
             return ctx.json({ error: "Invalid email or password" }, 401)
         }
 
@@ -95,7 +98,7 @@ class AuthController {
             return ctx.json({ error: "Invalid email or password" }, 401)
         }
 
-        const tokenPayload = { id: user.id, email: user.email, role: user.role };
+        const tokenPayload = { id: user.id, email: user.email, role: user.role, firstName: user.first_name};
         const [accessToken, refreshToken] = await Promise.all([
             JwtUtils.generateAccessToken(tokenPayload),
             JwtUtils.generateRefreshToken(tokenPayload)
@@ -128,7 +131,7 @@ class AuthController {
     });
 
     readonly refreshToken = this.factory.createHandlers(async (ctx) => {
-        const oldRefreshToken = getCookie(ctx, 'refresh_token');
+        const oldRefreshToken = await getSignedCookie(ctx, JwtUtils.REFRESH_JWT_SIGN_KEY, 'refresh_token');
 
         if (!oldRefreshToken) {
             return ctx.json({ error: "Refresh token is required" }, 401);
@@ -165,7 +168,7 @@ class AuthController {
         }
 
         // Generate new tokens (Rotate)
-        const newPayload = { id: payload.id, email: payload.email, role: payload.role };
+        const newPayload = { id: payload.id, email: payload.email, role: payload.role, firstName: payload.firstName };
         const [newAccessToken, newRefreshToken] = await Promise.all([
             JwtUtils.generateAccessToken(newPayload),
             JwtUtils.generateRefreshToken(newPayload)
@@ -202,7 +205,6 @@ class AuthController {
     // Stubs for other methods
     readonly getMe = this.factory.createHandlers(async (ctx) => {
         // Middleware should have attached user to context
-        // const user = ctx.get('user');
         return ctx.json({ msg: "Current user profile" });
     });
 

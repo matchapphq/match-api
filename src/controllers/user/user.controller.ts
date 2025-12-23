@@ -5,6 +5,7 @@ import type { Context } from "hono";
 
 import { FavoritesRepository } from "../../repository/favorites.repository";
 import type { HonoEnv } from "../../types/hono.types";
+import UserRepository from "../../repository/user.repository";
 
 // Validation schema for pagination
 const PaginationSchema = z.object({
@@ -18,6 +19,7 @@ const PaginationSchema = z.object({
 class UserController {
     private readonly factory = createFactory<HonoEnv>();
     private readonly favoritesRepository = new FavoritesRepository();
+    private readonly userRepository = new UserRepository();
 
     // Helper to get user ID from context
     private getUserId(ctx: Context<HonoEnv>): string {
@@ -29,7 +31,23 @@ class UserController {
     }
 
     readonly getMe = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Get current user profile" });
+        const user = ctx.get('user');
+        let _userData;
+        if (!user) {
+            throw new Error("Unauthorized");
+        }
+        
+        try {
+          _userData = await this.userRepository.getMe({id: user.id});
+          
+          if (!_userData) {
+            throw new Error("User not found");
+          }
+          
+          return ctx.json({ msg: "Get current user profile", user: _userData });
+        } catch (error) {
+            throw new Error("Failed to fetch user data");
+        }
     });
 
     readonly updateMe = this.factory.createHandlers(async (ctx) => {
