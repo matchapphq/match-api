@@ -1,0 +1,310 @@
+{
+	"info": {
+		"name": "Match API - Complete Collection",
+		"description": "Complete CRUD endpoints for Venues, Broadcasts, and Bookings",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{"key": "baseUrl", "value": "http://localhost:8008", "type": "string"},
+		{"key": "venueId", "value": "v1", "type": "string"},
+		{"key": "bookingId", "value": "", "type": "string"},
+		{"key": "broadcastId", "value": "", "type": "string"}
+	],
+	"item": [
+		{
+			"name": "Venues",
+			"item": [
+				{
+					"name": "Get All Venues",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/venues",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues"]
+						}
+					}
+				},
+				{
+					"name": "Get Nearby Venues",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/venues?lat=48.8566&lng=2.3522&radius_m=5000",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues"],
+							"query": [
+								{"key": "lat", "value": "48.8566"},
+								{"key": "lng", "value": "2.3522"},
+								{"key": "radius_m", "value": "5000"}
+							]
+						}
+					}
+				},
+				{
+					"name": "Get Venue by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}"]
+						}
+					}
+				},
+				{
+					"name": "Create Venue",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Sports Lounge Downtown\",\n  \"lat\": 48.8606,\n  \"lng\": 2.3376,\n  \"address\": \"15 Rue de la Victoire, Paris\",\n  \"capacity\": 80,\n  \"maxSimultaneousBroadcasts\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/venues",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues"]
+						}
+					}
+				},
+				{
+					"name": "Update Venue",
+					"request": {
+						"method": "PUT",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Stadium Bar Paris - Updated\",\n  \"capacity\": 70\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}"]
+						}
+					}
+				},
+				{
+					"name": "Delete Venue",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Venue Capacity",
+					"request": {
+						"method": "PUT",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"capacity\": 100\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}/capacity",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}", "capacity"]
+						}
+					}
+				},
+				{
+					"name": "Get Venue Availability",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}/availability?time=2025-10-29T20:00:00Z",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}", "availability"],
+							"query": [{"key": "time", "value": "2025-10-29T20:00:00Z"}]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Broadcasts",
+			"item": [
+				{
+					"name": "Get All Broadcasts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}/broadcasts",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}", "broadcasts"]
+						}
+					}
+				},
+				{
+					"name": "Get Broadcasts at Time",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}/broadcasts?time=2025-10-29T20:00:00Z",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}", "broadcasts"],
+							"query": [{"key": "time", "value": "2025-10-29T20:00:00Z"}]
+						}
+					}
+				},
+				{
+					"name": "Add Broadcast",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Real Madrid vs Barcelona\",\n  \"sport\": \"Football\",\n  \"startTime\": \"2025-10-29T20:00:00Z\",\n  \"endTime\": \"2025-10-29T22:00:00Z\",\n  \"screen\": 1\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}/broadcasts",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}", "broadcasts"]
+						}
+					}
+				},
+				{
+					"name": "Add 2nd Simultaneous Broadcast",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Lakers vs Celtics\",\n  \"sport\": \"Basketball\",\n  \"startTime\": \"2025-10-29T20:30:00Z\",\n  \"endTime\": \"2025-10-29T23:00:00Z\",\n  \"screen\": 2\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}/broadcasts",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}", "broadcasts"]
+						}
+					}
+				},
+				{
+					"name": "Update Broadcast",
+					"request": {
+						"method": "PUT",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"Real Madrid vs Barcelona - La Liga\",\n  \"endTime\": \"2025-10-29T22:30:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}/broadcasts/{{broadcastId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}", "broadcasts", "{{broadcastId}}"]
+						}
+					}
+				},
+				{
+					"name": "Remove Broadcast",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/venues/{{venueId}}/broadcasts/{{broadcastId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["venues", "{{venueId}}", "broadcasts", "{{broadcastId}}"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Bookings",
+			"item": [
+				{
+					"name": "Get All Bookings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/bookings",
+							"host": ["{{baseUrl}}"],
+							"path": ["bookings"]
+						}
+					}
+				},
+				{
+					"name": "Get User Bookings",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/bookings?userName=John Doe",
+							"host": ["{{baseUrl}}"],
+							"path": ["bookings"],
+							"query": [{"key": "userName", "value": "John Doe"}]
+						}
+					}
+				},
+				{
+					"name": "Get Booking by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/bookings/{{bookingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["bookings", "{{bookingId}}"]
+						}
+					}
+				},
+				{
+					"name": "Create Booking",
+					"request": {
+						"method": "POST",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"John Doe\",\n  \"seats\": 4,\n  \"time\": \"2025-10-29T20:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/bookings/{{venueId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["bookings", "{{venueId}}"]
+						}
+					}
+				},
+				{
+					"name": "Update Booking",
+					"request": {
+						"method": "PUT",
+						"header": [{"key": "Content-Type", "value": "application/json"}],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"seats\": 6,\n  \"time\": \"2025-10-29T21:00:00Z\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/bookings/{{bookingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["bookings", "{{bookingId}}"]
+						}
+					}
+				},
+				{
+					"name": "Cancel Booking",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/bookings/{{bookingId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["bookings", "{{bookingId}}"]
+						}
+					}
+				}
+			]
+		}
+	]
+}
