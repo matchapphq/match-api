@@ -5,14 +5,11 @@ export default defineConfig({
     schema: "./src/config/db",
     dialect: "postgresql",
     dbCredentials: {
-      host: process.env.DATABASE_HOST as string,
-      port: 5439,
-      user: process.env.DATABASE_USER as string,
-      password: process.env.DATABASE_PASSWORD as string,
-      database: process.env.DATABASE_NAME as string,
-      ssl: process.env.NODE_ENV === 'production' ? {
-        rejectUnauthorized: false
-      } : false
+        url: process.env.DATABASE_URL as string,
+    },
+    migrations: {
+        table: "drizzle_migrations",
+        schema: "drizzle"
     },
     extensionsFilters: ["postgis"]
 });
