@@ -183,6 +183,34 @@ class PartnerController {
         }
     });
 
+    // GET /partners/stats/customers
+    readonly getCustomerStats = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get("user").id;
+
+        try {
+            const venueIds = await this.repository.getVenueIdsByOwnerId(userId);
+            
+            if (venueIds.length === 0) {
+                return ctx.json({
+                    customerCount: 0,
+                    totalGuests: 0,
+                    totalReservations: 0,
+                    period: "last_30_days"
+                });
+            }
+
+            const stats = await this.repository.getCustomerCountLast30Days(venueIds);
+
+            return ctx.json({
+                ...stats,
+                period: "last_30_days"
+            });
+        } catch (error: any) {
+            console.error("Error fetching customer stats:", error);
+            return ctx.json({ error: "Failed to fetch customer stats", details: error.message }, 500);
+        }
+    });
+
     // GET /partners/analytics/summary
     readonly getAnalyticsSummary = this.factory.createHandlers(async (ctx) => {
         const userId = ctx.get("user").id;

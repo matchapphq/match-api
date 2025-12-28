@@ -2,7 +2,7 @@ import { db } from "../config/config.db";
 import { venuesTable } from "../config/db/venues.table";
 import { venueMatchesTable, matchesTable } from "../config/db/matches.table";
 import { reservationsTable } from "../config/db/reservations.table";
-import { eq, and, sql, inArray, count, countDistinct } from "drizzle-orm";
+import { eq, and, sql, inArray, count, countDistinct, gte, sum } from "drizzle-orm";
 
 export class PartnerRepository {
 
@@ -319,6 +319,47 @@ export class PartnerRepository {
      * Get venue clients data in a single transaction
      * Combines ownership verification and data fetching
      */
+    /**
+     * Get customer count for last 30 days for given venue IDs
+     */
+    async getCustomerCountLast30Days(venueIds: string[]) {
+        if (venueIds.length === 0) {
+            return { customerCount: 0, totalGuests: 0, totalReservations: 0 };
+        }
+
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+        // Get venue match IDs for these venues (no transaction needed)
+        const venueMatches = await db.select({ id: venueMatchesTable.id })
+            .from(venueMatchesTable)
+            .where(inArray(venueMatchesTable.venue_id, venueIds));
+
+        if (venueMatches.length === 0) {
+            return { customerCount: 0, totalGuests: 0, totalReservations: 0 };
+        }
+
+        const vmIds = venueMatches.map(vm => vm.id);
+
+        // Count unique customers and total guests in last 30 days
+        const stats = await db.select({
+            uniqueCustomers: countDistinct(reservationsTable.user_id),
+            totalReservations: count(reservationsTable.id),
+            totalGuests: sum(reservationsTable.party_size),
+        })
+            .from(reservationsTable)
+            .where(and(
+                inArray(reservationsTable.venue_match_id, vmIds),
+                gte(reservationsTable.created_at, thirtyDaysAgo)
+            ));
+
+        return {
+            customerCount: Number(stats[0]?.uniqueCustomers) || 0,
+            totalGuests: Number(stats[0]?.totalGuests) || 0,
+            totalReservations: Number(stats[0]?.totalReservations) || 0,
+        };
+    }
+
     async getVenueClientsData(venueId: string, ownerId: string) {
         return await db.transaction(async (tx) => {
             // Verify ownership
