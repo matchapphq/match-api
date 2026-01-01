@@ -1,6 +1,7 @@
 import { createFactory } from "hono/factory";
 import type { HonoEnv } from "../../types/hono.types";
 import { PartnerRepository } from "../../repository/partner.repository";
+import subscriptionsRepository from "../../repository/subscriptions.repository";
 
 class PartnerController {
     private readonly factory = createFactory<HonoEnv>();
@@ -31,10 +32,27 @@ class PartnerController {
                 return ctx.json({ error: "Missing required address fields" }, 400);
             }
 
+            // Check if user already has a subscription, if not create a pending one
+            let subscription = await subscriptionsRepository.getSubscriptionByUserId(userId);
+            
+            if (!subscription) {
+                // Create a pending subscription for venue creation
+                subscription = await subscriptionsRepository.createSubscription({
+                    user_id: userId,
+                    plan: 'basic',
+                    status: 'trialing', // Will be activated after payment
+                    current_period_start: new Date(),
+                    current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 day trial
+                    stripe_subscription_id: `pending_${Date.now()}`,
+                    stripe_payment_method_id: 'pending',
+                    price: '0',
+                });
+            }
+
             const newVenue = await this.repository.createVenue({
                 name: body.name,
                 owner_id: userId,
-                subscription_id: "00000000-0000-0000-0000-000000000000", // Placeholder
+                subscription_id: subscription.id,
                 street_address: body.street_address,
                 city: body.city,
                 state_province: body.state_province,
