@@ -202,10 +202,9 @@ class AuthController {
         return ctx.json({ message: "Logged out successfully" });
     });
 
-    // Stubs for other methods
+    // Stub - use /users/me instead
     readonly getMe = this.factory.createHandlers(async (ctx) => {
-        // Middleware should have attached user to context
-        return ctx.json({ msg: "Current user profile" });
+        return ctx.json({ msg: "Use /users/me endpoint instead" }, 301);
     });
 
     readonly updateMe = this.factory.createHandlers(async (ctx) => {

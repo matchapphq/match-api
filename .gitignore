@@ -39,3 +39,4 @@ drizzle/
 .vscode/
 postman/
 scripts/seed.ts
+scripts/
