@@ -257,8 +257,8 @@ export class PartnerRepository {
     }
 
     /**
-     * Get complete analytics summary for a partner in a single transaction
-     * Ensures data consistency across multiple related queries
+     * Get complete analytics summary for a partner
+     * Note: neon-http driver doesn't support transactions, using sequential queries
      */
     async getAnalyticsSummary(venueIds: string[]) {
         if (venueIds.length === 0) {
@@ -269,50 +269,48 @@ export class PartnerRepository {
             };
         }
 
-        return await db.transaction(async (tx) => {
-            // Get venue matches with capacity
-            const venueMatches = await tx.select({
-                id: venueMatchesTable.id,
-                total_capacity: venueMatchesTable.total_capacity,
-                reserved_capacity: venueMatchesTable.reserved_capacity,
+        // Get venue matches with capacity
+        const venueMatches = await db.select({
+            id: venueMatchesTable.id,
+            total_capacity: venueMatchesTable.total_capacity,
+            reserved_capacity: venueMatchesTable.reserved_capacity,
+        })
+            .from(venueMatchesTable)
+            .where(inArray(venueMatchesTable.venue_id, venueIds));
+
+        const vmIds = venueMatches.map(vm => vm.id);
+
+        // Get client statistics
+        let clientStats = { uniqueUsers: 0, totalReservations: 0 };
+        if (vmIds.length > 0) {
+            const stats = await db.select({
+                uniqueUsers: countDistinct(reservationsTable.user_id),
+                totalReservations: count(reservationsTable.id),
             })
-                .from(venueMatchesTable)
-                .where(inArray(venueMatchesTable.venue_id, venueIds));
+                .from(reservationsTable)
+                .where(inArray(reservationsTable.venue_match_id, vmIds));
 
-            const vmIds = venueMatches.map(vm => vm.id);
-
-            // Get client statistics
-            let clientStats = { uniqueUsers: 0, totalReservations: 0 };
-            if (vmIds.length > 0) {
-                const stats = await tx.select({
-                    uniqueUsers: countDistinct(reservationsTable.user_id),
-                    totalReservations: count(reservationsTable.id),
-                })
-                    .from(reservationsTable)
-                    .where(inArray(reservationsTable.venue_match_id, vmIds));
-
-                clientStats = {
-                    uniqueUsers: Number(stats[0]?.uniqueUsers) || 0,
-                    totalReservations: Number(stats[0]?.totalReservations) || 0,
-                };
-            }
-
-            // Get match statistics
-            const matchStats = await tx.select({
-                matchId: venueMatchesTable.match_id,
-                scheduledAt: matchesTable.scheduled_at,
-                status: matchesTable.status,
-            })
-                .from(venueMatchesTable)
-                .innerJoin(matchesTable, eq(venueMatchesTable.match_id, matchesTable.id))
-                .where(inArray(venueMatchesTable.venue_id, venueIds));
-
-            return {
-                venueMatches,
-                clientStats,
-                matchStats,
+            clientStats = {
+                uniqueUsers: Number(stats[0]?.uniqueUsers) || 0,
+                totalReservations: Number(stats[0]?.totalReservations) || 0,
             };
-        });
+        }
+
+        // Get match statistics
+        const matchStats = await db.select({
+            matchId: venueMatchesTable.match_id,
+            scheduledAt: matchesTable.scheduled_at,
+            status: matchesTable.status,
+        })
+            .from(venueMatchesTable)
+            .innerJoin(matchesTable, eq(venueMatchesTable.match_id, matchesTable.id))
+            .where(inArray(venueMatchesTable.venue_id, venueIds));
+
+        return {
+            venueMatches,
+            clientStats,
+            matchStats,
+        };
     }
 
     /**
@@ -360,56 +358,58 @@ export class PartnerRepository {
         };
     }
 
+    /**
+     * Get venue clients data
+     * Note: neon-http driver doesn't support transactions, using sequential queries
+     */
     async getVenueClientsData(venueId: string, ownerId: string) {
-        return await db.transaction(async (tx) => {
-            // Verify ownership
-            const [venue] = await tx.select({ id: venuesTable.id })
-                .from(venuesTable)
-                .where(and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId)))
-                .limit(1);
+        // Verify ownership
+        const [venue] = await db.select({ id: venuesTable.id })
+            .from(venuesTable)
+            .where(and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId)))
+            .limit(1);
 
-            if (!venue) {
-                return { authorized: false, clients: [] };
-            }
+        if (!venue) {
+            return { authorized: false, clients: [] };
+        }
 
-            // Get venue match IDs
-            const venueMatches = await tx.select({ id: venueMatchesTable.id })
-                .from(venueMatchesTable)
-                .where(eq(venueMatchesTable.venue_id, venueId));
+        // Get venue match IDs
+        const venueMatches = await db.select({ id: venueMatchesTable.id })
+            .from(venueMatchesTable)
+            .where(eq(venueMatchesTable.venue_id, venueId));
 
-            if (venueMatches.length === 0) {
-                return { authorized: true, clients: [] };
-            }
+        if (venueMatches.length === 0) {
+            return { authorized: true, clients: [] };
+        }
 
-            const vmIds = venueMatches.map(vm => vm.id);
+        const vmIds = venueMatches.map(vm => vm.id);
 
-            // Get reservations with related data
-            const reservations = await db.query.reservationsTable.findMany({
-                where: inArray(reservationsTable.venue_match_id, vmIds),
-                with: {
-                    user: {
-                        columns: {
-                            id: true,
-                            first_name: true,
-                            last_name: true,
-                            email: true,
-                        }
-                    },
-                    venueMatch: {
-                        with: {
-                            match: {
-                                with: {
-                                    homeTeam: true,
-                                    awayTeam: true,
-                                }
+        // Get reservations with related data
+        const reservations = await db.query.reservationsTable.findMany({
+            where: inArray(reservationsTable.venue_match_id, vmIds),
+            with: {
+                user: {
+                    columns: {
+                        id: true,
+                        first_name: true,
+                        last_name: true,
+                        email: true,
+                    }
+                },
+                venueMatch: {
+                    with: {
+                        match: {
+                            with: {
+                                homeTeam: true,
+                                awayTeam: true,
                             }
                         }
                     }
-                },
-                orderBy: (reservations, { desc }) => [desc(reservations.created_at)],
-            });
-
-            return { authorized: true, clients: reservations };
+                }
+            },
+            orderBy: (reservations, { desc }) => [desc(reservations.created_at)],
         });
+
+        return { authorized: true, clients: reservations };
     }
 }
