@@ -2,6 +2,7 @@ import { createFactory } from "hono/factory";
 import type { HonoEnv } from "../../types/hono.types";
 import { PartnerRepository } from "../../repository/partner.repository";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
+import stripe, { CHECKOUT_URLS, isStripeConfigured } from "../../config/stripe";
 
 class PartnerController {
     private readonly factory = createFactory<HonoEnv>();
@@ -32,22 +33,18 @@ class PartnerController {
                 return ctx.json({ error: "Missing required address fields" }, 400);
             }
 
-            // Check if user already has a subscription, if not create a pending one
-            let subscription = await subscriptionsRepository.getSubscriptionByUserId(userId);
-            
-            if (!subscription) {
-                // Create a pending subscription for venue creation
-                subscription = await subscriptionsRepository.createSubscription({
-                    user_id: userId,
-                    plan: 'basic',
-                    status: 'trialing', // Will be activated after payment
-                    current_period_start: new Date(),
-                    current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 day trial
-                    stripe_subscription_id: `pending_${Date.now()}`,
-                    stripe_payment_method_id: 'pending',
-                    price: '0',
-                });
-            }
+            // Create a NEW pending subscription for this venue
+            // Each venue needs its own subscription (will be activated after payment)
+            const subscription = await subscriptionsRepository.createSubscription({
+                user_id: userId,
+                plan: 'basic', // Default, will be updated based on checkout selection
+                status: 'trialing',
+                current_period_start: new Date(),
+                current_period_end: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 day trial
+                stripe_subscription_id: `pending_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                stripe_payment_method_id: 'pending',
+                price: '0',
+            });
 
             const newVenue = await this.repository.createVenue({
                 name: body.name,
@@ -277,6 +274,97 @@ class PartnerController {
         } catch (error: any) {
             console.error("Error fetching analytics summary:", error);
             return ctx.json({ error: "Failed to fetch analytics", details: error.message }, 500);
+        }
+    });
+
+    // GET /partners/venues/:venueId/subscription
+    // Get subscription for a specific venue
+    readonly getVenueSubscription = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
+        }
+
+        try {
+            // Verify venue ownership
+            const venue = await this.repository.getVenueByIdAndOwner(venueId, userId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found or access denied" }, 404);
+            }
+
+            // Get subscription by venue's subscription_id
+            if (!venue.subscription_id) {
+                return ctx.json({ subscription: null });
+            }
+
+            const subscription = await subscriptionsRepository.getSubscriptionById(venue.subscription_id);
+            
+            if (!subscription) {
+                return ctx.json({ subscription: null });
+            }
+
+            // Map plan to user-friendly name and get actual price
+            const planInfo = {
+                basic: { name: 'Mensuel', displayPrice: '30€/mois' },
+                pro: { name: 'Annuel', displayPrice: '300€/an' },
+                enterprise: { name: 'Enterprise', displayPrice: 'Sur devis' },
+                trial: { name: 'Essai', displayPrice: 'Gratuit' },
+            };
+
+            const info = planInfo[subscription.plan as keyof typeof planInfo] || { name: subscription.plan, displayPrice: `${subscription.price}€` };
+
+            return ctx.json({ 
+                subscription: {
+                    ...subscription,
+                    plan_name: info.name,
+                    display_price: info.displayPrice,
+                }
+            });
+        } catch (error: any) {
+            console.error("Error fetching venue subscription:", error);
+            return ctx.json({ error: "Failed to fetch subscription", details: error.message }, 500);
+        }
+    });
+
+    // POST /partners/venues/:venueId/payment-portal
+    // Opens Stripe Customer Portal for a specific venue's payment method
+    readonly getVenuePaymentPortal = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
+        }
+
+        if (!isStripeConfigured()) {
+            return ctx.json({ error: "Payment system not configured" }, 503);
+        }
+
+        try {
+            // Verify venue ownership
+            const venue = await this.repository.getVenueByIdAndOwner(venueId, userId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found or access denied" }, 404);
+            }
+
+            // Get user's Stripe customer ID
+            const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
+            if (!stripeCustomerId) {
+                return ctx.json({ error: "No payment profile found" }, 404);
+            }
+
+            // Create Stripe Customer Portal session
+            const portalSession = await stripe.billingPortal.sessions.create({
+                customer: stripeCustomerId,
+                return_url: CHECKOUT_URLS.SUCCESS.replace('?checkout=success', ''),
+            });
+
+            return ctx.json({ portal_url: portalSession.url });
+        } catch (error: any) {
+            console.error("Error creating payment portal:", error);
+            return ctx.json({ error: "Failed to create payment portal", details: error.message }, 500);
         }
     });
 }

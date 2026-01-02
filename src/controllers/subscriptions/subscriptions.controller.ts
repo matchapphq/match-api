@@ -120,6 +120,14 @@ class SubscriptionsController {
                     quantity: 1,
                 }];
 
+            // Log checkout parameters for debugging
+            console.log('Creating checkout session:', {
+                user_id: user.id,
+                plan_id: plan_id,
+                venue_id: venue_id,
+                plan_name: plan.name,
+            });
+
             // Create Checkout Session
             const session = await stripe.checkout.sessions.create({
                 customer: stripeCustomerId,
@@ -373,6 +381,25 @@ class SubscriptionsController {
         } catch (error: any) {
             console.error("Upgrade subscription error:", error);
             return ctx.json({ error: "Failed to upgrade subscription" }, 500);
+        }
+    });
+
+    /**
+     * GET /subscriptions/invoices
+     * Returns all invoices for the current user
+     */
+    readonly getMyInvoices = this.factory.createHandlers(async (ctx) => {
+        const user = ctx.get('user');
+        if (!user || !user.id) {
+            return ctx.json({ error: "Unauthorized" }, 401);
+        }
+
+        try {
+            const invoices = await subscriptionsRepository.getInvoicesByUserId(user.id);
+            return ctx.json({ invoices });
+        } catch (error: any) {
+            console.error("Get invoices error:", error);
+            return ctx.json({ error: "Failed to fetch invoices" }, 500);
         }
     });
 

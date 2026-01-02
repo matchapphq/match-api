@@ -2,6 +2,7 @@ import { createFactory } from "hono/factory";
 import Stripe from "stripe";
 import stripe, { STRIPE_WEBHOOK_SECRET } from "../../config/stripe";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
+import { PartnerRepository } from "../../repository/partner.repository";
 
 /**
  * Webhooks Controller
@@ -95,10 +96,14 @@ class WebhooksController {
      */
     private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         console.log('Processing checkout.session.completed:', session.id);
+        console.log('Session metadata:', session.metadata);
 
         const userId = session.metadata?.user_id;
         const planId = session.metadata?.plan_id;
+        const venueId = session.metadata?.venue_id;
         const subscriptionId = session.subscription as string;
+
+        console.log('Parsed values:', { userId, planId, venueId, subscriptionId });
 
         if (!userId || !subscriptionId) {
             console.error('Missing user_id or subscription in checkout session');
@@ -116,45 +121,90 @@ class WebhooksController {
         const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId) as any;
         const amount = stripeSubscription.items?.data?.[0]?.price?.unit_amount || 0;
 
-        // Determine plan type
+        // Determine plan type based on plan_id
         const plan = planId === 'annual' ? 'pro' : 'basic';
 
         // Calculate commitment end date (1 year from now)
         const commitmentEndDate = new Date();
         commitmentEndDate.setFullYear(commitmentEndDate.getFullYear() + 1);
 
-        // Check if user already has a pending subscription (created during venue setup)
-        const existingSubscription = await subscriptionsRepository.getSubscriptionByUserId(userId);
-        
-        if (existingSubscription && existingSubscription.stripe_subscription_id.startsWith('pending_')) {
-            // Update the pending subscription with real Stripe data
-            await subscriptionsRepository.updateSubscription(existingSubscription.id, {
-                plan: plan,
-                status: 'active',
-                current_period_start: new Date((stripeSubscription.current_period_start || Date.now() / 1000) * 1000),
-                current_period_end: new Date((stripeSubscription.current_period_end || Date.now() / 1000) * 1000),
-                stripe_subscription_id: subscriptionId,
-                stripe_payment_method_id: stripeSubscription.default_payment_method as string || 'unknown',
-                price: String(amount / 100),
-                auto_renew: !stripeSubscription.cancel_at_period_end,
-                commitment_end_date: commitmentEndDate,
-            });
-            console.log('Pending subscription activated for user:', userId);
+        const partnerRepository = new PartnerRepository();
+        let newSubscriptionId: string | null = null;
+
+        // If there's a venue_id, update the venue's pending subscription
+        // Note: venue_id could be empty string "", so check for truthy value
+        if (venueId && venueId.length > 0) {
+            console.log(`Processing subscription for venue ${venueId} with plan: ${plan} (planId: ${planId})`);
+            
+            // Get the venue to find its pending subscription
+            const venue = await partnerRepository.getVenueById(venueId);
+            
+            if (venue && venue.subscription_id) {
+                // Update the venue's existing pending subscription with real Stripe data
+                await subscriptionsRepository.updateSubscription(venue.subscription_id, {
+                    plan: plan,
+                    status: 'active',
+                    current_period_start: new Date((stripeSubscription.current_period_start || Date.now() / 1000) * 1000),
+                    current_period_end: new Date((stripeSubscription.current_period_end || Date.now() / 1000) * 1000),
+                    stripe_subscription_id: subscriptionId,
+                    stripe_payment_method_id: stripeSubscription.default_payment_method as string || 'unknown',
+                    price: String(amount / 100),
+                    auto_renew: !stripeSubscription.cancel_at_period_end,
+                    commitment_end_date: commitmentEndDate,
+                });
+                console.log(`Subscription updated for venue ${venueId} with plan ${plan}`);
+            } else {
+                // Venue not found or no subscription - create new subscription and link
+                const newSubscription = await subscriptionsRepository.createSubscription({
+                    user_id: userId,
+                    plan: plan,
+                    status: 'active',
+                    current_period_start: new Date((stripeSubscription.current_period_start || Date.now() / 1000) * 1000),
+                    current_period_end: new Date((stripeSubscription.current_period_end || Date.now() / 1000) * 1000),
+                    stripe_subscription_id: subscriptionId,
+                    stripe_payment_method_id: stripeSubscription.default_payment_method as string || 'unknown',
+                    price: String(amount / 100),
+                    auto_renew: !stripeSubscription.cancel_at_period_end,
+                    commitment_end_date: commitmentEndDate,
+                });
+                newSubscriptionId = newSubscription.id;
+                await partnerRepository.updateVenueSubscription(venueId, newSubscriptionId);
+                console.log(`New subscription created and linked to venue ${venueId} with plan ${plan}`);
+            }
         } else {
-            // Create new subscription in our database
-            await subscriptionsRepository.createSubscription({
-                user_id: userId,
-                plan: plan,
-                status: 'active',
-                current_period_start: new Date((stripeSubscription.current_period_start || Date.now() / 1000) * 1000),
-                current_period_end: new Date((stripeSubscription.current_period_end || Date.now() / 1000) * 1000),
-                stripe_subscription_id: subscriptionId,
-                stripe_payment_method_id: stripeSubscription.default_payment_method as string || 'unknown',
-                price: String(amount / 100),
-                auto_renew: !stripeSubscription.cancel_at_period_end,
-                commitment_end_date: commitmentEndDate,
-            });
-            console.log('Subscription created for user:', userId);
+            // No venue_id - check for pending subscription to update
+            const existingSubscription = await subscriptionsRepository.getSubscriptionByUserId(userId);
+            
+            if (existingSubscription && existingSubscription.stripe_subscription_id.startsWith('pending_')) {
+                // Update the pending subscription with real Stripe data
+                await subscriptionsRepository.updateSubscription(existingSubscription.id, {
+                    plan: plan,
+                    status: 'active',
+                    current_period_start: new Date((stripeSubscription.current_period_start || Date.now() / 1000) * 1000),
+                    current_period_end: new Date((stripeSubscription.current_period_end || Date.now() / 1000) * 1000),
+                    stripe_subscription_id: subscriptionId,
+                    stripe_payment_method_id: stripeSubscription.default_payment_method as string || 'unknown',
+                    price: String(amount / 100),
+                    auto_renew: !stripeSubscription.cancel_at_period_end,
+                    commitment_end_date: commitmentEndDate,
+                });
+                console.log('Pending subscription activated for user:', userId);
+            } else {
+                // Create new subscription in our database
+                await subscriptionsRepository.createSubscription({
+                    user_id: userId,
+                    plan: plan,
+                    status: 'active',
+                    current_period_start: new Date((stripeSubscription.current_period_start || Date.now() / 1000) * 1000),
+                    current_period_end: new Date((stripeSubscription.current_period_end || Date.now() / 1000) * 1000),
+                    stripe_subscription_id: subscriptionId,
+                    stripe_payment_method_id: stripeSubscription.default_payment_method as string || 'unknown',
+                    price: String(amount / 100),
+                    auto_renew: !stripeSubscription.cancel_at_period_end,
+                    commitment_end_date: commitmentEndDate,
+                });
+                console.log('Subscription created for user:', userId);
+            }
         }
     }
 

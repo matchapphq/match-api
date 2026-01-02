@@ -30,6 +30,12 @@ class PartnerService {
         // Venue Clients
         this.router.get("/venues/:venueId/clients", ...this.controller.getVenueClients);
         
+        // Venue Subscription
+        this.router.get("/venues/:venueId/subscription", ...this.controller.getVenueSubscription);
+        
+        // Venue Payment Portal
+        this.router.post("/venues/:venueId/payment-portal", ...this.controller.getVenuePaymentPortal);
+        
         // Analytics & Stats
         this.router.get("/stats/customers", ...this.controller.getCustomerStats);
         this.router.get("/analytics/summary", ...this.controller.getAnalyticsSummary);

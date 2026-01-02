@@ -26,6 +26,17 @@ export class PartnerRepository {
     }
 
     /**
+     * Update a venue's subscription_id
+     */
+    async updateVenueSubscription(venueId: string, subscriptionId: string) {
+        const [updated] = await db.update(venuesTable)
+            .set({ subscription_id: subscriptionId })
+            .where(eq(venuesTable.id, venueId))
+            .returning();
+        return updated;
+    }
+
+    /**
      * Create a new venue
      */
     async createVenue(data: {
@@ -60,6 +71,17 @@ export class PartnerRepository {
         }).returning();
 
         return newVenue;
+    }
+
+    /**
+     * Get venue by ID
+     */
+    async getVenueById(venueId: string) {
+        const venues = await db.select()
+            .from(venuesTable)
+            .where(eq(venuesTable.id, venueId))
+            .limit(1);
+        return venues[0] || null;
     }
 
     /**

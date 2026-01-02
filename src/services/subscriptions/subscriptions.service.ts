@@ -28,6 +28,7 @@ class SubscriptionsService {
         this.router.post("/me/update-payment-method", authMiddleware, ...this.controller.updatePaymentMethod);
         this.router.post("/me/cancel", authMiddleware, ...this.controller.cancelSubscription);
         this.router.post("/me/upgrade", authMiddleware, ...this.controller.upgradeSubscription);
+        this.router.get("/invoices", authMiddleware, ...this.controller.getMyInvoices);
 
         // Mock Subscription Toggle (Development only)
         this.router.post("/mock", authMiddleware, ...this.controller.mockSubscription);
