@@ -19,6 +19,7 @@ class MatchesService {
 
     initRoutes() {
         this.router.get("/", ...this.controller.getMatches);
+        this.router.get("/upcoming", ...this.controller.getUpcoming);
         this.router.get("/upcoming-nearby", ...this.controller.getUpcomingNearby);
         this.router.get("/:matchId", ...this.controller.getMatchDetails);
         this.router.get("/:matchId/venues", ...this.controller.getMatchVenues);

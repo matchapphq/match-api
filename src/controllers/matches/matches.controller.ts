@@ -126,6 +126,35 @@ class MatchesController {
     });
 
     /**
+     * GET /matches/upcoming - Get all upcoming matches
+     */
+    readonly getUpcoming = this.factory.createHandlers(async (c) => {
+        try {
+            const { limit = "20", offset = "0" } = c.req.query();
+
+            const matches = await db.query.matchesTable.findMany({
+                where: gte(matchesTable.scheduled_at, new Date()),
+                with: {
+                    homeTeam: true,
+                    awayTeam: true,
+                    league: true,
+                },
+                orderBy: [asc(matchesTable.scheduled_at)],
+                limit: parseInt(limit),
+                offset: parseInt(offset),
+            });
+
+            return c.json({ 
+                data: matches,
+                count: matches.length
+            });
+        } catch (error: any) {
+            console.error("Error fetching upcoming matches:", error);
+            return c.json({ error: "Failed to fetch upcoming matches" }, 500);
+        }
+    });
+
+    /**
      * GET /matches/upcoming-nearby - Get upcoming matches at venues near user
      */
     readonly getUpcomingNearby = this.factory.createHandlers(async (c) => {

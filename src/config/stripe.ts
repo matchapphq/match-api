@@ -1,23 +1,25 @@
-import Stripe from 'stripe';
+import Stripe from "stripe";
 
 /**
  * Stripe Configuration
- * 
+ *
  * This module initializes and exports the Stripe client instance.
  * All Stripe-related constants and helper functions are centralized here.
  */
 
 // Validate required environment variables
 if (!process.env.STRIPE_SECRET_KEY) {
-    console.warn('Warning: STRIPE_SECRET_KEY is not set. Stripe functionality will be disabled.');
+    console.warn(
+        "Warning: STRIPE_SECRET_KEY is not set. Stripe functionality will be disabled.",
+    );
 }
 
 /**
  * Stripe client instance
  * Uses the secret key from environment variables
  */
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-    apiVersion: '2024-12-18.acacia',
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+    apiVersion: "2025-12-15.clover",
     typescript: true,
 });
 
@@ -27,22 +29,26 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
  */
 export const STRIPE_PRICES = {
     // Monthly plan: €30/month
-    MONTHLY: process.env.STRIPE_PRICE_MONTHLY || '',
+    MONTHLY: process.env.STRIPE_PRICE_MONTHLY || "",
     // Annual plan: €300/year (€25/month equivalent)
-    ANNUAL: process.env.STRIPE_PRICE_ANNUAL || '',
+    ANNUAL: process.env.STRIPE_PRICE_ANNUAL || "",
 } as const;
 
 /**
  * Stripe Webhook Secret for verifying webhook signatures
  */
-export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
+export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 
 /**
  * Frontend URLs for Stripe Checkout redirects
  */
 export const CHECKOUT_URLS = {
-    SUCCESS: process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}?checkout=success` : 'http://localhost:5173?checkout=success',
-    CANCEL: process.env.FRONTEND_URL ? `${process.env.FRONTEND_URL}?checkout=cancel` : 'http://localhost:5173?checkout=cancel',
+    SUCCESS: process.env.FRONTEND_URL
+        ? `${process.env.FRONTEND_URL}?checkout=success`
+        : "http://localhost:5173?checkout=success",
+    CANCEL: process.env.FRONTEND_URL
+        ? `${process.env.FRONTEND_URL}?checkout=cancel`
+        : "http://localhost:5173?checkout=cancel",
 } as const;
 
 /**
@@ -51,40 +57,40 @@ export const CHECKOUT_URLS = {
  */
 export const SUBSCRIPTION_PLANS = {
     monthly: {
-        id: 'monthly',
-        name: 'Mensuel',
+        id: "monthly",
+        name: "Mensuel",
         price: 30,
-        currency: 'EUR',
-        interval: 'month' as const,
+        currency: "EUR",
+        interval: "month" as const,
         intervalCount: 1,
         stripePriceId: STRIPE_PRICES.MONTHLY,
         features: [
-            'Diffusion illimitée de matchs',
-            'Visibilité sur la plateforme Match',
-            'Gestion des réservations en temps réel',
-            'Statistiques détaillées',
-            'Support prioritaire',
+            "Diffusion illimitée de matchs",
+            "Visibilité sur la plateforme Match",
+            "Gestion des réservations en temps réel",
+            "Statistiques détaillées",
+            "Support prioritaire",
         ],
-        description: 'Facturation mensuelle - Engagement 12 mois',
+        description: "Facturation mensuelle - Sans engagement",
     },
     annual: {
-        id: 'annual',
-        name: 'Annuel',
+        id: "annual",
+        name: "Annuel",
         price: 300,
         pricePerMonth: 25,
-        currency: 'EUR',
-        interval: 'year' as const,
+        currency: "EUR",
+        interval: "year" as const,
         intervalCount: 1,
         stripePriceId: STRIPE_PRICES.ANNUAL,
         features: [
-            'Diffusion illimitée de matchs',
-            'Visibilité sur la plateforme Match',
-            'Gestion des réservations en temps réel',
-            'Statistiques détaillées',
-            'Support prioritaire',
-            'Économie de 60€/an',
+            "Diffusion illimitée de matchs",
+            "Visibilité sur la plateforme Match",
+            "Gestion des réservations en temps réel",
+            "Statistiques détaillées",
+            "Support prioritaire",
+            "Économie de 60€/an",
         ],
-        description: 'Facturation annuelle - Soit 25€/mois',
+        description: "Facturation annuelle - Soit 25€/mois",
     },
 } as const;
 
@@ -103,8 +109,8 @@ export function isStripeConfigured(): boolean {
  * Get plan details by plan ID
  */
 export function getPlanById(planId: string) {
-    if (planId === 'monthly') return SUBSCRIPTION_PLANS.monthly;
-    if (planId === 'annual') return SUBSCRIPTION_PLANS.annual;
+    if (planId === "monthly") return SUBSCRIPTION_PLANS.monthly;
+    if (planId === "annual") return SUBSCRIPTION_PLANS.annual;
     return null;
 }
 

@@ -23,6 +23,7 @@ class VenueService {
     initRoutes() {
         // Public/Shared
         this.router.get("/", ...this.controller.getAll);
+        this.router.get("/nearby", ...this.controller.getNearby);
         this.router.get("/:venueId", ...this.controller.getDetails);
         this.router.get("/:venueId/photos", ...this.controller.getPhotos);
         this.router.get("/:venueId/reviews", ...this.controller.getReviews);

@@ -72,6 +72,61 @@ class VenueController {
         }
     });
 
+    readonly getNearby = this.factory.createHandlers(async (ctx) => {
+        try {
+            const { lat, lng, radius = "5000" } = ctx.req.query();
+            
+            if (!lat || !lng) {
+                return ctx.json({ error: "lat and lng query parameters are required" }, 400);
+            }
+
+            const latitude = parseFloat(lat);
+            const longitude = parseFloat(lng);
+            const radiusKm = parseInt(radius) / 1000; // Convert meters to km
+
+            // Get all venues and filter by distance (simple implementation)
+            const result = await this.venueRepository.findAll({});
+            
+            // Filter venues by distance using Haversine formula
+            const nearbyVenues = result.filter((venue: any) => {
+                if (!venue.latitude || !venue.longitude) return false;
+                const distance = this.calculateDistance(
+                    latitude, longitude,
+                    venue.latitude, venue.longitude
+                );
+                return distance <= radiusKm;
+            }).map((venue: any) => ({
+                ...venue,
+                distance: this.calculateDistance(
+                    latitude, longitude,
+                    venue.latitude, venue.longitude
+                ).toFixed(2)
+            })).sort((a: any, b: any) => parseFloat(a.distance) - parseFloat(b.distance));
+
+            return ctx.json(nearbyVenues);
+        } catch (error) {
+            console.error("Get nearby venues error:", error);
+            return ctx.json({ error: "Failed to fetch nearby venues" }, 500);
+        }
+    });
+
+    // Haversine formula to calculate distance between two points
+    private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+        const R = 6371; // Radius of Earth in km
+        const dLat = this.toRad(lat2 - lat1);
+        const dLon = this.toRad(lon2 - lon1);
+        const a = 
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    private toRad(deg: number): number {
+        return deg * (Math.PI / 180);
+    }
+
     readonly create = this.factory.createHandlers(validator('json', (value, ctx) => {
         const parsed = CreateVenueSchema.safeParse(value);
         if (!parsed.success) {
