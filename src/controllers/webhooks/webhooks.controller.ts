@@ -109,6 +109,7 @@ class WebhooksController {
     /**
      * Handle checkout.session.completed
      * Creates the subscription record in our database
+     * If action is 'create_venue', also creates the venue after payment success
      */
     private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         console.log("Processing checkout.session.completed:", session.id);
@@ -117,13 +118,17 @@ class WebhooksController {
         const userId = session.metadata?.user_id;
         const planId = session.metadata?.plan_id;
         const venueId = session.metadata?.venue_id;
+        const venueDataStr = session.metadata?.venue_data;
+        const action = session.metadata?.action;
         const subscriptionId = session.subscription as string;
 
         console.log("Parsed values:", {
             userId,
             planId,
             venueId,
+            action,
             subscriptionId,
+            hasVenueData: !!venueDataStr,
         });
 
         if (!userId || !subscriptionId) {
@@ -235,8 +240,55 @@ class WebhooksController {
                     `New subscription created and linked to venue ${venueId} with plan ${plan}`,
                 );
             }
+        } else if (action === 'create_venue' && venueDataStr) {
+            // Payment successful for venue creation - NOW create the venue
+            console.log("Creating venue after successful payment...");
+            
+            try {
+                const venueData = JSON.parse(venueDataStr);
+                
+                // First create the subscription
+                const newSubscription = await subscriptionsRepository.createSubscription({
+                    user_id: userId,
+                    plan: plan,
+                    status: "active",
+                    current_period_start: new Date(
+                        (stripeSubscription.current_period_start || Date.now() / 1000) * 1000,
+                    ),
+                    current_period_end: new Date(
+                        (stripeSubscription.current_period_end || Date.now() / 1000) * 1000,
+                    ),
+                    stripe_subscription_id: subscriptionId,
+                    stripe_payment_method_id:
+                        (stripeSubscription.default_payment_method as string) || "unknown",
+                    price: String(amount / 100),
+                    auto_renew: !stripeSubscription.cancel_at_period_end,
+                    commitment_end_date: commitmentEndDate,
+                });
+                
+                // Now create the venue with the subscription
+                const newVenue = await partnerRepository.createVenue({
+                    name: venueData.name,
+                    owner_id: userId,
+                    subscription_id: newSubscription.id,
+                    street_address: venueData.street_address,
+                    city: venueData.city,
+                    state_province: venueData.state_province,
+                    postal_code: venueData.postal_code,
+                    country: venueData.country,
+                    phone: venueData.phone,
+                    email: venueData.email,
+                    capacity: venueData.capacity,
+                });
+                
+                if (newVenue) {
+                    console.log(`Venue created after payment: ${newVenue.id} - ${newVenue.name}`);
+                }
+            } catch (parseError: any) {
+                console.error("Error creating venue after payment:", parseError);
+            }
         } else {
-            // No venue_id - check for pending subscription to update
+            // No venue_id and no create_venue action - check for pending subscription to update
             const existingSubscription =
                 await subscriptionsRepository.getSubscriptionByUserId(userId);
 

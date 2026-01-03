@@ -130,6 +130,17 @@ export class SubscriptionsRepository {
     }
 
     /**
+     * Get user by ID
+     */
+    async getUserById(userId: string): Promise<{ id: string; email: string } | null> {
+        const result = await db.select({ id: usersTable.id, email: usersTable.email })
+            .from(usersTable)
+            .where(eq(usersTable.id, userId))
+            .limit(1);
+        return result[0] || null;
+    }
+
+    /**
      * Get user by Stripe customer ID
      */
     async getUserByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string; email: string } | null> {

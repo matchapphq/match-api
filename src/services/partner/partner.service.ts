@@ -21,6 +21,7 @@ class PartnerService {
         // Venues
         this.router.get("/venues", ...this.controller.getMyVenues);
         this.router.post("/venues", ...this.controller.createVenue);
+        this.router.post("/venues/verify-checkout", ...this.controller.verifyCheckoutAndCreateVenue);
         
         // Venue Matches (must be before :venueId routes to avoid conflict)
         this.router.get("/venues/matches", ...this.controller.getMyMatches);
