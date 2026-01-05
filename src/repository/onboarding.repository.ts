@@ -3,13 +3,9 @@ import { db } from "../config/config.db";
 import { userPreferencesTable, type NewUserPreferences } from "../config/db/user.table";
 
 export interface SavePreferencesData {
-    sports?: string[];
     ambiances?: string[];
     venue_types?: string[];
     budget?: string;
-    food_drinks_preferences?: string[];
-    max_distance_km?: number;
-    preferred_match_time?: string;
     home_lat?: number;
     home_lng?: number;
     fav_sports?: string[];
@@ -26,6 +22,9 @@ class OnboardingRepository {
             home_lng: preferences.home_lng ?? undefined,
             fav_sports: preferences.fav_sports ?? undefined,
             fav_team_ids: preferences.fav_team_ids ?? undefined,
+            ambiances: preferences.ambiances ?? undefined,
+            venue_types: preferences.venue_types ?? undefined,
+            budget: preferences.budget ?? undefined,
             updated_at: new Date()
         };
 

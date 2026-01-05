@@ -18,11 +18,7 @@ class OnboardingService {
     }
 
     initRoutes() {
-        this.router.get("/status", ...this.controller.getStatus);
-        this.router.post("/preferences", ...this.controller.savePreferences);
-        this.router.get("/sports", ...this.controller.getSports);
-        this.router.get("/categories", ...this.controller.getCategories);
-        this.router.get("/ambiances", ...this.controller.getAmbiances);
+        this.router.post("/complete", ...this.controller.complete);
     }
 }
 

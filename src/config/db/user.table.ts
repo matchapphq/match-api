@@ -66,6 +66,11 @@ export const userPreferencesTable = pgTable(
         // Interests
         fav_sports: jsonb('fav_sports').$type<string[] | null>(),
         fav_team_ids: jsonb('fav_team_ids').$type<string[] | null>(),
+        
+        ambiances: jsonb('ambiances').$type<string[] | null>(),
+        budget: varchar('budget', { length: 50 }),
+        venue_types: jsonb('venue_types').$type<string[] | null>(),
+
 
         // Notifications
         notification_settings: jsonb('notification_settings').default({

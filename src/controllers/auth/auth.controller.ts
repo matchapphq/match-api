@@ -54,25 +54,25 @@ class AuthController {
             ]);
 
             await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
-          
+
             await Promise.all([
-              setSignedCookie(ctx, "refresh_token", refreshToken, JwtUtils.REFRESH_JWT_SIGN_KEY, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: "Strict",
-                path: "/auth/refresh",
-                maxAge: JwtUtils.REFRESH_TOKEN_EXP
-              }),
-              setSignedCookie(ctx, "access_token", accessToken, JwtUtils.ACCESS_JWT_SIGN_KEY, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: "Strict",
-                path: "/",
-                maxAge: JwtUtils.ACCESS_TOKEN_EXP
-              })
+                setSignedCookie(ctx, "refresh_token", refreshToken, JwtUtils.REFRESH_JWT_SIGN_KEY, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: "Strict",
+                    path: "/auth/refresh",
+                    maxAge: JwtUtils.REFRESH_TOKEN_EXP
+                }),
+                setSignedCookie(ctx, "access_token", accessToken, JwtUtils.ACCESS_JWT_SIGN_KEY, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === 'production',
+                    sameSite: "Strict",
+                    path: "/",
+                    maxAge: JwtUtils.ACCESS_TOKEN_EXP
+                })
             ])
 
-            return ctx.json({ user }, 201);
+            return ctx.json({ user, token: accessToken }, 201);
         } catch (error) {
             console.error("Registration error:", error);
             return ctx.json({ error: "Registration failed" }, 500);
@@ -89,7 +89,7 @@ class AuthController {
         const body = ctx.req.valid("json");
         const user = await this.userRepository.getUserByEmail(body.email);
 
-        if (!user ||!user.first_name) {
+        if (!user || !user.first_name) {
             return ctx.json({ error: "Invalid email or password" }, 401)
         }
 
@@ -98,7 +98,7 @@ class AuthController {
             return ctx.json({ error: "Invalid email or password" }, 401)
         }
 
-        const tokenPayload = { id: user.id, email: user.email, role: user.role, firstName: user.first_name};
+        const tokenPayload = { id: user.id, email: user.email, role: user.role, firstName: user.first_name };
         const [accessToken, refreshToken] = await Promise.all([
             JwtUtils.generateAccessToken(tokenPayload),
             JwtUtils.generateRefreshToken(tokenPayload)
@@ -107,26 +107,27 @@ class AuthController {
         const deviceId = ctx.req.header("User-Agent") || "Unknown";
 
         await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
-        
+
         await Promise.all([
-          setSignedCookie(ctx, "access_token", accessToken, JwtUtils.ACCESS_JWT_SIGN_KEY, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: "Strict",
-            path: "/",
-            maxAge: JwtUtils.ACCESS_TOKEN_EXP
-          }),
-          setSignedCookie(ctx, "refresh_token", refreshToken, JwtUtils.REFRESH_JWT_SIGN_KEY, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: "Strict",
-            path: "/auth/refresh",
-            maxAge: JwtUtils.REFRESH_TOKEN_EXP
-          })
+            setSignedCookie(ctx, "access_token", accessToken, JwtUtils.ACCESS_JWT_SIGN_KEY, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: "Strict",
+                path: "/",
+                maxAge: JwtUtils.ACCESS_TOKEN_EXP
+            }),
+            setSignedCookie(ctx, "refresh_token", refreshToken, JwtUtils.REFRESH_JWT_SIGN_KEY, {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: "Strict",
+                path: "/auth/refresh",
+                maxAge: JwtUtils.REFRESH_TOKEN_EXP
+            })
         ]);
 
         return ctx.json({
-            user: { id: user.id, email: user.email, role: user.role }, // returning partial user for safety
+            user: { id: user.id, email: user.email, role: user.role, firstName: user.first_name },
+            token: accessToken
         });
     });
 
