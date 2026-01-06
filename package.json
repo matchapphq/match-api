@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --watch index.ts",
+    "dev": "bun --env-file=.env.dev --watch index.ts",
     "db:setup": "bun run src/config/setup.db.ts",
     "db:migrate": "bun run db:setup && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",

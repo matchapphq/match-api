@@ -1,6 +1,7 @@
 # Match Project — Complete API Routes Documentation
 
-**Production-ready API routes for Match platform**
+**Production-ready API routes for Match platform**  
+*Last updated: January 2026*
 
 ## 💼 Business Model
 
@@ -19,9 +20,14 @@ Response format: JSON
 Pagination: limit, offset query params
 ```
 
+### Protected Routes (Require Authentication)
+- `/api/partners/*` — All partner routes
+- `/api/users/*` — All user routes  
+- `/api/reservations/*` — All reservation routes
+
 ---
 
-## 🔐 Authentication Routes
+## 🔐 Authentication Routes (`/api/auth`)
 
 ### POST /api/auth/register
 **Register new user (regular user or venue owner)**
@@ -62,7 +68,7 @@ Response: 200
 }
 ```
 
-### POST /api/auth/refresh
+### POST /api/auth/refresh-token
 **Refresh JWT token**
 
 ```typescript
@@ -89,46 +95,43 @@ Response: 200
 }
 ```
 
-### POST /api/auth/forgot-password
-**Request password reset email**
+### GET /api/auth/me
+**Get current authenticated user**
 
 ```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  user: User;
+}
+```
+
+### PUT /api/auth/me
+**Update current user profile**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
 Request body:
 {
-  email: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
+  avatar_url?: string;
 }
 
 Response: 200
 {
-  message: string;
+  user: User;
 }
 ```
 
-### POST /api/auth/reset-password
-**Reset password with token**
+### DELETE /api/auth/me
+**Delete user account (soft delete)**
 
 ```typescript
-Request body:
-{
-  token: string;
-  password: string;
-  password_confirm: string;
-}
-
-Response: 200
-{
-  message: string;
-}
-```
-
-### POST /api/auth/verify-email
-**Verify email address**
-
-```typescript
-Request body:
-{
-  token: string;
-}
+Headers: Authorization: Bearer <token>
 
 Response: 200
 {
@@ -138,7 +141,9 @@ Response: 200
 
 ---
 
-## 👤 User Routes
+## 👤 User Routes (`/api/users`)
+
+*All routes require authentication*
 
 ### GET /api/users/me
 **Get current logged-in user profile**
@@ -165,8 +170,6 @@ Request body:
   phone?: string;
   avatar_url?: string;
   bio?: string;
-  language?: string;
-  timezone?: string;
 }
 
 Response: 200
@@ -187,23 +190,6 @@ Response: 200
 }
 ```
 
-### GET /api/users/:userId
-**Get public user profile**
-
-```typescript
-Response: 200
-{
-  user: {
-    id: string;
-    first_name: string;
-    last_name: string;
-    avatar_url: string;
-    bio: string;
-    created_at: timestamp;
-  }
-}
-```
-
 ### PUT /api/users/me/notification-preferences
 **Update notification settings**
 
@@ -215,18 +201,25 @@ Request body:
   email_notifications?: boolean;
   push_notifications?: boolean;
   sms_notifications?: boolean;
-  quiet_hours_enabled?: boolean;
-  quiet_hours_start?: string;
-  quiet_hours_end?: string;
   match_notifications?: boolean;
-  nearby_venue_notifications?: boolean;
-  promotion_notifications?: boolean;
   reservation_reminders?: boolean;
 }
 
 Response: 200
 {
-  notification_preferences: JSONB;
+  notification_preferences: object;
+}
+```
+
+### PUT /api/users/me/onboarding-complete
+**Mark onboarding as complete**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  onboarding_complete: boolean;
 }
 ```
 
@@ -274,9 +267,7 @@ Request body:
 {
   street_address?: string;
   city?: string;
-  state_province?: string;
   postal_code?: string;
-  country?: string;
   is_default?: boolean;
 }
 
@@ -298,12 +289,40 @@ Response: 200
 }
 ```
 
+### GET /api/users/me/favorite-venues
+**Get user's favorite venues**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  favorites: UserFavoriteVenue[];
+}
+```
+
+### GET /api/users/:userId
+**Get public user profile**
+
+```typescript
+Response: 200
+{
+  user: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    avatar_url: string;
+    created_at: timestamp;
+  }
+}
+```
+
 ---
 
-## 🎯 Onboarding Routes (User)
+## 🎯 Onboarding Routes (`/api/onboarding`)
 
-### POST /api/onboarding/preferences
-**Save user preferences during onboarding**
+### POST /api/onboarding/complete
+**Complete user onboarding with preferences**
 
 ```typescript
 Headers: Authorization: Bearer <token>
@@ -315,66 +334,18 @@ Request body:
   venue_types: string[];
   budget?: string;
   food_drinks_preferences?: string[];
-  max_distance_km?: number;
-  preferred_match_time?: string;
-}
-
-Response: 201
-{
-  preferences: UserPreferences;
-}
-```
-
-### GET /api/onboarding/preferences
-**Get current user preferences**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Response: 200
-{
-  preferences: UserPreferences;
-}
-```
-
-### PUT /api/onboarding/preferences
-**Update user preferences**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  sports?: string[];
-  ambiances?: string[];
-  venue_types?: string[];
-  budget?: string;
-  food_drinks_preferences?: string[];
-  max_distance_km?: number;
-  preferred_match_time?: string;
 }
 
 Response: 200
 {
+  success: boolean;
   preferences: UserPreferences;
-}
-```
-
-### PUT /api/users/me/onboarding-complete
-**Mark onboarding as complete**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Response: 200
-{
-  onboarding_complete: boolean;
 }
 ```
 
 ---
 
-## 🏟️ Venue Routes
+## 🏟️ Venue Routes (`/api/venues`)
 
 ### GET /api/venues
 **Get all venues (with filters)**
@@ -386,7 +357,6 @@ Query params:
   city?: string
   type?: venue_type
   search?: string
-  is_verified?: boolean
   lat?: number
   lng?: number
   distance_km?: number
@@ -395,8 +365,22 @@ Response: 200
 {
   venues: Venue[];
   total: number;
-  limit: number;
-  offset: number;
+}
+```
+
+### GET /api/venues/nearby
+**Get nearby venues based on location**
+
+```typescript
+Query params:
+  lat: number
+  lng: number
+  distance_km?: number (default: 10)
+  limit?: number
+
+Response: 200
+{
+  venues: Venue[];
 }
 ```
 
@@ -415,6 +399,61 @@ Response: 200
 }
 ```
 
+### GET /api/venues/:venueId/photos
+**Get venue photos**
+
+```typescript
+Response: 200
+{
+  photos: VenuePhoto[];
+}
+```
+
+### GET /api/venues/:venueId/reviews
+**Get venue reviews**
+
+```typescript
+Query params:
+  limit?: number
+  offset?: number
+
+Response: 200
+{
+  reviews: Review[];
+  total: number;
+  average_rating: number;
+}
+```
+
+### GET /api/venues/:venueId/matches
+**Get matches available at venue**
+
+```typescript
+Query params:
+  status?: match_status
+  limit?: number
+
+Response: 200
+{
+  matches: VenueMatch[];
+}
+```
+
+### GET /api/venues/:venueId/availability
+**Get venue availability for reservations**
+
+```typescript
+Query params:
+  date?: string
+  match_id?: uuid
+
+Response: 200
+{
+  available_tables: number;
+  total_capacity: number;
+}
+```
+
 ### POST /api/venues
 **Create new venue (venue_owner only)**
 
@@ -428,24 +467,12 @@ Request body:
   type: venue_type;
   street_address: string;
   city: string;
-  state_province?: string;
   postal_code: string;
   country: string;
   latitude: number;
   longitude: number;
   phone?: string;
-  email?: string;
-  website?: string;
-  instagram?: string;
-  facebook?: string;
-  tiktok?: string;
-  opening_hours?: object;
   capacity?: number;
-  has_terrace?: boolean;
-  has_wifi?: boolean;
-  has_parking?: boolean;
-  has_wheelchair_access?: boolean;
-  menu?: object;
 }
 
 Response: 201
@@ -464,20 +491,9 @@ Request body:
 {
   name?: string;
   description?: string;
-  type?: venue_type;
   phone?: string;
-  email?: string;
-  website?: string;
-  instagram?: string;
-  facebook?: string;
-  tiktok?: string;
   opening_hours?: object;
   capacity?: number;
-  has_terrace?: boolean;
-  has_wifi?: boolean;
-  has_parking?: boolean;
-  has_wheelchair_access?: boolean;
-  menu?: object;
 }
 
 Response: 200
@@ -498,80 +514,9 @@ Response: 200
 }
 ```
 
-### GET /api/venues/:venueId/stats
-**Get venue statistics (owner only)**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Response: 200
-{
-  total_reviews: number;
-  average_rating: number;
-  total_reservations: number;
-  upcoming_matches: number;
-  this_month_revenue?: number;
-}
-```
-
 ---
 
-## 📸 Venue Photos Routes
-
-### POST /api/venues/:venueId/photos
-**Upload venue photos**
-
-```typescript
-Headers: Authorization: Bearer <token>
-Content-Type: multipart/form-data
-
-Request body:
-{
-  photos: File[];
-  alt_texts?: string[];
-  is_primary?: boolean[];
-}
-
-Response: 201
-{
-  photos: VenuePhoto[];
-}
-```
-
-### PUT /api/venues/:venueId/photos/:photoId
-**Update photo details**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  alt_text?: string;
-  is_primary?: boolean;
-  display_order?: number;
-}
-
-Response: 200
-{
-  photo: VenuePhoto;
-}
-```
-
-### DELETE /api/venues/:venueId/photos/:photoId
-**Delete photo**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Response: 200
-{
-  message: string;
-}
-```
-
----
-
-## ⭐ Favorite Venues Routes
+## ⭐ Venue Favorites Routes (`/api/venues/:venueId/favorite`)
 
 ### POST /api/venues/:venueId/favorite
 **Add venue to favorites**
@@ -602,26 +547,39 @@ Response: 200
 }
 ```
 
-### GET /api/users/me/favorite-venues
-**Get user's favorite venues**
+### PATCH /api/venues/:venueId/favorite
+**Update favorite note**
 
 ```typescript
 Headers: Authorization: Bearer <token>
 
-Query params:
-  limit?: number
-  offset?: number
+Request body:
+{
+  note: string;
+}
 
 Response: 200
 {
-  favorites: UserFavoriteVenue[];
-  total: number;
+  favorite: UserFavoriteVenue;
+}
+```
+
+### GET /api/venues/:venueId/favorite
+**Check if venue is favorited**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  is_favorite: boolean;
+  favorite?: UserFavoriteVenue;
 }
 ```
 
 ---
 
-## 🏆 Sports & Leagues Routes
+## 🏆 Sports Routes (`/api/sports`)
 
 ### GET /api/sports
 **Get all sports**
@@ -630,12 +588,10 @@ Response: 200
 Query params:
   limit?: number
   offset?: number
-  is_active?: boolean
 
 Response: 200
 {
   sports: Sport[];
-  total: number;
 }
 ```
 
@@ -653,15 +609,15 @@ Response: 200
 **Get leagues for a sport**
 
 ```typescript
-Query params:
-  country?: string
-  is_active?: boolean
-
 Response: 200
 {
   leagues: League[];
 }
 ```
+
+---
+
+## 🏅 Leagues Routes (`/api/leagues`)
 
 ### GET /api/leagues/:leagueId
 **Get league details**
@@ -670,7 +626,6 @@ Response: 200
 Response: 200
 {
   league: League;
-  teams: Team[];
 }
 ```
 
@@ -678,16 +633,15 @@ Response: 200
 **Get teams in a league**
 
 ```typescript
-Query params:
-  limit?: number
-  offset?: number
-
 Response: 200
 {
   teams: Team[];
-  total: number;
 }
 ```
+
+---
+
+## 👥 Teams Routes (`/api/teams`)
 
 ### GET /api/teams/:teamId
 **Get team details**
@@ -701,7 +655,7 @@ Response: 200
 
 ---
 
-## ⚽ Matches Routes
+## ⚽ Matches Routes (`/api/matches`)
 
 ### GET /api/matches
 **Get all matches (with filters)**
@@ -712,19 +666,43 @@ Query params:
   offset?: number
   status?: match_status
   league_id?: uuid
-  home_team_id?: uuid
-  away_team_id?: uuid
   scheduled_from?: timestamp
   scheduled_to?: timestamp
-  nearby?: boolean
-  lat?: number
-  lng?: number
-  distance_km?: number
 
 Response: 200
 {
   matches: Match[];
   total: number;
+}
+```
+
+### GET /api/matches/upcoming
+**Get upcoming matches**
+
+```typescript
+Query params:
+  limit?: number
+  sport_id?: uuid
+
+Response: 200
+{
+  matches: Match[];
+}
+```
+
+### GET /api/matches/upcoming-nearby
+**Get upcoming matches near user location**
+
+```typescript
+Query params:
+  lat: number
+  lng: number
+  distance_km?: number (default: 10)
+  limit?: number
+
+Response: 200
+{
+  matches: Match[];
 }
 ```
 
@@ -735,7 +713,6 @@ Response: 200
 Response: 200
 {
   match: Match;
-  venues: VenueMatch[];
   teams: {
     home: Team;
     away: Team;
@@ -743,15 +720,90 @@ Response: 200
 }
 ```
 
-### GET /api/matches/nearby
-**Get nearby matches (for user)**
+### GET /api/matches/:matchId/venues
+**Get venues broadcasting this match**
 
 ```typescript
-Headers: Authorization: Bearer <token>
+Response: 200
+{
+  venues: VenueMatch[];
+}
+```
 
+### GET /api/matches/:matchId/live-updates
+**Get live score updates for match**
+
+```typescript
+Response: 200
+{
+  match_id: uuid;
+  status: string;
+  score?: {
+    home: number;
+    away: number;
+  }
+  events?: MatchEvent[];
+}
+```
+
+---
+
+## 🗺️ Discovery Routes (`/api/discovery`)
+
+### GET /api/discovery/nearby
+**Get nearby venues and matches**
+
+```typescript
 Query params:
+  lat: number
+  lng: number
   distance_km?: number (default: 10)
-  limit?: number
+
+Response: 200
+{
+  venues: Venue[];
+  matches: Match[];
+}
+```
+
+### GET /api/discovery/venues/:venueId
+**Get venue details for discovery**
+
+```typescript
+Response: 200
+{
+  venue: Venue;
+}
+```
+
+### GET /api/discovery/venues/:venueId/menu
+**Get venue menu**
+
+```typescript
+Response: 200
+{
+  menu: object;
+}
+```
+
+### GET /api/discovery/venues/:venueId/hours
+**Get venue opening hours**
+
+```typescript
+Response: 200
+{
+  opening_hours: object;
+}
+```
+
+### GET /api/discovery/matches-nearby
+**Get matches near a location**
+
+```typescript
+Query params:
+  lat: number
+  lng: number
+  distance_km?: number
 
 Response: 200
 {
@@ -759,147 +811,48 @@ Response: 200
 }
 ```
 
----
-
-## 🎫 Venue Matches Routes
-
-### GET /api/venues/:venueId/matches
-**Get matches available at venue**
+### POST /api/discovery/search
+**Search venues and matches**
 
 ```typescript
-Query params:
-  status?: match_status
-  limit?: number
-  offset?: number
-
-Response: 200
-{
-  matches: VenueMatch[];
-  total: number;
-}
-```
-
-### POST /api/venues/:venueId/matches
-**Add match to venue for broadcasting (owner only)**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
 Request body:
 {
-  match_id: uuid;
-  total_seats: number;           // Total capacity for this match
-  allows_reservations?: boolean; // Whether users can book tables (default: true)
-  estimated_crowd_level?: string;
-  notes?: string;
-}
-
-Response: 201
-{
-  venueMatch: VenueMatch;
-}
-```
-
-### PUT /api/venues/:venueId/matches/:venueMatchId
-**Update venue match details (owner only)**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  total_seats?: number;
-  available_seats?: number;
-  allows_reservations?: boolean;
-  is_active?: boolean;
-  is_featured?: boolean;
-  estimated_crowd_level?: string;
-  notes?: string;
+  query: string;
+  lat?: number;
+  lng?: number;
+  filters?: {
+    type?: venue_type;
+    sport?: string;
+  }
 }
 
 Response: 200
 {
-  venueMatch: VenueMatch;
-}
-```
-
-### DELETE /api/venues/:venueId/matches/:venueMatchId
-**Remove match from venue (owner only)**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Response: 200
-{
-  message: string;
+  venues: Venue[];
+  matches: Match[];
 }
 ```
 
 ---
 
-## 💺 Seat Management Routes
+## 💺 Seats Routes (`/api/venues/:venueId/seats`)
 
 ### GET /api/venues/:venueId/seats
-**Get all seats for a venue**
+**Get seat map for venue**
 
 ```typescript
 Query params:
   match_id?: uuid
-  status?: seat_status
-  section?: string
 
 Response: 200
 {
   seats: Seat[];
+  sections: Section[];
 }
 ```
 
-### POST /api/venues/:venueId/seats
-**Create seats (owner only) - Legacy, prefer using tables**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  seats: {
-    seat_number: string;
-    section?: string;
-    row?: string;
-    column?: string;
-    seat_type?: 'standard' | 'premium' | 'vip' | 'wheelchair' | 'couple';
-    is_accessible?: boolean;
-  }[];
-}
-
-Response: 201
-{
-  seats: Seat[];
-}
-```
-
-### PUT /api/venues/:venueId/seats/:seatId
-**Update seat details (owner only)**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  seat_type?: 'standard' | 'premium' | 'vip' | 'wheelchair' | 'couple';
-  status?: seat_status;
-  blocked_reason?: string;
-  blocked_until?: timestamp;
-}
-
-Response: 200
-{
-  seat: Seat;
-}
-```
-
-### POST /api/venues/:venueId/seats/bulk-block
-**Block multiple seats (owner only)**
+### POST /api/venues/:venueId/seats/reserve
+**Reserve seats**
 
 ```typescript
 Headers: Authorization: Bearer <token>
@@ -907,72 +860,76 @@ Headers: Authorization: Bearer <token>
 Request body:
 {
   seat_ids: uuid[];
-  reason: string;
-  until: timestamp;
-}
-
-Response: 200
-{
-  blocked_count: number;
-}
-```
-
----
-
-## 🔒 Seat Holds Routes (5-minute temporary holds)
-
-### POST /api/matches/:matchId/seat-holds
-**Place seat hold (regular user)**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  venue_match_id: uuid;
-  seat_ids: uuid[];
+  match_id: uuid;
 }
 
 Response: 201
 {
-  hold: SeatHold;
-  expires_at: timestamp;
+  reservation: SeatReservation;
 }
 ```
 
-### GET /api/users/me/seat-holds
-**Get active seat holds for user**
+### GET /api/venues/:venueId/seats/pricing
+**Get seat pricing**
 
 ```typescript
-Headers: Authorization: Bearer <token>
+Query params:
+  match_id?: uuid
 
 Response: 200
 {
-  holds: SeatHold[];
-}
-```
-
-### DELETE /api/seat-holds/:holdId
-**Release seat hold**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Response: 200
-{
-  message: string;
+  pricing: {
+    standard: number;
+    premium: number;
+    vip: number;
+  }
 }
 ```
 
 ---
 
-## � Reservations Routes (FREE for Users)
+## 🎟️ Reservations Routes (`/api/reservations`)
+
+*All routes require authentication*
 
 Reservations are completely free for users. They work like restaurant table bookings:
 1. User specifies venue, match, and party size
 2. System finds best available table
 3. User receives QR code
 4. Venue owner scans QR to verify on match day
+
+### GET /api/reservations
+**Get user's reservations**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+  status?: reservation_status
+  limit?: number
+  offset?: number
+
+Response: 200
+{
+  reservations: Reservation[];
+  total: number;
+}
+```
+
+### GET /api/reservations/:reservationId
+**Get reservation details with QR code**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  reservation: Reservation;
+  qr_code: string;
+  venue: Venue;
+  match: Match;
+}
+```
 
 ### POST /api/reservations/hold
 **Hold a table (15 min temporary hold)**
@@ -983,7 +940,7 @@ Headers: Authorization: Bearer <token>
 Request body:
 {
   venue_match_id: uuid;
-  party_size: number;           // How many people in your group
+  party_size: number;
   requires_accessibility?: boolean;
 }
 
@@ -1013,102 +970,7 @@ Request body:
 Response: 201
 {
   reservation: Reservation;
-  qr_code: string;              // Base64 QR code image for check-in
-}
-```
-
-### GET /api/reservations/:reservationId
-**Get reservation details**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Response: 200
-{
-  reservation: Reservation;
-  venue: {
-    name: string;
-    location: {
-      latitude: number;
-      longitude: number;
-    }
-  }
-  match: {
-    home_team: Team;
-    away_team: Team;
-    scheduled_at: timestamp;
-  }
-}
-```
-
-### GET /api/users/me/reservations
-**Get user's reservations**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Query params:
-  status?: reservation_status
-  limit?: number
-  offset?: number
-
-Response: 200
-{
-  reservations: Reservation[];
-  total: number;
-}
-```
-
-### GET /api/venues/:venueId/reservations
-**Get venue's reservations (owner only)**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Query params:
-  status?: reservation_status
-  match_id?: uuid
-  limit?: number
-  offset?: number
-
-Response: 200
-{
-  reservations: Reservation[];
-  total: number;
-}
-```
-
-### PUT /api/reservations/:reservationId
-**Update reservation**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  special_requests?: string;
-}
-
-Response: 200
-{
-  reservation: Reservation;
-}
-```
-
-### POST /api/reservations/:reservationId/check-in
-**Check-in to reservation**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  qr_code?: string;
-}
-
-Response: 200
-{
-  reservation: Reservation;
+  qr_code: string;
 }
 ```
 
@@ -1126,6 +988,96 @@ Request body:
 Response: 200
 {
   reservation: Reservation;
+}
+```
+
+### POST /api/reservations/verify-qr
+**Verify QR code (venue owner scans user's QR)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  qr_code: string;
+}
+
+Response: 200
+{
+  valid: boolean;
+  reservation: Reservation;
+}
+```
+
+### POST /api/reservations/:reservationId/check-in
+**Check-in reservation after QR verification**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  reservation: Reservation;
+}
+```
+
+### GET /api/reservations/venue-match/:venueMatchId
+**Get all reservations for a venue match (venue owner)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  reservations: Reservation[];
+  total: number;
+}
+```
+
+---
+
+## 📋 Waitlist Routes (`/api/reservations/waitlist`)
+
+### POST /api/reservations/waitlist
+**Join waitlist when no tables available**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  venue_match_id: uuid;
+  party_size: number;
+}
+
+Response: 201
+{
+  waitlist_entry: WaitlistEntry;
+  position: number;
+}
+```
+
+### GET /api/reservations/waitlist/me
+**Get user's waitlist entries**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  waitlist: WaitlistEntry[];
+}
+```
+
+### DELETE /api/reservations/waitlist/:waitlistId
+**Leave waitlist**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  message: string;
 }
 ```
 
@@ -1711,9 +1663,11 @@ Response: 200
 
 ---
 
-## 🤝 Partner Routes (Venue Owners - Legacy/Shortcuts)
+## 🤝 Partner Routes (`/api/partners`)
 
-These routes were migrated from the previous workspace and provide direct access for venue owners to manage their venues and matches.
+*All routes require authentication*
+
+Dashboard and management routes for venue owners (partners).
 
 ### GET /api/partners/venues
 **Get venues owned by the current user**
@@ -1738,14 +1692,45 @@ Request body:
   name: string;
   street_address: string;
   city: string;
-  state_province?: string;
   postal_code: string;
   country: string;
+  latitude: number;
+  longitude: number;
 }
 
 Response: 201
 {
   venue: Venue;
+}
+```
+
+### POST /api/partners/venues/verify-checkout
+**Verify Stripe checkout and create venue**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  session_id: string;
+}
+
+Response: 200
+{
+  venue: Venue;
+  subscription: Subscription;
+}
+```
+
+### GET /api/partners/venues/matches
+**Get all matches for partner's venues**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  matches: VenueMatch[];
 }
 ```
 
@@ -1759,7 +1744,6 @@ Request body:
 {
   match_id: uuid;
   total_seats: number;
-  base_price: number;
 }
 
 Response: 201
@@ -1780,28 +1764,77 @@ Response: 200
 }
 ```
 
+### GET /api/partners/venues/:venueId/clients
+**Get clients/customers for a venue**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  clients: Client[];
+}
+```
+
+### GET /api/partners/venues/:venueId/subscription
+**Get venue subscription details**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  subscription: Subscription;
+}
+```
+
+### POST /api/partners/venues/:venueId/payment-portal
+**Get Stripe payment portal URL**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  portal_url: string;
+}
+```
+
+### GET /api/partners/stats/customers
+**Get customer statistics**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  total_customers: number;
+  new_this_month: number;
+  returning_customers: number;
+}
+```
+
+### GET /api/partners/analytics/summary
+**Get analytics summary for partner**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  total_reservations: number;
+  total_matches_broadcast: number;
+  average_attendance: number;
+}
+```
+
 ---
 
-## 🏥 Health & Status Routes
+## 🏥 Health Route
 
 ### GET /api/health
 **Health check**
 
 ```typescript
-Response: 200
-{
-  status: 'ok';
-  timestamp: timestamp;
-}
-```
-
-### GET /api/status
-**System status**
-
-```typescript
-Response: 200
-{
-  status: 'operational' | 'degraded' | 'maintenance';
-  version: string;
-}
+Response: 200 "OK"
 ```

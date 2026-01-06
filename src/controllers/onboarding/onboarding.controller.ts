@@ -1,11 +1,11 @@
 import { createFactory } from "hono/factory";
 import { validator } from "hono/validator";
-import OnboardingRepository from "../../repository/onboarding.repository";
-import UserRepository from "../../repository/user.repository";
-import { RegisterRequestSchema } from "../../utils/auth.valid";
 import { JwtUtils } from "../../utils/jwt";
 import { setSignedCookie } from "hono/cookie";
 import type { userRegisterData } from "../../utils/userData";
+import UserRepository from "../../repository/user.repository";
+import { RegisterRequestSchema } from "../../utils/auth.valid";
+import OnboardingRepository, { type SavePreferencesData } from "../../repository/onboarding.repository";
 
 /**
  * Controller for User Onboarding flow.
@@ -47,13 +47,22 @@ class OnboardingController {
             };
 
             try {
-                const user = await this.userRepository.createUser(userRequest);
+                const user = await this.userRepository.createUser({ ...userRequest, role: "user"});
                 if (!user || !user.id) {
                     return ctx.json({ error: "Failed to create user" }, 500);
                 }
-
+                
+                const userPreferences: SavePreferencesData = {
+                    home_lat: body.home_lat || undefined,
+                    home_lng: body.home_lng || undefined,
+                    budget: body.budget || undefined,
+                    ambiances: body.ambiances || [],
+                    venue_types: body.venue_types || [],
+                    fav_sports: body.fav_sports || [],
+                    fav_team_ids: body.fav_team_ids || []
+                }
                 // Save preferences
-                await this.repository.savePreferences(user.id, body);
+                await this.repository.savePreferences(user.id, userPreferences);
 
                 // Generate Tokens
                 const tokenPayload = {
