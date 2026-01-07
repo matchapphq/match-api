@@ -17,7 +17,7 @@ class TeamsService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Teams
         this.router.get("/:teamId", ...this.controller.getTeamById);
     }

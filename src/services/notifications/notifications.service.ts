@@ -16,7 +16,7 @@ class NotificationsService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         this.router.get("/", ...this.controller.getNotifications);
         this.router.put("/read-all", ...this.controller.markAllAsRead);
         this.router.put("/:notificationId/read", ...this.controller.markAsRead);

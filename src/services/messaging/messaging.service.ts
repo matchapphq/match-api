@@ -16,7 +16,7 @@ class MessagingService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Conversations
         this.router.post("/conversations", ...this.controller.createConversation);
         this.router.get("/conversations", ...this.controller.getConversations);

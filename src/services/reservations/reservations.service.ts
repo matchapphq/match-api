@@ -15,7 +15,7 @@ class ReservationsService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // All routes require authentication
         this.router.use("/*", authMiddleware);
 

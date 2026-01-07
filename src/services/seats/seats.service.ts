@@ -17,7 +17,7 @@ class SeatsService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         this.router.get("/", ...this.controller.getSeatMap);
         this.router.post("/reserve", ...this.controller.reserveSeats);
         this.router.get("/pricing", ...this.controller.getPricing);

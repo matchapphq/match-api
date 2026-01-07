@@ -16,7 +16,7 @@ class ReviewsService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Venue Reviews (Usually mounted under /venues/:venueId/reviews, but here we might need flexibility)
         // If this service is mounted at /reviews, we handle top-level review actions
 

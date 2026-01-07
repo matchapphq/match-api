@@ -16,7 +16,7 @@ class BillingService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Invoices
         this.router.get("/invoices", ...this.controller.getInvoices);
         this.router.get("/invoices/:invoiceId", ...this.controller.getInvoiceDetails);

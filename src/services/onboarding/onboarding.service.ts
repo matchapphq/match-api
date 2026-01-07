@@ -17,7 +17,7 @@ class OnboardingService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         this.router.post("/complete", ...this.controller.complete);
     }
 }

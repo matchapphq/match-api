@@ -19,7 +19,7 @@ class UserService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Me routes (Protected)
         this.router.get("/me", authMiddleware, ...this.controller.getMe);
         this.router.put("/me", authMiddleware, ...this.controller.updateMe);

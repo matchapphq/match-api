@@ -20,7 +20,7 @@ class VenueService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Public/Shared
         this.router.get("/", ...this.controller.getAll);
         this.router.get("/nearby", ...this.controller.getNearby);

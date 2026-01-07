@@ -17,7 +17,7 @@ class PartnerService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Venues
         this.router.get("/venues", ...this.controller.getMyVenues);
         this.router.post("/venues", ...this.controller.createVenue);

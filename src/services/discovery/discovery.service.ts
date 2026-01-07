@@ -17,7 +17,7 @@ class DiscoveryService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         this.router.get("/nearby", ...this.controller.getNearby);
         this.router.get("/venues/:venueId", ...this.controller.getVenueDetails);
         this.router.get("/venues/:venueId/menu", ...this.controller.getVenueMenu);
