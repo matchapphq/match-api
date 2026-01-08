@@ -143,7 +143,7 @@ class MatchesController {
                 limit: parseInt(limit),
                 offset: parseInt(offset),
             });
-
+            
             return c.json({ 
                 data: matches,
                 count: matches.length

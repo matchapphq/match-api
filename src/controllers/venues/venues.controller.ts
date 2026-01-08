@@ -6,7 +6,11 @@ import type { Context } from "hono";
 
 import { VenueRepository } from "../../repository/venue.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
-import { CreateVenueSchema, UpdateVenueSchema, GetVenuesSchema } from "../../utils/venue.valid";
+import {
+    CreateVenueSchema,
+    UpdateVenueSchema,
+    GetVenuesSchema,
+} from "../../utils/venue.valid";
 import { db } from "../../config/config.db";
 import { subscriptionsTable } from "../../config/db/subscriptions.table";
 import type { HonoEnv } from "../../types/hono.types";
@@ -31,7 +35,7 @@ class VenueController {
 
     // Helper to get user ID from context (assuming auth middleware sets it)
     private getUserId(ctx: Context<HonoEnv>): string {
-        const user = ctx.get('user');
+        const user = ctx.get("user");
         if (!user || !user.id) {
             throw new Error("Unauthorized");
         }
@@ -45,39 +49,48 @@ class VenueController {
             where: and(
                 eq(subscriptionsTable.user_id, userId),
                 // check status (active or trialing)
-                gt(subscriptionsTable.current_period_end, new Date())
-            )
+                gt(subscriptionsTable.current_period_end, new Date()),
+            ),
         });
 
-        if (!sub || (sub.status !== 'active' && sub.status !== 'trialing')) {
+        if (!sub || (sub.status !== "active" && sub.status !== "trialing")) {
             return null;
         }
         return sub;
     }
 
-    readonly getAll = this.factory.createHandlers(validator('query', (value, ctx) => {
-        const parsed = GetVenuesSchema.safeParse(value);
-        if (!parsed.success) {
-            return ctx.json({ error: "Invalid query params", details: parsed.error }, 400);
-        }
-        return parsed.data;
-    }), async (ctx) => {
-        try {
-            const query = ctx.req.valid('query');
-            const result = await this.venueRepository.findAll(query);
-            return ctx.json(result);
-        } catch (error) {
-            console.error("Get venues error:", error);
-            return ctx.json({ error: "Failed to fetch venues" }, 500);
-        }
-    });
+    readonly getAll = this.factory.createHandlers(
+        validator("query", (value, ctx) => {
+            const parsed = GetVenuesSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json(
+                    { error: "Invalid query params", details: parsed.error },
+                    400,
+                );
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            try {
+                const query = ctx.req.valid("query");
+                const result = await this.venueRepository.findAll(query);
+                return ctx.json(result);
+            } catch (error) {
+                console.error("Get venues error:", error);
+                return ctx.json({ error: "Failed to fetch venues" }, 500);
+            }
+        },
+    );
 
     readonly getNearby = this.factory.createHandlers(async (ctx) => {
         try {
             const { lat, lng, radius = "5000" } = ctx.req.query();
-            
+
             if (!lat || !lng) {
-                return ctx.json({ error: "lat and lng query parameters are required" }, 400);
+                return ctx.json(
+                    { error: "lat and lng query parameters are required" },
+                    400,
+                );
             }
 
             const latitude = parseFloat(lat);
@@ -88,21 +101,28 @@ class VenueController {
             const result = await this.venueRepository.findAll({});
             
             // Filter venues by distance using Haversine formula
-            const nearbyVenues = result.filter((venue: any) => {
-                if (!venue.latitude || !venue.longitude) return false;
-                const distance = this.calculateDistance(
-                    latitude, longitude,
-                    venue.latitude, venue.longitude
+            const nearbyVenues = result.data.filter((venue: any) => {
+                    if (!venue.latitude || !venue.longitude) return false;
+                    const distance = this.calculateDistance(
+                        latitude,
+                        longitude,
+                        venue.latitude,
+                        venue.longitude,
+                    );
+                    return distance <= radiusKm;
+                }).map((venue: any) => ({
+                    ...venue,
+                    distance: this.calculateDistance(
+                        latitude,
+                        longitude,
+                        venue.latitude,
+                        venue.longitude,
+                    ).toFixed(2),
+                }))
+                .sort(
+                    (a: any, b: any) =>
+                        parseFloat(a.distance) - parseFloat(b.distance),
                 );
-                return distance <= radiusKm;
-            }).map((venue: any) => ({
-                ...venue,
-                distance: this.calculateDistance(
-                    latitude, longitude,
-                    venue.latitude, venue.longitude
-                ).toFixed(2)
-            })).sort((a: any, b: any) => parseFloat(a.distance) - parseFloat(b.distance));
-
             return ctx.json(nearbyVenues);
         } catch (error) {
             console.error("Get nearby venues error:", error);
@@ -111,14 +131,21 @@ class VenueController {
     });
 
     // Haversine formula to calculate distance between two points
-    private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    private calculateDistance(
+        lat1: number,
+        lon1: number,
+        lat2: number,
+        lon2: number,
+    ): number {
         const R = 6371; // Radius of Earth in km
         const dLat = this.toRad(lat2 - lat1);
         const dLon = this.toRad(lon2 - lon1);
-        const a = 
+        const a =
             Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-            Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
-            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            Math.cos(this.toRad(lat1)) *
+                Math.cos(this.toRad(lat2)) *
+                Math.sin(dLon / 2) *
+                Math.sin(dLon / 2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
     }
@@ -127,74 +154,103 @@ class VenueController {
         return deg * (Math.PI / 180);
     }
 
-    readonly create = this.factory.createHandlers(validator('json', (value, ctx) => {
-        const parsed = CreateVenueSchema.safeParse(value);
-        if (!parsed.success) {
-            return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
-        }
-        return parsed.data;
-    }), async (ctx) => {
-        try {
-            const user = ctx.get('user');
-            const body = ctx.req.valid('json');
-
-            if (!user || !user.id) {
-                return ctx.json({ error: "User ID not found (Unauthorized)" }, 401);
+    readonly create = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const parsed = CreateVenueSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json(
+                    { error: "Invalid request body", details: parsed.error },
+                    400,
+                );
             }
-            const userId = user.id;
-            // 1. Check Subscription
-            const subscription = await this.getActiveSubscription(userId);
-            if (!subscription) {
-                return ctx.json({ error: "Active subscription required to create a venue." }, 403);
+            return parsed.data;
+        }),
+        async (ctx) => {
+            try {
+                const user = ctx.get("user");
+                const body = ctx.req.valid("json");
+
+                if (!user || !user.id) {
+                    return ctx.json(
+                        { error: "User ID not found (Unauthorized)" },
+                        401,
+                    );
+                }
+                const userId = user.id;
+                // 1. Check Subscription
+                const subscription = await this.getActiveSubscription(userId);
+                if (!subscription) {
+                    return ctx.json(
+                        {
+                            error: "Active subscription required to create a venue.",
+                        },
+                        403,
+                    );
+                }
+
+                // 2. Create Venue
+                const venue = await this.venueRepository.create(
+                    userId,
+                    subscription.id,
+                    body,
+                );
+
+                return ctx.json(venue, 201);
+            } catch (error: any) {
+                if (error.message === "Unauthorized")
+                    return ctx.json({ error: "Unauthorized" }, 401);
+                console.error("Create venue error:", error);
+                return ctx.json({ error: "Failed to create venue" }, 500);
             }
+        },
+    );
 
-            // 2. Create Venue
-            const venue = await this.venueRepository.create(userId, subscription.id, body);
-
-            return ctx.json(venue, 201);
-        } catch (error: any) {
-            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
-            console.error("Create venue error:", error);
-            return ctx.json({ error: "Failed to create venue" }, 500);
-        }
-    });
-
-    readonly update = this.factory.createHandlers(validator('json', (value, ctx) => {
-        const parsed = UpdateVenueSchema.safeParse(value);
-        if (!parsed.success) {
-            return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
-        }
-        return parsed.data;
-    }), async (ctx) => {
-        try {
-            const userId = this.getUserId(ctx);
-            const venueId = ctx.req.param("venueId");
-
-            if (!venueId) {
-                return ctx.json({ error: "Venue ID is required" }, 400);
+    readonly update = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const parsed = UpdateVenueSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json(
+                    { error: "Invalid request body", details: parsed.error },
+                    400,
+                );
             }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            try {
+                const userId = this.getUserId(ctx);
+                const venueId = ctx.req.param("venueId");
 
-            const body = ctx.req.valid('json');
+                if (!venueId) {
+                    return ctx.json({ error: "Venue ID is required" }, 400);
+                }
 
-            // 1. Verify Ownership & Existence using findByOwnerId logic or direct check
-            // We can fetch the venue first
-            const existing = await this.venueRepository.findById(venueId);
-            if (!existing) {
-                return ctx.json({ error: "Venue not found" }, 404);
+                const body = ctx.req.valid("json");
+
+                // 1. Verify Ownership & Existence using findByOwnerId logic or direct check
+                // We can fetch the venue first
+                const existing = await this.venueRepository.findById(venueId);
+                if (!existing) {
+                    return ctx.json({ error: "Venue not found" }, 404);
+                }
+                if (existing.owner_id !== userId) {
+                    return ctx.json({ error: "Forbidden" }, 403);
+                }
+
+                // 2. Update
+                const updated = await this.venueRepository.update(
+                    venueId,
+                    body,
+                );
+                return ctx.json(updated);
+            } catch (error: any) {
+                if (error.message === "Unauthorized")
+                    return ctx.json({ error: "Unauthorized" }, 401);
+                console.error("Update venue error:", error);
+                return ctx.json({ error: "Failed to update venue" }, 500);
             }
-            if (existing.owner_id !== userId) {
-                return ctx.json({ error: "Forbidden" }, 403);
-            }
-
-            // 2. Update
-            const updated = await this.venueRepository.update(venueId, body);
-            return ctx.json(updated);
-        } catch (error: any) {
-            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
-            console.error("Update venue error:", error);
-            return ctx.json({ error: "Failed to update venue" }, 500);
-        }
-    });
+        },
+    );
 
     readonly delete = this.factory.createHandlers(async (ctx) => {
         try {
@@ -215,9 +271,9 @@ class VenueController {
 
             await this.venueRepository.softDelete(venueId);
             return ctx.json({ message: "Venue deleted successfully" });
-
         } catch (error: any) {
-            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            if (error.message === "Unauthorized")
+                return ctx.json({ error: "Unauthorized" }, 401);
             console.error("Delete venue error:", error);
             return ctx.json({ error: "Failed to delete venue" }, 500);
         }
@@ -272,46 +328,64 @@ class VenueController {
     /**
      * POST /venues/:venueId/favorite - Add venue to favorites
      */
-    readonly addFavorite = this.factory.createHandlers(validator('json', (value, ctx) => {
-        const parsed = AddFavoriteSchema.safeParse(value);
-        if (!parsed.success) {
-            return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
-        }
-        return parsed.data;
-    }), async (ctx) => {
-        try {
-            const userId = this.getUserId(ctx);
-            const venueId = ctx.req.param("venueId");
-
-            if (!venueId) {
-                return ctx.json({ error: "Venue ID is required" }, 400);
+    readonly addFavorite = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const parsed = AddFavoriteSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json(
+                    { error: "Invalid request body", details: parsed.error },
+                    400,
+                );
             }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            try {
+                const userId = this.getUserId(ctx);
+                const venueId = ctx.req.param("venueId");
 
-            const { note } = ctx.req.valid('json');
-
-            const result = await this.favoritesRepository.addFavorite(userId, venueId, note);
-
-            if (!result.success) {
-                if (result.error === 'venue_not_found') {
-                    return ctx.json({ error: "Venue not found" }, 404);
+                if (!venueId) {
+                    return ctx.json({ error: "Venue ID is required" }, 400);
                 }
-                if (result.error === 'already_favorited') {
-                    return ctx.json({ error: "Venue is already in your favorites" }, 409);
+
+                const { note } = ctx.req.valid("json");
+
+                const result = await this.favoritesRepository.addFavorite(
+                    userId,
+                    venueId,
+                    note,
+                );
+
+                if (!result.success) {
+                    if (result.error === "venue_not_found") {
+                        return ctx.json({ error: "Venue not found" }, 404);
+                    }
+                    if (result.error === "already_favorited") {
+                        return ctx.json(
+                            { error: "Venue is already in your favorites" },
+                            409,
+                        );
+                    }
+                    return ctx.json({ error: "Failed to add favorite" }, 500);
                 }
+
+                return ctx.json(
+                    {
+                        message: result.restored
+                            ? "Venue restored to favorites"
+                            : "Venue added to favorites",
+                        favorite: result.favorite,
+                    },
+                    201,
+                );
+            } catch (error: any) {
+                if (error.message === "Unauthorized")
+                    return ctx.json({ error: "Unauthorized" }, 401);
+                console.error("Add favorite error:", error);
                 return ctx.json({ error: "Failed to add favorite" }, 500);
             }
-
-            return ctx.json({
-                message: result.restored ? "Venue restored to favorites" : "Venue added to favorites",
-                favorite: result.favorite
-            }, 201);
-
-        } catch (error: any) {
-            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
-            console.error("Add favorite error:", error);
-            return ctx.json({ error: "Failed to add favorite" }, 500);
-        }
-    });
+        },
+    );
 
     /**
      * DELETE /venues/:venueId/favorite - Remove venue from favorites
@@ -325,16 +399,19 @@ class VenueController {
                 return ctx.json({ error: "Venue ID is required" }, 400);
             }
 
-            const deleted = await this.favoritesRepository.removeFavorite(userId, venueId);
+            const deleted = await this.favoritesRepository.removeFavorite(
+                userId,
+                venueId,
+            );
 
             if (!deleted) {
                 return ctx.json({ error: "Favorite not found" }, 404);
             }
 
             return ctx.json({ message: "Venue removed from favorites" });
-
         } catch (error: any) {
-            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            if (error.message === "Unauthorized")
+                return ctx.json({ error: "Unauthorized" }, 401);
             console.error("Remove favorite error:", error);
             return ctx.json({ error: "Failed to remove favorite" }, 500);
         }
@@ -343,40 +420,50 @@ class VenueController {
     /**
      * PATCH /venues/:venueId/favorite - Update note on a favorite
      */
-    readonly updateFavoriteNote = this.factory.createHandlers(validator('json', (value, ctx) => {
-        const parsed = UpdateFavoriteNoteSchema.safeParse(value);
-        if (!parsed.success) {
-            return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
-        }
-        return parsed.data;
-    }), async (ctx) => {
-        try {
-            const userId = this.getUserId(ctx);
-            const venueId = ctx.req.param("venueId");
-
-            if (!venueId) {
-                return ctx.json({ error: "Venue ID is required" }, 400);
+    readonly updateFavoriteNote = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const parsed = UpdateFavoriteNoteSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json(
+                    { error: "Invalid request body", details: parsed.error },
+                    400,
+                );
             }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            try {
+                const userId = this.getUserId(ctx);
+                const venueId = ctx.req.param("venueId");
 
-            const { note } = ctx.req.valid('json');
+                if (!venueId) {
+                    return ctx.json({ error: "Venue ID is required" }, 400);
+                }
 
-            const updated = await this.favoritesRepository.updateNote(userId, venueId, note);
+                const { note } = ctx.req.valid("json");
 
-            if (!updated) {
-                return ctx.json({ error: "Favorite not found" }, 404);
+                const updated = await this.favoritesRepository.updateNote(
+                    userId,
+                    venueId,
+                    note,
+                );
+
+                if (!updated) {
+                    return ctx.json({ error: "Favorite not found" }, 404);
+                }
+
+                return ctx.json({
+                    message: "Favorite note updated",
+                    favorite: updated,
+                });
+            } catch (error: any) {
+                if (error.message === "Unauthorized")
+                    return ctx.json({ error: "Unauthorized" }, 401);
+                console.error("Update favorite note error:", error);
+                return ctx.json({ error: "Failed to update favorite" }, 500);
             }
-
-            return ctx.json({
-                message: "Favorite note updated",
-                favorite: updated
-            });
-
-        } catch (error: any) {
-            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
-            console.error("Update favorite note error:", error);
-            return ctx.json({ error: "Failed to update favorite" }, 500);
-        }
-    });
+        },
+    );
 
     /**
      * GET /venues/:venueId/favorite - Check if venue is favorited
@@ -390,15 +477,18 @@ class VenueController {
                 return ctx.json({ error: "Venue ID is required" }, 400);
             }
 
-            const favorite = await this.favoritesRepository.getFavorite(userId, venueId);
+            const favorite = await this.favoritesRepository.getFavorite(
+                userId,
+                venueId,
+            );
 
             return ctx.json({
                 isFavorited: !!favorite,
-                favorite: favorite ?? null
+                favorite: favorite ?? null,
             });
-
         } catch (error: any) {
-            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            if (error.message === "Unauthorized")
+                return ctx.json({ error: "Unauthorized" }, 401);
             console.error("Check favorite error:", error);
             return ctx.json({ error: "Failed to check favorite" }, 500);
         }
