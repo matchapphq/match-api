@@ -79,6 +79,32 @@ app.route("/users", userRouter.getRouter); // Replaces /profile for user-centric
 app.route("/onboarding", onboardingRouter.getRouter);
 app.route("/discovery", discoveryRouter.getRouter);
 app.route("/venues", venueRouter.getRouter);
+// Global amenities route (public) - direct DB query
+app.get("/amenities", async (c) => {
+    try {
+        const { VenueRepository } = await import("./repository/venue.repository");
+        const venueRepository = new VenueRepository();
+        const amenities = await venueRepository.getAllAmenities();
+        
+        // Group by category
+        const categories: Record<string, { slug: string; name: string; amenities: string[] }> = {};
+        for (const amenity of amenities) {
+            if (!categories[amenity.category]) {
+                categories[amenity.category] = {
+                    slug: amenity.category,
+                    name: amenity.category.charAt(0).toUpperCase() + amenity.category.slice(1),
+                    amenities: [],
+                };
+            }
+            categories[amenity.category]!.amenities.push(amenity.id);
+        }
+        
+        return c.json({ amenities, categories: Object.values(categories) });
+    } catch (error) {
+        console.error("Get all amenities error:", error);
+        return c.json({ error: "Failed to fetch amenities" }, 500);
+    }
+});
 app.route("/matches", matchesRouter.getRouter);
 app.route("/sports", sportsRouter.getRouter);
 app.route("/leagues", leaguesRouter.getRouter);

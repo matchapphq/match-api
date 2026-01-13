@@ -1,9 +1,10 @@
 import { db } from "../config/config.db";
 import { venuesTable } from "../config/db/venues.table";
-import { eq, and, isNull, or, ilike, desc } from "drizzle-orm";
+import { eq, and, isNull, or, ilike, desc, gte, lte, count, inArray } from "drizzle-orm";
 import { sql } from "drizzle-orm";
 import type { CreateVenueInput, UpdateVenueInput, GetVenuesQuery } from "../types/venue.types";
 import { venuePhotosTable } from "../config/db/venue-photos.table";
+import { openingHoursExceptionsTable, amenitiesTable, venueAmenitiesTable } from "../config/db/venue-amenities.table";
 
 export class VenueRepository {
 
@@ -193,5 +194,221 @@ export class VenueRepository {
         return await db.query.venuesTable.findMany({
             where: and(eq(venuesTable.owner_id, ownerId), isNull(venuesTable.deleted_at))
         });
+    }
+
+    // ============================================
+    // PHOTOS MANAGEMENT
+    // ============================================
+
+    async addPhoto(venueId: string, data: {
+        photo_url: string;
+        alt_text?: string;
+        is_primary?: boolean;
+        display_order?: number;
+        uploaded_by: string;
+    }) {
+        // If setting as primary, unset any existing primary
+        if (data.is_primary) {
+            await db.update(venuePhotosTable)
+                .set({ is_primary: false })
+                .where(eq(venuePhotosTable.venue_id, venueId));
+        }
+
+        const [photo] = await db.insert(venuePhotosTable).values({
+            venue_id: venueId,
+            photo_url: data.photo_url,
+            alt_text: data.alt_text,
+            is_primary: data.is_primary ?? false,
+            display_order: data.display_order ?? 0,
+            uploaded_by: data.uploaded_by,
+        }).returning();
+
+        return photo;
+    }
+
+    async deletePhoto(photoId: string, venueId: string) {
+        const result = await db.delete(venuePhotosTable)
+            .where(and(
+                eq(venuePhotosTable.id, photoId),
+                eq(venuePhotosTable.venue_id, venueId)
+            ))
+            .returning();
+        return result.length > 0;
+    }
+
+    async getPhotos(venueId: string) {
+        return await db.select()
+            .from(venuePhotosTable)
+            .where(eq(venuePhotosTable.venue_id, venueId))
+            .orderBy(venuePhotosTable.display_order);
+    }
+
+    async getPhoto(photoId: string, venueId: string) {
+        return await db.query.venuePhotosTable.findFirst({
+            where: and(
+                eq(venuePhotosTable.id, photoId),
+                eq(venuePhotosTable.venue_id, venueId)
+            )
+        });
+    }
+
+    async setPrimaryPhoto(photoId: string, venueId: string) {
+        // First unset all primary photos for this venue
+        await db.update(venuePhotosTable)
+            .set({ is_primary: false })
+            .where(eq(venuePhotosTable.venue_id, venueId));
+
+        // Then set the specified photo as primary
+        const [photo] = await db.update(venuePhotosTable)
+            .set({ is_primary: true, updated_at: new Date() })
+            .where(and(
+                eq(venuePhotosTable.id, photoId),
+                eq(venuePhotosTable.venue_id, venueId)
+            ))
+            .returning();
+
+        // Update venue's cover_image_url if photo exists
+        if (photo) {
+            await db.update(venuesTable)
+                .set({ cover_image_url: photo.photo_url, updated_at: new Date() })
+                .where(eq(venuesTable.id, venueId));
+        }
+
+        return photo;
+    }
+
+    async countPhotos(venueId: string) {
+        const result = await db.select({ count: count() })
+            .from(venuePhotosTable)
+            .where(eq(venuePhotosTable.venue_id, venueId));
+        return result[0]?.count ?? 0;
+    }
+
+    // ============================================
+    // OPENING HOURS EXCEPTIONS
+    // ============================================
+
+    async addOpeningHoursException(venueId: string, data: {
+        date: Date;
+        reason: string;
+        closed: boolean;
+        special_open?: string;
+        special_close?: string;
+    }) {
+        const [exception] = await db.insert(openingHoursExceptionsTable).values({
+            venue_id: venueId,
+            date: data.date,
+            reason: data.reason,
+            closed: data.closed,
+            special_open: data.special_open,
+            special_close: data.special_close,
+        }).returning();
+
+        return exception;
+    }
+
+    async getOpeningHoursExceptions(venueId: string, options?: {
+        from?: Date;
+        to?: Date;
+        upcomingOnly?: boolean;
+    }) {
+        const conditions = [eq(openingHoursExceptionsTable.venue_id, venueId)];
+
+        if (options?.upcomingOnly) {
+            conditions.push(gte(openingHoursExceptionsTable.date, new Date()));
+        }
+        if (options?.from) {
+            conditions.push(gte(openingHoursExceptionsTable.date, options.from));
+        }
+        if (options?.to) {
+            conditions.push(lte(openingHoursExceptionsTable.date, options.to));
+        }
+
+        return await db.select()
+            .from(openingHoursExceptionsTable)
+            .where(and(...conditions))
+            .orderBy(openingHoursExceptionsTable.date);
+    }
+
+    async getOpeningHoursExceptionByDate(venueId: string, date: Date) {
+        return await db.query.openingHoursExceptionsTable.findFirst({
+            where: and(
+                eq(openingHoursExceptionsTable.venue_id, venueId),
+                eq(openingHoursExceptionsTable.date, date)
+            )
+        });
+    }
+
+    async deleteOpeningHoursException(exceptionId: string, venueId: string) {
+        const result = await db.delete(openingHoursExceptionsTable)
+            .where(and(
+                eq(openingHoursExceptionsTable.id, exceptionId),
+                eq(openingHoursExceptionsTable.venue_id, venueId)
+            ))
+            .returning();
+        return result.length > 0;
+    }
+
+    // ============================================
+    // AMENITIES MANAGEMENT
+    // ============================================
+
+    async getAllAmenities() {
+        return await db.select()
+            .from(amenitiesTable)
+            .where(eq(amenitiesTable.is_active, true))
+            .orderBy(amenitiesTable.display_order);
+    }
+
+    async getVenueAmenities(venueId: string) {
+        return await db.select({
+            id: amenitiesTable.id,
+            slug: amenitiesTable.slug,
+            name: amenitiesTable.name,
+            icon: amenitiesTable.icon,
+            category: amenitiesTable.category,
+            description: amenitiesTable.description,
+        })
+            .from(venueAmenitiesTable)
+            .innerJoin(amenitiesTable, eq(venueAmenitiesTable.amenity_id, amenitiesTable.id))
+            .where(eq(venueAmenitiesTable.venue_id, venueId));
+    }
+
+    async setVenueAmenities(venueId: string, amenityIds: string[]) {
+        // Delete existing amenities for the venue
+        await db.delete(venueAmenitiesTable)
+            .where(eq(venueAmenitiesTable.venue_id, venueId));
+
+        if (amenityIds.length === 0) {
+            return [];
+        }
+
+        // Validate amenity IDs exist
+        const validAmenities = await db.select({ id: amenitiesTable.id })
+            .from(amenitiesTable)
+            .where(inArray(amenitiesTable.id, amenityIds));
+
+        const validIds = validAmenities.map(a => a.id);
+        const invalidIds = amenityIds.filter(id => !validIds.includes(id));
+
+        if (invalidIds.length > 0) {
+            throw new Error(`Invalid amenity IDs: ${invalidIds.join(', ')}`);
+        }
+
+        // Insert new amenities
+        await db.insert(venueAmenitiesTable).values(
+            validIds.map(amenityId => ({
+                venue_id: venueId,
+                amenity_id: amenityId,
+            }))
+        );
+
+        return await this.getVenueAmenities(venueId);
+    }
+
+    async findAmenitiesBySlug(slugs: string[]) {
+        return await db.select()
+            .from(amenitiesTable)
+            .where(inArray(amenitiesTable.slug, slugs));
     }
 }

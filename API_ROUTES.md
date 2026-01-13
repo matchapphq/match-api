@@ -409,6 +409,276 @@ Response: 200
 }
 ```
 
+### POST /api/venues/:venueId/photos
+**Upload venue photo (owner only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  photo_url: string;
+  alt_text?: string;
+  is_primary?: boolean;
+  display_order?: number;
+}
+
+Response: 201
+{
+  photo: VenuePhoto;
+}
+```
+
+### DELETE /api/venues/:venueId/photos/:photoId
+**Delete venue photo (owner only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  message: string;
+}
+```
+
+### PUT /api/venues/:venueId/photos/:photoId/primary
+**Set photo as primary (owner only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  photo: {
+    id: string;
+    venue_id: string;
+    url: string;
+    is_primary: boolean;
+    display_order: number;
+    uploaded_by: string;
+    created_at: string;
+    updated_at: string;
+  }
+}
+
+Error: 403 Forbidden
+{
+  error: "Not authorized to modify photos for this venue";
+}
+
+Error: 404 Not Found
+{
+  error: "Photo not found";
+}
+```
+
+### GET /api/venues/:venueId/opening-hours
+**Get venue opening hours**
+
+```typescript
+Response: 200
+{
+  opening_hours: {
+    monday: { open: string; close: string; closed: boolean };
+    tuesday: { open: string; close: string; closed: boolean };
+    // ... other days
+  }
+}
+```
+
+### PUT /api/venues/:venueId/opening-hours
+**Update venue opening hours (owner only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  opening_hours: {
+    monday: { open: string; close: string; closed: boolean };
+    tuesday: { open: string; close: string; closed: boolean };
+    // ... other days
+  }
+}
+
+Response: 200
+{
+  venue: Venue;
+  message: string;
+}
+```
+
+### POST /api/venues/:venueId/opening-hours/exceptions
+**Add special hours exception (owner only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  date: string;                   // "2026-12-25"
+  reason: string;                 // "Christmas Day"
+  closed: boolean;
+  special_hours?: {
+    open: string;                 // "10:00"
+    close: string;                // "18:00"
+  };
+}
+
+Response: 201
+{
+  exception: {
+    id: string;
+    venue_id: string;
+    date: string;
+    reason: string;
+    closed: boolean;
+    special_open: string | null;
+    special_close: string | null;
+    created_at: string;
+  }
+}
+
+Error: 400 Bad Request
+{
+  error: "Date must be in the future" | "Exception already exists for this date";
+}
+```
+
+### GET /api/venues/:venueId/opening-hours/exceptions
+**List all special hours exceptions**
+
+```typescript
+Query params:
+- from?: string                   // "2026-01-01"
+- to?: string                     // "2026-12-31"
+- upcoming_only?: boolean         // Default: false
+
+Response: 200
+{
+  exceptions: OpeningHoursException[];
+  total: number;
+}
+```
+
+### DELETE /api/venues/:venueId/opening-hours/exceptions/:exceptionId
+**Delete a special hours exception (owner only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  success: true;
+  message: "Exception deleted successfully";
+}
+
+Error: 404 Not Found
+{
+  error: "Exception not found";
+}
+```
+
+### GET /api/amenities
+**Get list of all available amenities (public)**
+
+```typescript
+Response: 200
+{
+  amenities: [
+    {
+      id: string;
+      slug: string;               // "wifi"
+      name: string;               // "Wi-Fi"
+      icon: string;               // "Wifi" (lucide-react)
+      category: string;           // "facilities"
+      description?: string;
+    }
+  ];
+  categories: [
+    {
+      slug: string;               // "facilities"
+      name: string;               // "Facilities"
+      amenities: string[];        // Array of amenity IDs
+    }
+  ];
+}
+```
+
+### GET /api/venues/:venueId/amenities
+**Get venue amenities**
+
+```typescript
+Response: 200
+{
+  amenities: Amenity[];
+}
+```
+
+### PUT /api/venues/:venueId/amenities
+**Set venue amenities (owner only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  amenities: string[];            // Array of amenity IDs
+}
+
+Response: 200
+{
+  venue: {
+    id: string;
+    name: string;
+    amenities: Amenity[];
+    updated_at: string;
+  }
+}
+
+Error: 400 Bad Request
+{
+  error: "Invalid amenity ID";
+  invalid_amenities: string[];
+}
+```
+
+### GET /api/venues/:venueId/menu
+**Get venue menu**
+
+```typescript
+Response: 200
+{
+  menu: MenuItem[];
+}
+```
+
+### POST /api/venues/:venueId/menu
+**Create/update venue menu (owner only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  menu: [
+    {
+      name: string;
+      description?: string;
+      price: number;
+      category: string;
+      image_url?: string;
+    }
+  ]
+}
+
+Response: 200
+{
+  venue: Venue;
+  message: string;
+}
+```
+
 ### GET /api/venues/:venueId/reviews
 **Get venue reviews**
 
@@ -1745,6 +2015,168 @@ Response: 201
 }
 ```
 
+### PUT /api/partners/venues/:venueId/matches/:matchId
+**Update a venue match**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  total_capacity?: number;
+  available_capacity?: number;
+  is_active?: boolean;
+  is_featured?: boolean;
+  allows_reservations?: boolean;
+  max_group_size?: number;
+  notes?: string;
+}
+
+Response: 200
+{
+  venueMatch: VenueMatch;
+}
+```
+
+### GET /api/partners/venues/:venueId/reservations
+**Get all reservations for a venue**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+- page?: number (default: 1)
+- limit?: number (default: 20)
+- status?: 'all' | 'pending' | 'confirmed' | 'canceled'
+
+Response: 200
+{
+  reservations: [
+    {
+      id: string;
+      user: { id, first_name, last_name, email, phone };
+      venueMatch: { match: { homeTeam, awayTeam, scheduled_at } };
+      party_size: number;
+      status: string;
+      special_requests?: string;
+      created_at: string;
+    }
+  ];
+  total: number;
+  page: number;
+  limit: number;
+}
+```
+
+### GET /api/partners/venues/:venueId/reservations/stats
+**Get reservation statistics for a venue**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+- from?: string                   // "2026-01-01"
+- to?: string                     // "2026-01-31"
+
+Response: 200
+{
+  stats: {
+    period: { from: string; to: string };
+    reservations: {
+      total: number;
+      confirmed: number;
+      cancelled: number;
+      no_show: number;
+      cancellation_rate: number;
+      no_show_rate: number;
+    };
+    customers: {
+      total_unique: number;
+    };
+  }
+}
+```
+
+### GET /api/partners/venues/:venueId/matches/calendar
+**Get calendar view of scheduled matches**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+- month?: string                  // "2026-01" (defaults to current month)
+- status?: string                 // Filter by status
+
+Response: 200
+{
+  matches: VenueMatch[];
+  summary: {
+    total_matches: number;
+    total_seats_available: number;
+    total_seats_reserved: number;
+    occupancy_rate: number;
+  };
+  days_with_matches: string[];    // ["2026-01-15", "2026-01-18", ...]
+}
+```
+
+### PATCH /api/partners/reservations/:reservationId
+**Update reservation details (full update)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  status?: 'pending' | 'confirmed' | 'canceled' | 'checked_in' | 'completed' | 'no_show';
+  table_number?: string;
+  notes?: string;
+  party_size?: number;
+  special_requests?: string;
+}
+
+Response: 200
+{
+  reservation: Reservation;
+}
+
+Error: 400 Bad Request
+{
+  error: "Cannot increase party size: not enough available seats";
+  available_seats: number;
+  requested_increase: number;
+}
+```
+
+### POST /api/partners/reservations/:reservationId/mark-no-show
+**Mark reservation as no-show**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  reason?: string;
+}
+
+Response: 200
+{
+  reservation: {
+    id: string;
+    status: "no_show";
+    marked_no_show_at: string;
+    no_show_reason: string | null;
+  };
+  seats_released: number;
+}
+
+Error: 400 Bad Request
+{
+  error: "Can only mark confirmed or checked_in reservations as no-show";
+  current_status: string;
+}
+```
+
 ### DELETE /api/partners/venues/:venueId/matches/:matchId
 **Cancel a scheduled match**
 
@@ -1818,6 +2250,32 @@ Response: 200
   total_reservations: number;
   total_matches_broadcast: number;
   average_attendance: number;
+}
+```
+
+### GET /api/partners/analytics/dashboard
+**Get complete analytics dashboard**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+- start_date?: string (ISO date)
+- end_date?: string (ISO date)
+
+Response: 200
+{
+  overview: {
+    total_venues: number;
+    total_matches: number;
+    total_reservations: number;
+  };
+  reservations_by_status: {
+    pending: number;
+    confirmed: number;
+    canceled: number;
+  };
+  capacity_utilization: number; // 0-100 percentage
 }
 ```
 
@@ -2067,6 +2525,47 @@ Response: 200
 }
 ```
 
+### GET /api/boosts/stats
+**Get global boost statistics**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  boosts: {
+    available: number;
+    active: number;
+    used: number;
+    expired: number;
+    total: number;
+  };
+  purchases: {
+    total_spent: number;
+    total_purchased: number;
+  };
+  performance: {
+    total_views: number;
+    total_bookings: number;
+    avg_performance_score: number;
+  };
+}
+```
+
+### GET /api/boosts/summary
+**Get boost summary for dashboard**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  available_boosts: number;
+  active_boosts: number;
+  last_purchase_date: string | null;
+}
+```
+
 ### POST /api/boosts/purchase/create-checkout
 **Create Stripe Checkout session for boost purchase**
 
@@ -2085,6 +2584,54 @@ Response: 200
   checkout_url: string;
   session_id: string;
   purchase_id: string;
+}
+```
+
+### POST /api/boosts/purchase/verify
+**Verify a Stripe payment after checkout**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  session_id: string;
+}
+
+Response: 200
+{
+  success: boolean;
+  purchase: {
+    id: string;
+    pack_type: string;
+    quantity: number;
+    payment_status: string;
+    paid_at?: string;
+  };
+}
+```
+
+### GET /api/boosts/boostable/:venueId
+**Get matches available for boosting at a venue**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  matches: [
+    {
+      id: string;
+      venue_id: string;
+      match_id: string;
+      is_boosted: boolean;
+      total_capacity: number;
+      available_capacity: number;
+      scheduled_at: string;
+      status: string;
+      home_team: string;
+    }
+  ]
 }
 ```
 
@@ -2226,6 +2773,72 @@ Response: 200
 3. User activates boost on a venue match → status becomes `used`, match shows "⚡ Sponsorisé" badge
 4. Boost expires automatically when match ends
 5. Analytics track views/bookings during boost period
+
+---
+
+## 📋 Waitlist Routes
+
+### GET /api/partners/venues/:venueId/matches/:matchId/waitlist
+**View waitlist for a venue match (venue owner)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+- status?: 'all' | 'waiting' | 'notified' | 'converted' | 'expired'
+
+Response: 200
+{
+  waitlist: [
+    {
+      id: string;
+      user_id: string;
+      party_size: number;
+      status: 'waiting' | 'notified' | 'expired' | 'converted';
+      position: number | null;
+      notified_at?: string;
+      notification_expires_at?: string;
+      created_at: string;
+    }
+  ];
+  summary: {
+    total_entries: number;
+    waiting_entries: number;
+    notified_entries: number;
+    total_party_size: number;
+  };
+}
+```
+
+### POST /api/partners/waitlist/:entryId/notify
+**Notify waitlist customer that a spot is available**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  message?: string;
+  expiry_minutes?: number;        // Default: 60
+}
+
+Response: 200
+{
+  waitlistEntry: WaitlistEntry;
+  notifications_sent: {
+    email: boolean;
+    sms: boolean;
+    push: boolean;
+  };
+  message: "Customer has been notified and has 60 minutes to claim their spot.";
+}
+
+Error: 400 Bad Request
+{
+  error: "Customer already notified";
+  notified_at: string;
+}
+```
 
 ---
 

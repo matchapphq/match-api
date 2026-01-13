@@ -433,6 +433,154 @@ export class BoostRepository {
 
         return result.length;
     }
+
+    // ============================================
+    // BOOST STATS & SUMMARY
+    // ============================================
+
+    async getBoostStats(userId: string) {
+        // Get counts by status
+        const statusCounts = await db.select({
+            status: boostsTable.status,
+            count: sql<number>`count(*)`,
+        })
+            .from(boostsTable)
+            .where(eq(boostsTable.user_id, userId))
+            .groupBy(boostsTable.status);
+
+        const stats = {
+            available: 0,
+            active: 0,
+            used: 0,
+            expired: 0,
+            total: 0,
+        };
+
+        for (const s of statusCounts) {
+            if (s.status in stats) {
+                (stats as any)[s.status] = Number(s.count);
+            }
+            stats.total += Number(s.count);
+        }
+
+        // Get purchase totals
+        const purchaseStats = await db.select({
+            total_spent: sql<number>`COALESCE(SUM(CAST(total_price AS NUMERIC)), 0)`,
+            total_purchased: sql<number>`COALESCE(SUM(quantity), 0)`,
+        })
+            .from(boostPurchasesTable)
+            .where(and(
+                eq(boostPurchasesTable.user_id, userId),
+                eq(boostPurchasesTable.payment_status, 'paid')
+            ));
+
+        // Get analytics summary
+        const analyticsSummary = await db.select({
+            total_views: sql<number>`COALESCE(SUM(views_during_boost), 0)`,
+            total_bookings: sql<number>`COALESCE(SUM(bookings_during_boost), 0)`,
+            avg_performance: sql<number>`COALESCE(AVG(performance_score), 0)`,
+        })
+            .from(boostAnalyticsTable)
+            .where(eq(boostAnalyticsTable.user_id, userId));
+
+        return {
+            boosts: stats,
+            purchases: {
+                total_spent: Number(purchaseStats[0]?.total_spent) || 0,
+                total_purchased: Number(purchaseStats[0]?.total_purchased) || 0,
+            },
+            performance: {
+                total_views: Number(analyticsSummary[0]?.total_views) || 0,
+                total_bookings: Number(analyticsSummary[0]?.total_bookings) || 0,
+                avg_performance_score: Math.round(Number(analyticsSummary[0]?.avg_performance) || 0),
+            },
+        };
+    }
+
+    async getBoostSummary(userId: string) {
+        // Quick summary for dashboard
+        const available = await this.getAvailableBoostsCount(userId);
+
+        // Get active boosts count
+        const activeResult = await db.select({ count: sql<number>`count(*)` })
+            .from(boostsTable)
+            .where(and(
+                eq(boostsTable.user_id, userId),
+                eq(boostsTable.status, 'used')
+            ));
+
+        // Get last purchase date
+        const lastPurchase = await db.select({ paid_at: boostPurchasesTable.paid_at })
+            .from(boostPurchasesTable)
+            .where(and(
+                eq(boostPurchasesTable.user_id, userId),
+                eq(boostPurchasesTable.payment_status, 'paid')
+            ))
+            .orderBy(desc(boostPurchasesTable.paid_at))
+            .limit(1);
+
+        return {
+            available_boosts: available,
+            active_boosts: Number(activeResult[0]?.count) || 0,
+            last_purchase_date: lastPurchase[0]?.paid_at?.toISOString() || null,
+        };
+    }
+
+    // ============================================
+    // BOOSTABLE MATCHES
+    // ============================================
+
+    async getBoostableMatches(venueId: string, userId: string) {
+        // Get venue matches that can be boosted (scheduled, not already boosted)
+        const boostableMatches = await db.select({
+            id: venueMatchesTable.id,
+            venue_id: venueMatchesTable.venue_id,
+            match_id: venueMatchesTable.match_id,
+            is_boosted: venueMatchesTable.is_boosted,
+            total_capacity: venueMatchesTable.total_capacity,
+            available_capacity: venueMatchesTable.available_capacity,
+            scheduled_at: matchesTable.scheduled_at,
+            status: matchesTable.status,
+            home_team: teamsTable.name,
+        })
+            .from(venueMatchesTable)
+            .innerJoin(matchesTable, eq(venueMatchesTable.match_id, matchesTable.id))
+            .leftJoin(teamsTable, eq(matchesTable.home_team_id, teamsTable.id))
+            .where(and(
+                eq(venueMatchesTable.venue_id, venueId),
+                eq(venueMatchesTable.is_boosted, false),
+                eq(matchesTable.status, 'scheduled')
+            ))
+            .orderBy(matchesTable.scheduled_at);
+
+        return boostableMatches;
+    }
+
+    async verifyPurchase(sessionId: string, userId: string) {
+        // Find purchase by session ID
+        const purchase = await db.select()
+            .from(boostPurchasesTable)
+            .where(and(
+                eq(boostPurchasesTable.stripe_session_id, sessionId),
+                eq(boostPurchasesTable.user_id, userId)
+            ))
+            .limit(1);
+
+        if (!purchase[0]) {
+            return { success: false, error: 'Purchase not found' };
+        }
+
+        return {
+            success: true,
+            purchase: {
+                id: purchase[0].id,
+                pack_type: purchase[0].pack_type,
+                quantity: purchase[0].quantity,
+                payment_status: purchase[0].payment_status,
+                paid_at: purchase[0].paid_at?.toISOString(),
+            },
+        };
+    }
 }
 
 export default new BoostRepository();

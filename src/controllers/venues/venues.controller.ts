@@ -302,8 +302,95 @@ class VenueController {
     });
 
     readonly getPhotos = this.factory.createHandlers(async (ctx) => {
-        // TODO: Implement actual photo fetch if separate from details
-        return ctx.json({ msg: "Venue photos" });
+        const venueId = ctx.req.param("venueId");
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            const photos = await this.venueRepository.getPhotos(venueId);
+            return ctx.json({ photos });
+        } catch (error: any) {
+            console.error("Get venue photos error:", error);
+            return ctx.json({ error: "Failed to fetch photos" }, 500);
+        }
+    });
+
+    readonly uploadPhoto = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+        const userId = this.getUserId(ctx);
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            // Verify ownership
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+            if (venue.owner_id !== userId) {
+                return ctx.json({ error: "Forbidden" }, 403);
+            }
+
+            const body = await ctx.req.json();
+            const { photo_url, alt_text, is_primary, display_order } = body;
+
+            if (!photo_url) {
+                return ctx.json({ error: "photo_url is required" }, 400);
+            }
+
+            const photo = await this.venueRepository.addPhoto(venueId, {
+                photo_url,
+                alt_text,
+                is_primary,
+                display_order,
+                uploaded_by: userId,
+            });
+
+            return ctx.json({ photo }, 201);
+        } catch (error: any) {
+            if (error.message === "Unauthorized")
+                return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Upload photo error:", error);
+            return ctx.json({ error: "Failed to upload photo" }, 500);
+        }
+    });
+
+    readonly deletePhoto = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+        const photoId = ctx.req.param("photoId");
+        const userId = this.getUserId(ctx);
+
+        if (!venueId || !photoId) {
+            return ctx.json({ error: "Venue ID and Photo ID are required" }, 400);
+        }
+
+        try {
+            // Verify ownership
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+            if (venue.owner_id !== userId) {
+                return ctx.json({ error: "Forbidden" }, 403);
+            }
+
+            const deleted = await this.venueRepository.deletePhoto(photoId, venueId);
+
+            if (!deleted) {
+                return ctx.json({ error: "Photo not found" }, 404);
+            }
+
+            return ctx.json({ message: "Photo deleted successfully" });
+        } catch (error: any) {
+            if (error.message === "Unauthorized")
+                return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Delete photo error:", error);
+            return ctx.json({ error: "Failed to delete photo" }, 500);
+        }
     });
 
     readonly getReviews = this.factory.createHandlers(async (ctx) => {
@@ -319,6 +406,138 @@ class VenueController {
     readonly getAvailability = this.factory.createHandlers(async (ctx) => {
         // TODO: Implement
         return ctx.json({ msg: "Venue availability" });
+    });
+
+    readonly getOpeningHours = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+
+            // Return opening hours from venue metadata or default structure
+            const openingHours = (venue as any).opening_hours || {
+                monday: { open: "09:00", close: "23:00", closed: false },
+                tuesday: { open: "09:00", close: "23:00", closed: false },
+                wednesday: { open: "09:00", close: "23:00", closed: false },
+                thursday: { open: "09:00", close: "23:00", closed: false },
+                friday: { open: "09:00", close: "00:00", closed: false },
+                saturday: { open: "10:00", close: "00:00", closed: false },
+                sunday: { open: "10:00", close: "22:00", closed: false },
+            };
+
+            return ctx.json({ opening_hours: openingHours });
+        } catch (error: any) {
+            console.error("Get opening hours error:", error);
+            return ctx.json({ error: "Failed to fetch opening hours" }, 500);
+        }
+    });
+
+    readonly updateOpeningHours = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+        const userId = this.getUserId(ctx);
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            // Verify ownership
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+            if (venue.owner_id !== userId) {
+                return ctx.json({ error: "Forbidden" }, 403);
+            }
+
+            const body = await ctx.req.json();
+            const { opening_hours } = body;
+
+            if (!opening_hours) {
+                return ctx.json({ error: "opening_hours is required" }, 400);
+            }
+
+            // Update venue with new opening hours
+            const updated = await this.venueRepository.update(venueId, {
+                opening_hours,
+            } as any);
+
+            return ctx.json({ venue: updated, message: "Opening hours updated" });
+        } catch (error: any) {
+            if (error.message === "Unauthorized")
+                return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Update opening hours error:", error);
+            return ctx.json({ error: "Failed to update opening hours" }, 500);
+        }
+    });
+
+    readonly getMenu = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+
+            // Return menu from venue metadata or empty array
+            const menu = (venue as any).menu || [];
+
+            return ctx.json({ menu });
+        } catch (error: any) {
+            console.error("Get menu error:", error);
+            return ctx.json({ error: "Failed to fetch menu" }, 500);
+        }
+    });
+
+    readonly updateMenu = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+        const userId = this.getUserId(ctx);
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            // Verify ownership
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+            if (venue.owner_id !== userId) {
+                return ctx.json({ error: "Forbidden" }, 403);
+            }
+
+            const body = await ctx.req.json();
+            const { menu } = body;
+
+            if (!menu) {
+                return ctx.json({ error: "menu is required" }, 400);
+            }
+
+            // Update venue with new menu
+            const updated = await this.venueRepository.update(venueId, {
+                menu,
+            } as any);
+
+            return ctx.json({ venue: updated, message: "Menu updated" });
+        } catch (error: any) {
+            if (error.message === "Unauthorized")
+                return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Update menu error:", error);
+            return ctx.json({ error: "Failed to update menu" }, 500);
+        }
     });
 
     /**
@@ -371,6 +590,300 @@ class VenueController {
                 return ctx.json({ error: "Failed to update booking mode" }, 500);
             }
         },
+    );
+
+    // =============================================
+    // SET PRIMARY PHOTO
+    // =============================================
+
+    /**
+     * PUT /venues/:venueId/photos/:photoId/primary - Set photo as primary
+     */
+    readonly setPrimaryPhoto = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+        const photoId = ctx.req.param("photoId");
+        const userId = this.getUserId(ctx);
+
+        if (!venueId || !photoId) {
+            return ctx.json({ error: "Venue ID and Photo ID are required" }, 400);
+        }
+
+        try {
+            // Verify ownership
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+            if (venue.owner_id !== userId) {
+                return ctx.json({ error: "Not authorized to modify photos for this venue" }, 403);
+            }
+
+            // Check photo exists
+            const photo = await this.venueRepository.getPhoto(photoId, venueId);
+            if (!photo) {
+                return ctx.json({ error: "Photo not found" }, 404);
+            }
+
+            // Set as primary
+            const updatedPhoto = await this.venueRepository.setPrimaryPhoto(photoId, venueId);
+
+            return ctx.json({ photo: updatedPhoto });
+        } catch (error: any) {
+            console.error("Set primary photo error:", error);
+            return ctx.json({ error: "Failed to set primary photo" }, 500);
+        }
+    });
+
+    // =============================================
+    // OPENING HOURS EXCEPTIONS
+    // =============================================
+
+    /**
+     * POST /venues/:venueId/opening-hours/exceptions - Add special hours exception
+     */
+    readonly addOpeningHoursException = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const schema = z.object({
+                date: z.string(),
+                reason: z.string().min(1).max(255),
+                closed: z.boolean(),
+                special_hours: z.object({
+                    open: z.string().regex(/^\d{2}:\d{2}$/),
+                    close: z.string().regex(/^\d{2}:\d{2}$/),
+                }).optional(),
+            });
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const venueId = ctx.req.param("venueId");
+            const userId = this.getUserId(ctx);
+
+            if (!venueId) {
+                return ctx.json({ error: "Venue ID is required" }, 400);
+            }
+
+            try {
+                // Verify ownership
+                const venue = await this.venueRepository.findById(venueId);
+                if (!venue) {
+                    return ctx.json({ error: "Venue not found" }, 404);
+                }
+                if (venue.owner_id !== userId) {
+                    return ctx.json({ error: "Not authorized to add exceptions for this venue" }, 403);
+                }
+
+                const { date, reason, closed, special_hours } = ctx.req.valid("json");
+                const exceptionDate = new Date(date);
+
+                // Validate date is in the future
+                if (exceptionDate < new Date()) {
+                    return ctx.json({ error: "Date must be in the future" }, 400);
+                }
+
+                // Check if exception already exists for this date
+                const existing = await this.venueRepository.getOpeningHoursExceptionByDate(venueId, exceptionDate);
+                if (existing) {
+                    return ctx.json({ error: "Exception already exists for this date" }, 400);
+                }
+
+                const exception = await this.venueRepository.addOpeningHoursException(venueId, {
+                    date: exceptionDate,
+                    reason,
+                    closed,
+                    special_open: special_hours?.open,
+                    special_close: special_hours?.close,
+                });
+
+                return ctx.json({ exception }, 201);
+            } catch (error: any) {
+                console.error("Add opening hours exception error:", error);
+                return ctx.json({ error: "Failed to add opening hours exception" }, 500);
+            }
+        }
+    );
+
+    /**
+     * GET /venues/:venueId/opening-hours/exceptions - List exceptions
+     */
+    readonly getOpeningHoursExceptions = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+
+            const from = ctx.req.query("from");
+            const to = ctx.req.query("to");
+            const upcomingOnly = ctx.req.query("upcoming_only") === "true";
+
+            const exceptions = await this.venueRepository.getOpeningHoursExceptions(venueId, {
+                from: from ? new Date(from) : undefined,
+                to: to ? new Date(to) : undefined,
+                upcomingOnly,
+            });
+
+            return ctx.json({ exceptions, total: exceptions.length });
+        } catch (error: any) {
+            console.error("Get opening hours exceptions error:", error);
+            return ctx.json({ error: "Failed to fetch opening hours exceptions" }, 500);
+        }
+    });
+
+    /**
+     * DELETE /venues/:venueId/opening-hours/exceptions/:exceptionId
+     */
+    readonly deleteOpeningHoursException = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+        const exceptionId = ctx.req.param("exceptionId");
+        const userId = this.getUserId(ctx);
+
+        if (!venueId || !exceptionId) {
+            return ctx.json({ error: "Venue ID and Exception ID are required" }, 400);
+        }
+
+        try {
+            // Verify ownership
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+            if (venue.owner_id !== userId) {
+                return ctx.json({ error: "Not authorized to delete exceptions for this venue" }, 403);
+            }
+
+            const deleted = await this.venueRepository.deleteOpeningHoursException(exceptionId, venueId);
+            if (!deleted) {
+                return ctx.json({ error: "Exception not found" }, 404);
+            }
+
+            return ctx.json({ success: true, message: "Exception deleted successfully" });
+        } catch (error: any) {
+            console.error("Delete opening hours exception error:", error);
+            return ctx.json({ error: "Failed to delete opening hours exception" }, 500);
+        }
+    });
+
+    // =============================================
+    // AMENITIES MANAGEMENT
+    // =============================================
+
+    /**
+     * GET /amenities - Get all available amenities (public)
+     */
+    readonly getAllAmenities = this.factory.createHandlers(async (ctx) => {
+        try {
+            const amenities = await this.venueRepository.getAllAmenities();
+
+            // Group by category
+            const categories: Record<string, { slug: string; name: string; amenities: string[] }> = {};
+            for (const amenity of amenities) {
+                if (!categories[amenity.category]) {
+                    categories[amenity.category] = {
+                        slug: amenity.category,
+                        name: amenity.category.charAt(0).toUpperCase() + amenity.category.slice(1),
+                        amenities: [],
+                    };
+                }
+                categories[amenity.category]!.amenities.push(amenity.id);
+            }
+
+            return ctx.json({
+                amenities,
+                categories: Object.values(categories),
+            });
+        } catch (error: any) {
+            console.error("Get all amenities error:", error);
+            return ctx.json({ error: "Failed to fetch amenities" }, 500);
+        }
+    });
+
+    /**
+     * GET /venues/:venueId/amenities - Get venue amenities
+     */
+    readonly getVenueAmenities = this.factory.createHandlers(async (ctx) => {
+        const venueId = ctx.req.param("venueId");
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+
+            const amenities = await this.venueRepository.getVenueAmenities(venueId);
+            return ctx.json({ amenities });
+        } catch (error: any) {
+            console.error("Get venue amenities error:", error);
+            return ctx.json({ error: "Failed to fetch venue amenities" }, 500);
+        }
+    });
+
+    /**
+     * PUT /venues/:venueId/amenities - Set venue amenities
+     */
+    readonly setVenueAmenities = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const schema = z.object({
+                amenities: z.array(z.string()),
+            });
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const venueId = ctx.req.param("venueId");
+            const userId = this.getUserId(ctx);
+
+            if (!venueId) {
+                return ctx.json({ error: "Venue ID is required" }, 400);
+            }
+
+            try {
+                // Verify ownership
+                const venue = await this.venueRepository.findById(venueId);
+                if (!venue) {
+                    return ctx.json({ error: "Venue not found" }, 404);
+                }
+                if (venue.owner_id !== userId) {
+                    return ctx.json({ error: "Not authorized to update this venue" }, 403);
+                }
+
+                const { amenities: amenityIds } = ctx.req.valid("json");
+
+                const updatedAmenities = await this.venueRepository.setVenueAmenities(venueId, amenityIds);
+
+                return ctx.json({
+                    venue: {
+                        id: venue.id,
+                        name: venue.name,
+                        amenities: updatedAmenities,
+                        updated_at: new Date().toISOString(),
+                    },
+                });
+            } catch (error: any) {
+                if (error.message?.startsWith("Invalid amenity IDs")) {
+                    const invalidIds = error.message.replace("Invalid amenity IDs: ", "").split(", ");
+                    return ctx.json({ error: "Invalid amenity ID", invalid_amenities: invalidIds }, 400);
+                }
+                console.error("Set venue amenities error:", error);
+                return ctx.json({ error: "Failed to update venue amenities" }, 500);
+            }
+        }
     );
 
     // =============================================

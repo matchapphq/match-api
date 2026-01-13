@@ -5,6 +5,7 @@ export * from './user-favorites.table';
 export * from './subscriptions.table';
 export * from './venues.table';
 export * from './venue-photos.table';
+export * from './venue-amenities.table';
 export * from './sports.table';
 export * from './matches.table';
 export * from './seats.table';

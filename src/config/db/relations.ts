@@ -399,3 +399,4 @@ export const boostAnalyticsRelations = relations(boostAnalyticsTable, ({ one }) 
         references: [usersTable.id],
     }),
 }));
+

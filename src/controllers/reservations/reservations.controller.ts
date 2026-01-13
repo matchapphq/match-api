@@ -1,5 +1,6 @@
 import { createFactory } from "hono/factory";
 import { validator } from "hono/validator";
+import { z } from "zod";
 import type { HonoEnv } from "../../types/hono.types";
 import { CapacityRepository } from "../../repository/capacity.repository";
 import { ReservationRepository } from "../../repository/reservation.repository";
@@ -571,6 +572,7 @@ class ReservationsController {
             stats
         });
     });
+
 }
 
 export default ReservationsController;

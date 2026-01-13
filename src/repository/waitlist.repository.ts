@@ -174,6 +174,94 @@ export class WaitlistRepository {
     }
 
     /**
+     * Get waitlist for a venue match with user details (for venue owner)
+     */
+    async getWaitlistForVenueMatch(venueMatchId: string, status?: string) {
+        const conditions = [eq(waitlistTable.venue_match_id, venueMatchId)];
+        if (status && status !== 'all') {
+            conditions.push(eq(waitlistTable.status, status));
+        }
+
+        const entries = await db.select()
+            .from(waitlistTable)
+            .where(and(...conditions))
+            .orderBy(asc(waitlistTable.created_at));
+
+        // Calculate positions
+        let position = 1;
+        return entries.map(entry => ({
+            ...entry,
+            position: entry.status === 'waiting' ? position++ : null,
+        }));
+    }
+
+    /**
+     * Get total party size of waiting entries
+     */
+    async getTotalWaitingPartySize(venueMatchId: string): Promise<number> {
+        const entries = await db.select({ party_size: waitlistTable.party_size })
+            .from(waitlistTable)
+            .where(and(
+                eq(waitlistTable.venue_match_id, venueMatchId),
+                eq(waitlistTable.status, 'waiting')
+            ));
+
+        return entries.reduce((sum, e) => sum + e.party_size, 0);
+    }
+
+    /**
+     * Manually notify a waitlist entry with custom expiry
+     */
+    async notifyUserManually(waitlistId: string, expiryMinutes: number = 60) {
+        const entry = await db.query.waitlistTable.findFirst({
+            where: eq(waitlistTable.id, waitlistId)
+        });
+
+        if (!entry) {
+            return { success: false, error: "Waitlist entry not found" };
+        }
+
+        if (entry.status === 'notified') {
+            return { success: false, error: "Customer already notified", notified_at: entry.notified_at };
+        }
+
+        if (entry.status !== 'waiting') {
+            return { success: false, error: "Cannot notify non-waiting entry" };
+        }
+
+        const notificationExpiry = new Date(Date.now() + expiryMinutes * 60 * 1000);
+
+        const [updated] = await db.update(waitlistTable)
+            .set({
+                status: 'notified',
+                notified_at: new Date(),
+                notification_expires_at: notificationExpiry,
+                updated_at: new Date()
+            })
+            .where(eq(waitlistTable.id, waitlistId))
+            .returning();
+
+        return {
+            success: true,
+            waitlistEntry: updated,
+            notifications_sent: {
+                email: entry.notification_method === 'email' || entry.notification_method === 'all',
+                sms: entry.notification_method === 'sms' || entry.notification_method === 'all',
+                push: entry.notification_method === 'push' || entry.notification_method === 'all',
+            },
+        };
+    }
+
+    /**
+     * Find waitlist entry by ID
+     */
+    async findById(waitlistId: string) {
+        return await db.query.waitlistTable.findFirst({
+            where: eq(waitlistTable.id, waitlistId)
+        });
+    }
+
+    /**
      * Clean up expired notifications (return them to waiting or expire)
      */
     async cleanupExpiredNotifications() {

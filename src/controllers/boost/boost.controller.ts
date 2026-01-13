@@ -313,6 +313,87 @@ class BoostController {
             return ctx.json({ error: "Failed to get purchase history", details: error.message }, 500);
         }
     });
+
+    /**
+     * GET /boosts/stats
+     * Get global boost statistics
+     */
+    readonly getStats = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+
+        try {
+            const stats = await boostRepository.getBoostStats(userId);
+            return ctx.json(stats);
+        } catch (error: any) {
+            console.error("Error getting boost stats:", error);
+            return ctx.json({ error: "Failed to get boost stats", details: error.message }, 500);
+        }
+    });
+
+    /**
+     * GET /boosts/summary
+     * Get boost summary for dashboard
+     */
+    readonly getSummary = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+
+        try {
+            const summary = await boostRepository.getBoostSummary(userId);
+            return ctx.json(summary);
+        } catch (error: any) {
+            console.error("Error getting boost summary:", error);
+            return ctx.json({ error: "Failed to get boost summary", details: error.message }, 500);
+        }
+    });
+
+    /**
+     * POST /boosts/purchase/verify
+     * Verify a Stripe payment after checkout
+     */
+    readonly verifyPurchase = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+
+        try {
+            const body = await ctx.req.json();
+            const { session_id } = body;
+
+            if (!session_id) {
+                return ctx.json({ error: "session_id is required" }, 400);
+            }
+
+            const result = await boostRepository.verifyPurchase(session_id, userId);
+
+            if (!result.success) {
+                return ctx.json({ success: false, error: result.error }, 404);
+            }
+
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error verifying purchase:", error);
+            return ctx.json({ error: "Failed to verify purchase", details: error.message }, 500);
+        }
+    });
+
+    /**
+     * GET /boosts/boostable/:venueId
+     * Get matches available for boosting at a venue
+     */
+    readonly getBoostableMatches = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            const matches = await boostRepository.getBoostableMatches(venueId, userId);
+            return ctx.json({ matches });
+        } catch (error: any) {
+            console.error("Error getting boostable matches:", error);
+            return ctx.json({ error: "Failed to get boostable matches", details: error.message }, 500);
+        }
+    });
 }
 
 export default BoostController;

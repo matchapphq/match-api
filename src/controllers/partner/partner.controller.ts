@@ -1,12 +1,16 @@
 import { createFactory } from "hono/factory";
+import { validator } from "hono/validator";
+import { z } from "zod";
 import type { HonoEnv } from "../../types/hono.types";
 import { PartnerRepository } from "../../repository/partner.repository";
+import { WaitlistRepository } from "../../repository/waitlist.repository";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import stripe, { CHECKOUT_URLS, isStripeConfigured } from "../../config/stripe";
 
 class PartnerController {
     private readonly factory = createFactory<HonoEnv>();
     private readonly repository = new PartnerRepository();
+    private readonly waitlistRepo = new WaitlistRepository();
 
     // GET /partners/venues
     readonly getMyVenues = this.factory.createHandlers(async (ctx) => {
@@ -576,6 +580,336 @@ class PartnerController {
             return ctx.json({ error: "Failed to update reservation status", details: error.message }, 500);
         }
     });
+
+    // GET /partners/venues/:venueId/reservations
+    // Get all reservations for a specific venue
+    readonly getVenueReservations = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
+        }
+
+        try {
+            const page = parseInt(ctx.req.query('page') || '1', 10);
+            const limit = parseInt(ctx.req.query('limit') || '20', 10);
+            const status = ctx.req.query('status') || 'all';
+
+            const result = await this.repository.getVenueReservations(venueId, userId, { page, limit, status });
+
+            if (!result.authorized) {
+                return ctx.json({ error: "Venue not found or access denied" }, 403);
+            }
+
+            return ctx.json({
+                reservations: result.reservations,
+                total: result.total,
+                page: result.page,
+                limit: result.limit,
+            });
+        } catch (error: any) {
+            console.error("Error getting venue reservations:", error);
+            return ctx.json({ error: "Failed to get venue reservations", details: error.message }, 500);
+        }
+    });
+
+    // PUT /partners/venues/:venueId/matches/:matchId
+    // Update a venue match
+    readonly updateVenueMatch = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+        const matchId = ctx.req.param('matchId');
+
+        if (!venueId || !matchId) {
+            return ctx.json({ error: "Venue ID and Match ID required" }, 400);
+        }
+
+        try {
+            const body = await ctx.req.json();
+
+            const result = await this.repository.updateVenueMatch(venueId, matchId, userId, {
+                total_capacity: body.total_capacity,
+                available_capacity: body.available_capacity,
+                is_active: body.is_active,
+                is_featured: body.is_featured,
+                allows_reservations: body.allows_reservations,
+                max_group_size: body.max_group_size,
+                notes: body.notes,
+            });
+
+            if (!result.success) {
+                const statusCode = (result.statusCode || 400) as 400 | 403 | 404;
+                return ctx.json({ error: result.error }, statusCode);
+            }
+
+            return ctx.json({ venueMatch: result.venueMatch });
+        } catch (error: any) {
+            console.error("Error updating venue match:", error);
+            return ctx.json({ error: "Failed to update venue match", details: error.message }, 500);
+        }
+    });
+
+    // GET /partners/analytics/dashboard
+    // Get complete analytics dashboard
+    readonly getAnalyticsDashboard = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+
+        try {
+            const startDate = ctx.req.query('start_date');
+            const endDate = ctx.req.query('end_date');
+
+            const dateRange = startDate ? {
+                start: new Date(startDate),
+                end: endDate ? new Date(endDate) : undefined,
+            } : undefined;
+
+            const dashboard = await this.repository.getAnalyticsDashboard(userId, dateRange);
+            return ctx.json(dashboard);
+        } catch (error: any) {
+            console.error("Error getting analytics dashboard:", error);
+            return ctx.json({ error: "Failed to get analytics dashboard", details: error.message }, 500);
+        }
+    });
+
+    // Get matches calendar view
+    readonly getMatchesCalendar = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            const month = ctx.req.query('month');
+            const status = ctx.req.query('status');
+
+            const result = await this.repository.getMatchesCalendar(venueId, userId, { month, status });
+
+            if (!result.success) {
+                const status = result.statusCode === 403 ? 403 : result.statusCode === 404 ? 404 : 500;
+                return ctx.json({ error: result.error }, status);
+            }
+
+            return ctx.json({
+                matches: result.matches,
+                summary: result.summary,
+                days_with_matches: result.days_with_matches,
+            });
+        } catch (error: any) {
+            console.error("Error getting matches calendar:", error);
+            return ctx.json({ error: "Failed to get matches calendar", details: error.message }, 500);
+        }
+    });
+
+    // Get reservation statistics
+    readonly getReservationStats = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            const from = ctx.req.query('from');
+            const to = ctx.req.query('to');
+
+            const dateRange = from ? {
+                from: new Date(from),
+                to: to ? new Date(to) : undefined,
+            } : undefined;
+
+            const result = await this.repository.getReservationStats(venueId, userId, dateRange);
+
+            if (!result.success) {
+                const status = result.statusCode === 403 ? 403 : result.statusCode === 404 ? 404 : 500;
+                return ctx.json({ error: result.error }, status);
+            }
+
+            return ctx.json({ stats: result.stats });
+        } catch (error: any) {
+            console.error("Error getting reservation stats:", error);
+            return ctx.json({ error: "Failed to get reservation stats", details: error.message }, 500);
+        }
+    });
+
+    // Update reservation (full update)
+    readonly updateReservationFull = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const schema = z.object({
+                status: z.enum(['pending', 'confirmed', 'canceled', 'checked_in', 'completed', 'no_show']).optional(),
+                table_number: z.string().optional(),
+                notes: z.string().optional(),
+                party_size: z.number().int().positive().optional(),
+                special_requests: z.string().optional(),
+            });
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const userId = ctx.get('user').id;
+            const reservationId = ctx.req.param('reservationId');
+
+            if (!reservationId) {
+                return ctx.json({ error: "Reservation ID is required" }, 400);
+            }
+
+            try {
+                const data = ctx.req.valid('json');
+                const result = await this.repository.updateReservation(reservationId, userId, data);
+
+                if (!result.success) {
+                    const response: any = { error: result.error };
+                    if ('available_seats' in result) {
+                        response.available_seats = result.available_seats;
+                        response.requested_increase = result.requested_increase;
+                    }
+                    const status = result.statusCode === 403 ? 403 : result.statusCode === 404 ? 404 : result.statusCode === 400 ? 400 : 500;
+                    return ctx.json(response, status);
+                }
+
+                return ctx.json({ reservation: result.reservation });
+            } catch (error: any) {
+                console.error("Error updating reservation:", error);
+                return ctx.json({ error: "Failed to update reservation", details: error.message }, 500);
+            }
+        }
+    );
+
+    // Mark reservation as no-show
+    readonly markReservationNoShow = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const schema = z.object({
+                reason: z.string().optional(),
+            });
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const userId = ctx.get('user').id;
+            const reservationId = ctx.req.param('reservationId');
+
+            if (!reservationId) {
+                return ctx.json({ error: "Reservation ID is required" }, 400);
+            }
+
+            try {
+                const { reason } = ctx.req.valid('json');
+                const result = await this.repository.markReservationNoShow(reservationId, userId, reason);
+
+                if (!result.success) {
+                    const response: any = { error: result.error };
+                    if ('current_status' in result) {
+                        response.current_status = result.current_status;
+                    }
+                    const status = result.statusCode === 403 ? 403 : result.statusCode === 404 ? 404 : result.statusCode === 400 ? 400 : 500;
+                    return ctx.json(response, status);
+                }
+
+                return ctx.json({
+                    reservation: result.reservation,
+                    seats_released: result.seats_released,
+                });
+            } catch (error: any) {
+                console.error("Error marking reservation as no-show:", error);
+                return ctx.json({ error: "Failed to mark reservation as no-show", details: error.message }, 500);
+            }
+        }
+    );
+
+    // =============================================
+    // WAITLIST MANAGEMENT (Partner)
+    // =============================================
+
+    // View waitlist for a venue match
+    readonly getVenueMatchWaitlist = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+        const matchId = ctx.req.param('matchId');
+
+        if (!venueId || !matchId) {
+            return ctx.json({ error: "Venue ID and Match ID required" }, 400);
+        }
+
+        try {
+            // Verify venue ownership
+            const venues = await this.repository.getVenuesByOwnerId(userId);
+            const ownsVenue = venues.some(v => v.id === venueId);
+            if (!ownsVenue) {
+                return ctx.json({ error: "Not authorized to view this venue's waitlist" }, 403);
+            }
+
+            // TODO: Get venue_match_id from venueId and matchId
+            const venueMatchId = matchId;
+
+            const status = ctx.req.query('status');
+            const entries = await this.waitlistRepo.getWaitlistForVenueMatch(venueMatchId, status);
+            const totalWaitingSize = await this.waitlistRepo.getTotalWaitingPartySize(venueMatchId);
+
+            return ctx.json({
+                waitlist: entries,
+                summary: {
+                    total_entries: entries.length,
+                    waiting_entries: entries.filter(e => e.status === 'waiting').length,
+                    notified_entries: entries.filter(e => e.status === 'notified').length,
+                    total_party_size: totalWaitingSize,
+                },
+            });
+        } catch (error: any) {
+            console.error("Error getting waitlist:", error);
+            return ctx.json({ error: "Failed to get waitlist", details: error.message }, 500);
+        }
+    });
+
+    // Notify a waitlist customer that a spot is available
+    readonly notifyWaitlistCustomer = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const schema = z.object({
+                message: z.string().optional(),
+                expiry_minutes: z.number().int().positive().default(60),
+            });
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json({ error: "Invalid request body", details: parsed.error }, 400);
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const userId = ctx.get('user').id;
+            const entryId = ctx.req.param('entryId');
+
+            if (!entryId) {
+                return ctx.json({ error: "Entry ID required" }, 400);
+            }
+
+            try {
+                const { expiry_minutes } = ctx.req.valid('json');
+                const result = await this.waitlistRepo.notifyUserManually(entryId, expiry_minutes);
+
+                if (!result.success) {
+                    return ctx.json({ error: result.error }, 400);
+                }
+
+                return ctx.json({
+                    waitlistEntry: result.waitlistEntry,
+                    notifications_sent: result.notifications_sent,
+                    message: "Customer has been notified and has " + expiry_minutes + " minutes to claim their spot.",
+                });
+            } catch (error: any) {
+                console.error("Error notifying waitlist customer:", error);
+                return ctx.json({ error: "Failed to notify customer", details: error.message }, 500);
+            }
+        }
+    );
+
 }
 
 export default PartnerController;

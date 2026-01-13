@@ -28,9 +28,17 @@ class BoostService {
         // Available boosts
         this.router.get("/available", ...this.controller.getAvailable);
 
+        // Stats and summary
+        this.router.get("/stats", ...this.controller.getStats);
+        this.router.get("/summary", ...this.controller.getSummary);
+
         // Purchase flow
         this.router.post("/purchase/create-checkout", ...this.controller.createCheckout);
+        this.router.post("/purchase/verify", ...this.controller.verifyPurchase);
         this.router.get("/purchases", ...this.controller.getPurchaseHistory);
+
+        // Boostable matches
+        this.router.get("/boostable/:venueId", ...this.controller.getBoostableMatches);
 
         // Boost activation/deactivation
         this.router.post("/activate", ...this.controller.activateBoost);
