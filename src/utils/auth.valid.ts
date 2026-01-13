@@ -6,6 +6,10 @@ export const RegisterRequestSchema = z.object({
     lastName: z.string().min(1, { message: "Last name is required" }),
     password: z.string().min(6, { message: "Password must be at least 6 characters" }),
     role: z.enum(['user', 'venue_owner', 'admin']).optional(),
+    referralCode: z.string()
+        .trim()
+        .regex(/^MATCH-RESTO-[A-Z0-9]{6}$/, { message: "Invalid referral code format" })
+        .optional(),
     phone: z.string().optional(),
     fav_sports: z.array(z.string()).optional(),
     fav_team_ids: z.array(z.string()).optional(),

@@ -7,6 +7,7 @@ import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
 import { setCookie, getCookie, setSignedCookie, deleteCookie, getSignedCookie } from "hono/cookie";
 import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
+import referralRepository from "../../repository/referral.repository";
 
 /**
  * Controller for Authentication operations.
@@ -41,6 +42,19 @@ class AuthController {
             const user = await this.userRepository.createUser(userRequest);
             if (!user || !user.first_name) {
                 return ctx.json({ error: "Failed to create user" }, 500);
+            }
+
+            // Optional referral code handling (non-blocking)
+            if (body.referralCode) {
+                try {
+                    const referralResult = await referralRepository.registerReferral(body.referralCode, user.id);
+                    if (!referralResult.success) {
+                        console.warn("Referral registration failed:", referralResult.error);
+                    }
+                } catch (referralError) {
+                    console.error("Referral registration exception:", referralError);
+                    // Do not block user creation if referral flow fails
+                }
             }
 
             // Generate Tokens

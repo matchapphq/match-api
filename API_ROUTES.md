@@ -1855,7 +1855,170 @@ Response: 200
 
 ---
 
-## �🏥 Health Route
+## 🎁 Referral Routes (`/api/referral`)
+
+The referral system allows venue owners to invite other restaurateurs and earn 1 free boost per converted referral.
+
+**Rule: 1 converted referral = 1 free boost**
+
+### GET /api/referral/code
+**Get current user's referral code (creates one if not exists)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  referral_code: string;      // e.g., "MATCH-RESTO-A7B9C2"
+  referral_link: string;      // e.g., "https://match.app/signup?ref=MATCH-RESTO-A7B9C2"
+  created_at: string;
+}
+```
+
+### GET /api/referral/stats
+**Get referral statistics for current user**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  total_invited: number;
+  total_signed_up: number;
+  total_converted: number;
+  total_rewards_earned: number;
+  rewards_value: number;      // In euros (e.g., 150 for 5 boosts)
+  conversion_rate: number;    // Percentage
+}
+```
+
+### GET /api/referral/history
+**Get referral history with pagination**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+- page?: number (default: 1)
+- limit?: number (default: 20)
+- status?: 'all' | 'invited' | 'signed_up' | 'converted' (default: 'all')
+
+Response: 200
+{
+  referred_users: [
+    {
+      id: string;
+      name: string;           // Anonymized: "Marc D."
+      status: 'invited' | 'signed_up' | 'converted';
+      reward_earned: string | null;  // "1 boost" if converted
+      created_at: string;
+      signed_up_at?: string;
+      converted_at?: string;
+    }
+  ];
+  total: number;
+  page: number;
+  limit: number;
+}
+```
+
+### POST /api/referral/validate
+**Validate a referral code (public - for signup flow)**
+
+```typescript
+Request body:
+{
+  referral_code: string;
+}
+
+Response: 200
+{
+  valid: boolean;
+  referrer_name?: string;     // e.g., "Jean D." (anonymized)
+  message: string;
+}
+```
+
+### POST /api/referral/register
+**Register a referral when new user signs up with a code**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  referral_code: string;
+  referred_user_id: string;
+}
+
+Response: 200
+{
+  success: boolean;
+  referral_id: string;
+  message: string;
+}
+```
+
+### POST /api/referral/convert
+**Convert a referral after first payment (internal/webhook use)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  referred_user_id: string;
+}
+
+Response: 200
+{
+  success: boolean;
+  referral_id: string;
+  boost_id: string;
+  referrer_id: string;
+  message: string;
+}
+```
+
+### GET /api/referral/boosts
+**Get available boosts for current user**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  boosts: Boost[];
+  total: number;
+}
+```
+
+### POST /api/referral/boosts/:boostId/use
+**Use a boost for a venue match**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  venue_match_id: string;
+}
+
+Response: 200
+{
+  success: boolean;
+  message: string;
+}
+```
+
+**Referral Status Flow:**
+1. `invited` → User has been invited but hasn't signed up yet
+2. `signed_up` → User has created an account using the referral code
+3. `converted` → User has completed their first payment → **Referrer gets 1 boost**
+
+---
+
+## 🏥 Health Route
 
 ### GET /api/health
 **Health check**

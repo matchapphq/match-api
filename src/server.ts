@@ -26,6 +26,7 @@ import BillingService from "./services/billing/billing.service";
 import AnalyticsService from "./services/analytics/analytics.service";
 import CouponsService from "./services/coupons/coupons.service";
 import WebhooksService from "./services/webhooks/webhooks.service";
+import ReferralService from "./services/referral/referral.service";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -49,6 +50,7 @@ const billingRouter = new BillingService();
 const analyticsRouter = new AnalyticsService();
 const couponsRouter = new CouponsService();
 const webhooksRouter = new WebhooksService();
+const referralRouter = new ReferralService();
 
 const app = new Hono().basePath("/api");
 
@@ -122,5 +124,8 @@ app.route("/venues/:venueId/analytics", analyticsRouter.getRouter);
 // Now we strictly want /venues/:venueId/seats
 app.route("/venues/:venueId/seats", seatsRouter.getRouter);
 // Note: if SeatService defines "/" as get seats, this works.
+
+// Referral System (for venue owners)
+app.route("/referral", referralRouter.getRouter);
 
 export default app;

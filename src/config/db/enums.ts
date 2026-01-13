@@ -88,6 +88,10 @@ export const transactionStatusEnum = pgEnum('transaction_status', [
 
 export const couponTypeEnum = pgEnum('coupon_type', ['percentage', 'fixed']);
 
+export const referralStatusEnum = pgEnum('referral_status', ['invited', 'signed_up', 'converted']);
+export const boostTypeEnum = pgEnum('boost_type', ['purchased', 'referral', 'promotional']);
+export const boostStatusEnum = pgEnum('boost_status', ['available', 'used', 'expired']);
+
 export const auditActionEnum = pgEnum('audit_action', [
     'create',
     'update',

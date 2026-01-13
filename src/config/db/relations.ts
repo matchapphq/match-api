@@ -16,6 +16,7 @@ import { reviewsTable, reviewHelpfulTable } from './reviews.table';
 import { notificationsTable, conversationsTable, messagesTable } from './notifications.table';
 import { paymentMethodsTable, invoicesTable, transactionsTable } from './billing.table';
 import { analyticsTable, auditLogsTable, bannedUsersTable } from './admin.table';
+import { referralCodesTable, referralsTable, referralStatsTable, boostsTable } from './referral.table';
 
 export const usersRelations = relations(usersTable, ({ one, many }) => ({
     preferences: one(userPreferencesTable, {
@@ -321,6 +322,48 @@ export const waitlistRelations = relations(waitlistTable, ({ one }) => ({
     }),
     venueMatch: one(venueMatchesTable, {
         fields: [waitlistTable.venue_match_id],
+        references: [venueMatchesTable.id],
+    }),
+}));
+
+// ============================================
+// REFERRAL RELATIONS
+// ============================================
+
+export const referralCodesRelations = relations(referralCodesTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [referralCodesTable.user_id],
+        references: [usersTable.id],
+    }),
+}));
+
+export const referralsRelations = relations(referralsTable, ({ one }) => ({
+    referrer: one(usersTable, {
+        fields: [referralsTable.referrer_id],
+        references: [usersTable.id],
+        relationName: 'referrer',
+    }),
+    referredUser: one(usersTable, {
+        fields: [referralsTable.referred_user_id],
+        references: [usersTable.id],
+        relationName: 'referredUser',
+    }),
+}));
+
+export const referralStatsRelations = relations(referralStatsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [referralStatsTable.user_id],
+        references: [usersTable.id],
+    }),
+}));
+
+export const boostsRelations = relations(boostsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [boostsTable.user_id],
+        references: [usersTable.id],
+    }),
+    venueMatch: one(venueMatchesTable, {
+        fields: [boostsTable.venue_match_id],
         references: [venueMatchesTable.id],
     }),
 }));
