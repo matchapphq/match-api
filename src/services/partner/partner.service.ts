@@ -40,6 +40,9 @@ class PartnerService {
         // Analytics & Stats
         this.router.get("/stats/customers", ...this.controller.getCustomerStats);
         this.router.get("/analytics/summary", ...this.controller.getAnalyticsSummary);
+
+        // Reservation Management (accept/decline PENDING reservations)
+        this.router.patch("/reservations/:reservationId/status", ...this.controller.updateReservationStatus);
     }
 }
 

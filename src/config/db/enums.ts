@@ -18,6 +18,7 @@ export const venueTypeEnum = pgEnum('venue_type', [
 ]);
 export const venueStatusEnum = pgEnum('venue_status', ['pending', 'approved', 'rejected', 'suspended']);
 export const subscriptionLevelEnum = pgEnum('subscription_level', ['basic', 'pro', 'enterprise']);
+export const bookingModeEnum = pgEnum('booking_mode', ['INSTANT', 'REQUEST']);
 
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'finished', 'canceled', 'postponed']);
 

@@ -16,7 +16,7 @@ import {
 import { sql as drizzleSql } from 'drizzle-orm';
 import { usersTable } from './user.table';
 import { subscriptionsTable } from './subscriptions.table';
-import { venueTypeEnum, venueStatusEnum, subscriptionLevelEnum, subscriptionStatusEnum } from './enums';
+import { venueTypeEnum, venueStatusEnum, subscriptionLevelEnum, subscriptionStatusEnum, bookingModeEnum } from './enums';
 
 // ============================================
 // TYPES
@@ -116,6 +116,9 @@ export const venuesTable = pgTable('venues', {
         is_active: boolean('is_active').default(true),
         is_verified: boolean('is_verified').default(false),
         verification_documents: jsonb('verification_documents').$type<VerificationDocuments>(),
+
+        // Booking Mode: INSTANT = auto confirm, REQUEST = owner must confirm
+        booking_mode: bookingModeEnum('booking_mode').default('INSTANT').notNull(),
 
         // Stats
         average_rating: numeric('average_rating', { precision: 3, scale: 2 }).default('0.00'),

@@ -22,6 +22,8 @@ export type Venue = {
     reservedSeatsByTime: Record<string, number>
 }
 
+export type BookingMode = "INSTANT" | "REQUEST";
+
 export type CreateVenueInput = {
     name: string
     lat: number
@@ -37,6 +39,7 @@ export type CreateVenueInput = {
     phone?: string
     email?: string
     website?: string
+    booking_mode?: BookingMode // INSTANT = auto confirm, REQUEST = owner must confirm
     photos?: {
         url: string
         altText?: string

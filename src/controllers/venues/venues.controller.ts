@@ -321,6 +321,58 @@ class VenueController {
         return ctx.json({ msg: "Venue availability" });
     });
 
+    /**
+     * PUT /venues/:venueId/booking-mode - Update venue booking mode (owner only)
+     */
+    readonly updateBookingMode = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const schema = z.object({
+                booking_mode: z.enum(["INSTANT", "REQUEST"]),
+            });
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json(
+                    { error: "Invalid request body", details: parsed.error },
+                    400,
+                );
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            try {
+                const userId = this.getUserId(ctx);
+                const venueId = ctx.req.param("venueId");
+
+                if (!venueId) {
+                    return ctx.json({ error: "Venue ID is required" }, 400);
+                }
+
+                const { booking_mode } = ctx.req.valid("json");
+
+                // Verify ownership
+                const existing = await this.venueRepository.findById(venueId);
+                if (!existing) {
+                    return ctx.json({ error: "Venue not found" }, 404);
+                }
+                if (existing.owner_id !== userId) {
+                    return ctx.json({ error: "Forbidden" }, 403);
+                }
+
+                // Update booking mode
+                const updated = await this.venueRepository.update(venueId, {
+                    booking_mode,
+                });
+
+                return ctx.json({ venue: updated });
+            } catch (error: any) {
+                if (error.message === "Unauthorized")
+                    return ctx.json({ error: "Unauthorized" }, 401);
+                console.error("Update booking mode error:", error);
+                return ctx.json({ error: "Failed to update booking mode" }, 500);
+            }
+        },
+    );
+
     // =============================================
     // FAVORITES ENDPOINTS
     // =============================================

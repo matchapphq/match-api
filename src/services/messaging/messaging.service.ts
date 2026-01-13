@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import MessagingController from "../../controllers/messaging/messaging.controller";
+import { authMiddleware } from "../../middleware/auth.middleware";
 
 /**
  * Service for defining Messaging routes.
@@ -17,6 +18,7 @@ class MessagingService {
     }
 
     private initRoutes() {
+        this.router.use("/*", authMiddleware);
         // Conversations
         this.router.post("/conversations", ...this.controller.createConversation);
         this.router.get("/conversations", ...this.controller.getConversations);

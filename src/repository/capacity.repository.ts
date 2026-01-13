@@ -491,6 +491,7 @@ export class CapacityRepository {
                 name: true,
                 city: true,
                 street_address: true,
+                booking_mode: true,
                 // Exclude: location (geometry field causes parsing issues)
             }
         });

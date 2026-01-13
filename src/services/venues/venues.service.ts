@@ -34,6 +34,7 @@ class VenueService {
         this.router.post("/", authMiddleware, venueOwnerMiddleware, ...this.controller.create);
         this.router.put("/:venueId", authMiddleware, venueOwnerMiddleware, ...this.controller.update);
         this.router.delete("/:venueId", authMiddleware, venueOwnerMiddleware, ...this.controller.delete);
+        this.router.put("/:venueId/booking-mode", authMiddleware, venueOwnerMiddleware, ...this.controller.updateBookingMode);
 
         // Favorites (Any authenticated user)
         this.router.post("/:venueId/favorite", authMiddleware, ...this.controller.addFavorite);

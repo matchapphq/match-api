@@ -5,7 +5,7 @@ import { authMiddleware } from "./middleware/auth.middleware";
 
 
 import AuthService from "./services/auth/auth.service";
-import UserService from "./services/user/user.service"; // Renamed from ProfileService
+import UserService from "./services/user/user.service";
 import OnboardingService from "./services/onboarding/onboarding.service";
 import DiscoveryService from "./services/discovery/discovery.service";
 import VenueService from "./services/venues/venues.service";

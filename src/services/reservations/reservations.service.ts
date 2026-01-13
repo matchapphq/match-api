@@ -29,27 +29,12 @@ class ReservationsService {
         // Get single reservation with QR code
         this.router.get("/:reservationId", ...this.controller.getById);
         
-        // Hold a table (15 min temporary hold)
-        this.router.post("/hold", ...this.controller.holdTable);
-        
-        // Confirm reservation from hold
-        this.router.post("/confirm", ...this.controller.confirmReservation);
+        // Create reservation (instant or request mode)
+        // Backend decides PENDING vs CONFIRMED based on venue.booking_mode
+        this.router.post("/", ...this.controller.create);
         
         // Cancel reservation
         this.router.post("/:reservationId/cancel", ...this.controller.cancel);
-
-        // =============================================
-        // WAITLIST ROUTES
-        // =============================================
-        
-        // Join waitlist when no tables available
-        this.router.post("/waitlist", ...this.controller.joinWaitlist);
-        
-        // Get user's waitlist entries
-        this.router.get("/waitlist/me", ...this.controller.getWaitlist);
-        
-        // Leave waitlist
-        this.router.delete("/waitlist/:waitlistId", ...this.controller.leaveWaitlist);
 
         // =============================================
         // VENUE OWNER ROUTES (QR Verification & Check-in)

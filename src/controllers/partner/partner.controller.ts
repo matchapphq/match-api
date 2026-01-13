@@ -539,6 +539,43 @@ class PartnerController {
             return ctx.json({ error: "Failed to create payment portal", details: error.message }, 500);
         }
     });
+
+    // PATCH /partners/reservations/:reservationId/status
+    // Update reservation status (confirm or decline PENDING reservations)
+    readonly updateReservationStatus = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const reservationId = ctx.req.param('reservationId');
+
+        if (!reservationId) {
+            return ctx.json({ error: "Reservation ID required" }, 400);
+        }
+
+        try {
+            const body = await ctx.req.json();
+            const { status } = body;
+
+            if (!status || !['CONFIRMED', 'DECLINED'].includes(status)) {
+                return ctx.json({ error: "Status must be 'CONFIRMED' or 'DECLINED'" }, 400);
+            }
+
+            // Update reservation status with ownership verification
+            const result = await this.repository.updateReservationStatus(
+                reservationId,
+                userId,
+                status
+            );
+
+            if (!result.success) {
+                const statusCode = (result.statusCode || 400) as 400 | 403 | 404;
+                return ctx.json({ error: result.error }, statusCode);
+            }
+
+            return ctx.json({ reservation: result.reservation });
+        } catch (error: any) {
+            console.error("Error updating reservation status:", error);
+            return ctx.json({ error: "Failed to update reservation status", details: error.message }, 500);
+        }
+    });
 }
 
 export default PartnerController;

@@ -8,6 +8,7 @@ export const HoldTableSchema = z.object({
     venueMatchId: z.string().uuid(),
     partySize: z.number().int().min(1).max(20),
     requiresAccessibility: z.boolean().optional().default(false),
+    specialRequests: z.string().max(500).optional(),
 });
 
 export const ConfirmReservationSchema = z.object({

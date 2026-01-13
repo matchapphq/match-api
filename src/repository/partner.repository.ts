@@ -434,4 +434,77 @@ export class PartnerRepository {
 
         return { authorized: true, clients: reservations };
     }
+
+    /**
+     * Update reservation status (for venue owners to confirm/decline PENDING reservations)
+     * Verifies venue ownership before allowing status change
+     */
+    async updateReservationStatus(
+        reservationId: string, 
+        ownerId: string, 
+        newStatus: 'CONFIRMED' | 'DECLINED'
+    ): Promise<{ success: boolean; reservation?: any; error?: string; statusCode?: number }> {
+        // Get the reservation with venue match and venue info
+        const reservation = await db.query.reservationsTable.findFirst({
+            where: eq(reservationsTable.id, reservationId),
+            with: {
+                venueMatch: {
+                    with: {
+                        venue: {
+                            columns: {
+                                id: true,
+                                owner_id: true,
+                                name: true,
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!reservation) {
+            return { success: false, error: "Reservation not found", statusCode: 404 };
+        }
+
+        // Verify the user owns the venue
+        if (reservation.venueMatch?.venue?.owner_id !== ownerId) {
+            return { success: false, error: "Not authorized to manage this reservation", statusCode: 403 };
+        }
+
+        // Check current status is PENDING
+        if (reservation.status !== 'pending') {
+            return { 
+                success: false, 
+                error: `Cannot update reservation with status '${reservation.status}'. Only PENDING reservations can be confirmed or declined.`,
+                statusCode: 400 
+            };
+        }
+
+        // Map the new status to database format
+        const dbStatus = newStatus === 'CONFIRMED' ? 'confirmed' : 'canceled';
+
+        // Update the reservation
+        const [updated] = await db.update(reservationsTable)
+            .set({
+                status: dbStatus,
+                updated_at: new Date(),
+                ...(newStatus === 'DECLINED' ? { 
+                    canceled_at: new Date(),
+                    canceled_reason: 'Declined by venue owner'
+                } : {})
+            })
+            .where(eq(reservationsTable.id, reservationId))
+            .returning();
+
+        // TODO: If CONFIRMED, generate QR code and update reservation
+        // TODO: Notify user of status change
+
+        return { 
+            success: true, 
+            reservation: {
+                ...updated,
+                status: newStatus // Return the API-friendly status
+            }
+        };
+    }
 }

@@ -514,6 +514,25 @@ Response: 200
 }
 ```
 
+### PUT /api/venues/:venueId/booking-mode
+**Update venue booking mode (owner only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  booking_mode: 'INSTANT' | 'REQUEST';
+}
+
+Response: 200
+{
+  venue: Venue;
+}
+```
+
+> **Note:** Add `booking_mode: 'INSTANT' | 'REQUEST'` field to the Venue model. `INSTANT` = auto confirm, `REQUEST` = owner must confirm.
+
 ---
 
 ## ⭐ Venue Favorites Routes (`/api/venues/:venueId/favorite`)
@@ -892,11 +911,22 @@ Response: 200
 
 *All routes require authentication*
 
-Reservations are completely free for users. They work like restaurant table bookings:
-1. User specifies venue, match, and party size
-2. System finds best available table
-3. User receives QR code
-4. Venue owner scans QR to verify on match day
+Reservations work like restaurant table bookings. The flow now supports two modes per venue:
+
+- **INSTANT**: reservation is immediately `CONFIRMED` if capacity allows
+- **REQUEST**: reservation is created as `PENDING` and the venue owner must confirm/decline
+
+### Common Statuses
+
+```typescript
+type reservation_status =
+  | 'PENDING'           // awaiting venue confirmation
+  | 'CONFIRMED'         // confirmed by system (instant) or venue
+  | 'DECLINED'          // declined by venue
+  | 'CANCELED_BY_USER'
+  | 'CANCELED_BY_VENUE'
+  | 'NO_SHOW';
+```
 
 ### GET /api/reservations
 **Get user's reservations**
@@ -931,8 +961,10 @@ Response: 200
 }
 ```
 
-### POST /api/reservations/hold
-**Hold a table (15 min temporary hold)**
+### POST /api/reservations
+**Create reservation (instant or request mode)**
+
+Single button on the client; backend decides `PENDING` vs `CONFIRMED` based on `venue.booking_mode` and availability.
 
 ```typescript
 Headers: Authorization: Bearer <token>
@@ -942,37 +974,27 @@ Request body:
   venue_match_id: uuid;
   party_size: number;
   requires_accessibility?: boolean;
-}
-
-Response: 201
-{
-  hold_id: uuid;
-  expires_at: timestamp;
-  table: {
-    name: string;
-    capacity: number;
-  }
-}
-```
-
-### POST /api/reservations/confirm
-**Confirm reservation from hold**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  hold_id: uuid;
   special_requests?: string;
 }
 
 Response: 201
 {
-  reservation: Reservation;
-  qr_code: string;
+  reservation: Reservation; // status: 'PENDING' | 'CONFIRMED'
+  qr_code?: string;         // present only if status === 'CONFIRMED'
 }
 ```
+
+**Backend behavior:**
+
+1. Load `venue_match` and `venue.booking_mode`.
+2. If `booking_mode === 'INSTANT'`:
+   - Check capacity/availability.
+   - If available → create reservation with `status = 'CONFIRMED'`, generate QR, send notifications to user & venue.
+   - If not available → 409 / 422 error.
+3. If `booking_mode === 'REQUEST'`:
+   - Create reservation with `status = 'PENDING'` (no QR yet or optional "pending" QR).
+   - Notify venue owner of new reservation request.
+   - Optionally auto-expire after a configured time window.
 
 ### POST /api/reservations/:reservationId/cancel
 **Cancel reservation**
@@ -1031,53 +1053,6 @@ Response: 200
 {
   reservations: Reservation[];
   total: number;
-}
-```
-
----
-
-## 📋 Waitlist Routes (`/api/reservations/waitlist`)
-
-### POST /api/reservations/waitlist
-**Join waitlist when no tables available**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Request body:
-{
-  venue_match_id: uuid;
-  party_size: number;
-}
-
-Response: 201
-{
-  waitlist_entry: WaitlistEntry;
-  position: number;
-}
-```
-
-### GET /api/reservations/waitlist/me
-**Get user's waitlist entries**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Response: 200
-{
-  waitlist: WaitlistEntry[];
-}
-```
-
-### DELETE /api/reservations/waitlist/:waitlistId
-**Leave waitlist**
-
-```typescript
-Headers: Authorization: Bearer <token>
-
-Response: 200
-{
-  message: string;
 }
 ```
 
@@ -1358,7 +1333,7 @@ Response: 200
 
 ## 💳 Subscription Routes (Venue Owners Only)
 
-### POST /api/subscriptions/plans
+### GET /api/subscriptions/plans
 **Get available subscription plans**
 
 ```typescript
@@ -1469,6 +1444,24 @@ Request body:
 Response: 200
 {
   subscription: Subscription;
+}
+```
+
+### GET /api/subscriptions/invoices
+**List invoices scoped to the authenticated venue owner (alias of `/api/invoices`)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+  status?: invoice_status
+  limit?: number
+  offset?: number
+
+Response: 200
+{
+  invoices: Invoice[];
+  total: number;
 }
 ```
 
@@ -1830,7 +1823,39 @@ Response: 200
 
 ---
 
-## 🏥 Health Route
+## �️ Reservation Owner Actions (`/api/partners/reservations`)
+
+Venue owners must be able to accept/decline `PENDING` reservations.
+
+### PATCH /api/partners/reservations/:reservationId/status
+**Update reservation status (venue owner)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  status: 'CONFIRMED' | 'DECLINED';
+}
+
+Response: 200
+{
+  reservation: Reservation;
+}
+```
+
+**Behavior:**
+
+- Only valid if:
+  - Current user owns the venue.
+  - Current reservation status is `PENDING`.
+- Transitions:
+  - `PENDING → CONFIRMED`: generate QR (if not generated) and notify user.
+  - `PENDING → DECLINED`: notify user, optionally suggest alternatives.
+
+---
+
+## �🏥 Health Route
 
 ### GET /api/health
 **Health check**
