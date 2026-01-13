@@ -17,6 +17,7 @@ import { notificationsTable, conversationsTable, messagesTable } from './notific
 import { paymentMethodsTable, invoicesTable, transactionsTable } from './billing.table';
 import { analyticsTable, auditLogsTable, bannedUsersTable } from './admin.table';
 import { referralCodesTable, referralsTable, referralStatsTable, boostsTable } from './referral.table';
+import { boostPurchasesTable, boostPricesTable, boostAnalyticsTable } from './boost.table';
 
 export const usersRelations = relations(usersTable, ({ one, many }) => ({
     preferences: one(userPreferencesTable, {
@@ -365,5 +366,36 @@ export const boostsRelations = relations(boostsTable, ({ one }) => ({
     venueMatch: one(venueMatchesTable, {
         fields: [boostsTable.venue_match_id],
         references: [venueMatchesTable.id],
+    }),
+    purchase: one(boostPurchasesTable, {
+        fields: [boostsTable.purchase_id],
+        references: [boostPurchasesTable.id],
+    }),
+    referral: one(referralsTable, {
+        fields: [boostsTable.referral_id],
+        references: [referralsTable.id],
+    }),
+}));
+
+export const boostPurchasesRelations = relations(boostPurchasesTable, ({ one, many }) => ({
+    user: one(usersTable, {
+        fields: [boostPurchasesTable.user_id],
+        references: [usersTable.id],
+    }),
+    boosts: many(boostsTable),
+}));
+
+export const boostAnalyticsRelations = relations(boostAnalyticsTable, ({ one }) => ({
+    boost: one(boostsTable, {
+        fields: [boostAnalyticsTable.boost_id],
+        references: [boostsTable.id],
+    }),
+    venueMatch: one(venueMatchesTable, {
+        fields: [boostAnalyticsTable.venue_match_id],
+        references: [venueMatchesTable.id],
+    }),
+    user: one(usersTable, {
+        fields: [boostAnalyticsTable.user_id],
+        references: [usersTable.id],
     }),
 }));

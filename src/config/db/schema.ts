@@ -17,4 +17,5 @@ export * from './tables.table';
 export * from './table-holds.table';
 export * from './waitlist.table';
 export * from './referral.table';
+export * from './boost.table';
 export * from './relations';

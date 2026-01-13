@@ -3,6 +3,7 @@ import Stripe from "stripe";
 import stripe, { STRIPE_WEBHOOK_SECRET } from "../../config/stripe";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import { PartnerRepository } from "../../repository/partner.repository";
+import boostRepository from "../../repository/boost.repository";
 
 /**
  * Webhooks Controller
@@ -64,9 +65,13 @@ class WebhooksController {
         try {
             switch (event.type) {
                 case "checkout.session.completed":
-                    await this.handleCheckoutCompleted(
-                        event.data.object as Stripe.Checkout.Session,
-                    );
+                    const session = event.data.object as Stripe.Checkout.Session;
+                    // Check if this is a boost purchase
+                    if (session.metadata?.type === 'boost_purchase') {
+                        await this.handleBoostPurchaseCompleted(session);
+                    } else {
+                        await this.handleCheckoutCompleted(session);
+                    }
                     break;
 
                 case "invoice.paid":
@@ -497,6 +502,78 @@ class WebhooksController {
         );
 
         console.log("Subscription canceled:", subscription.id);
+    }
+
+    /**
+     * Handle boost purchase checkout completed
+     * Creates boost records after successful payment
+     */
+    private async handleBoostPurchaseCompleted(session: Stripe.Checkout.Session) {
+        console.log("Processing boost purchase:", session.id);
+
+        const purchaseId = session.metadata?.purchase_id;
+        const userId = session.metadata?.user_id;
+        const packType = session.metadata?.pack_type;
+
+        if (!purchaseId || !userId) {
+            console.error("Missing purchase_id or user_id in boost checkout session");
+            return;
+        }
+
+        // Get the purchase record
+        const purchase = await boostRepository.getPurchaseById(purchaseId);
+        if (!purchase) {
+            console.error("Purchase not found:", purchaseId);
+            return;
+        }
+
+        // Check if already processed (idempotency)
+        if (purchase.payment_status === 'paid') {
+            console.log("Boost purchase already processed:", purchaseId);
+            return;
+        }
+
+        // Update the purchase record
+        await boostRepository.updatePurchase(purchaseId, {
+            payment_status: 'paid',
+            payment_intent_id: session.payment_intent as string,
+            stripe_customer_id: session.customer as string,
+            paid_at: new Date(),
+        });
+
+        // Create the boosts
+        const boostIds = await boostRepository.createBoostsFromPurchase(
+            purchaseId,
+            userId,
+            purchase.quantity,
+            'stripe_payment'
+        );
+
+        console.log(`Created ${boostIds.length} boosts for user ${userId} from purchase ${purchaseId}`);
+    }
+
+    /**
+     * Handle boost refund
+     * Called when a charge is refunded for a boost purchase
+     */
+    private async handleBoostRefund(paymentIntentId: string) {
+        console.log("Processing boost refund for payment intent:", paymentIntentId);
+
+        const purchase = await boostRepository.getPurchaseByPaymentIntent(paymentIntentId);
+        if (!purchase) {
+            console.log("No boost purchase found for payment intent:", paymentIntentId);
+            return;
+        }
+
+        // Mark purchase as refunded
+        await boostRepository.updatePurchase(purchase.id, {
+            payment_status: 'refunded',
+            refunded_at: new Date(),
+        });
+
+        // Mark available boosts as expired (refunded)
+        const refundedCount = await boostRepository.refundBoostsByPurchase(purchase.id);
+        console.log(`Refunded ${refundedCount} boosts for purchase ${purchase.id}`);
     }
 }
 

@@ -125,11 +125,17 @@ export const boostsTable = pgTable('boosts', {
     
     type: boostTypeEnum('type').notNull(),
     status: boostStatusEnum('status').default('available').notNull(),
-    source: varchar('source', { length: 100 }),
+    source: varchar('source', { length: 100 }), // 'stripe_payment', 'referral_reward', 'promo_code', 'admin_grant'
     
+    // Utilisation
     venue_match_id: uuid('venue_match_id'),
+    activated_at: timestamp('activated_at', { withTimezone: true }),
     used_at: timestamp('used_at', { withTimezone: true }),
     expires_at: timestamp('expires_at', { withTimezone: true }),
+    
+    // Source et traçabilité
+    purchase_id: uuid('purchase_id'),
+    referral_id: uuid('referral_id'),
     
     metadata: jsonb('metadata').default(sql`'{}'::jsonb`),
     
@@ -139,6 +145,8 @@ export const boostsTable = pgTable('boosts', {
     index('idx_boosts_user_id').on(table.user_id),
     index('idx_boosts_status').on(table.status),
     index('idx_boosts_type').on(table.type),
+    index('idx_boosts_venue_match_id').on(table.venue_match_id),
+    index('idx_boosts_expires_at').on(table.expires_at),
     foreignKey({
         columns: [table.user_id],
         foreignColumns: [usersTable.id],

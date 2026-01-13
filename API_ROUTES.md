@@ -2018,6 +2018,217 @@ Response: 200
 
 ---
 
+## ⚡ Boost Routes (`/api/boosts`)
+
+The boost system allows venue owners to increase visibility of their venue matches in search results.
+
+**Pricing:**
+- 1 boost = 30€
+- Pack of 3 = 75€ (25€/unit, 17% off)
+- Pack of 10 = 200€ (20€/unit, 33% off)
+
+### GET /api/boosts/prices
+**Get boost pack prices (public)**
+
+```typescript
+Response: 200
+{
+  prices: [
+    {
+      pack_type: string;        // 'single', 'pack_3', 'pack_10'
+      quantity: number;
+      price: number;            // Total price in EUR
+      unit_price: number;       // Price per boost
+      discount_percentage: number;
+      stripe_price_id?: string;
+      badge?: string;           // e.g., "Meilleure offre"
+    }
+  ]
+}
+```
+
+### GET /api/boosts/available
+**Get available boosts for current user**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  count: number;
+  boosts: [
+    {
+      id: string;
+      type: 'purchased' | 'referral' | 'promotional';
+      source: string;
+      created_at: string;
+    }
+  ]
+}
+```
+
+### POST /api/boosts/purchase/create-checkout
+**Create Stripe Checkout session for boost purchase**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  pack_type: 'single' | 'pack_3' | 'pack_10';
+  success_url?: string;
+  cancel_url?: string;
+}
+
+Response: 200
+{
+  checkout_url: string;
+  session_id: string;
+  purchase_id: string;
+}
+```
+
+### GET /api/boosts/purchases
+**Get purchase history**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+- page?: number (default: 1)
+- limit?: number (default: 20)
+
+Response: 200
+{
+  purchases: [
+    {
+      id: string;
+      pack_type: string;
+      quantity: number;
+      total_price: number;
+      payment_status: 'pending' | 'paid' | 'failed' | 'refunded';
+      paid_at?: string;
+      created_at: string;
+    }
+  ];
+  total: number;
+  page: number;
+  limit: number;
+}
+```
+
+### POST /api/boosts/activate
+**Activate a boost on a venue match**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  boost_id: string;
+  venue_match_id: string;
+}
+
+Response: 200
+{
+  success: boolean;
+  boost_id: string;
+  venue_match_id: string;
+  expires_at: string;
+  message: string;
+}
+```
+
+**Validation:**
+- Boost must be available (status = 'available')
+- Venue match must exist and belong to user's venue
+- Match must be scheduled (upcoming)
+- Match must not already be boosted
+
+### POST /api/boosts/deactivate
+**Deactivate a boost (mark as used)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  boost_id: string;
+}
+
+Response: 200
+{
+  success: boolean;
+  boost_id: string;
+  message: string;
+}
+```
+
+### GET /api/boosts/history
+**Get boost usage history**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+- page?: number (default: 1)
+- limit?: number (default: 20)
+- status?: 'all' | 'available' | 'used' | 'expired'
+
+Response: 200
+{
+  boosts: [
+    {
+      id: string;
+      type: string;
+      status: string;
+      source: string;
+      venue_match_id?: string;
+      activated_at?: string;
+      used_at?: string;
+      expires_at?: string;
+      created_at: string;
+      home_team?: string;
+    }
+  ];
+  total: number;
+  page: number;
+  limit: number;
+}
+```
+
+### GET /api/boosts/analytics/:boostId
+**Get detailed analytics for a specific boost**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  boost_id: string;
+  venue_match_id: string;
+  boost_started_at: string;
+  boost_ended_at?: string;
+  views_before_boost: number;
+  views_during_boost: number;
+  views_after_boost: number;
+  bookings_before_boost: number;
+  bookings_during_boost: number;
+  bookings_after_boost: number;
+  performance_score?: number;    // 0-100
+  estimated_roi?: number;        // In EUR
+}
+```
+
+**Boost Workflow:**
+1. User purchases boosts via Stripe Checkout
+2. Webhook creates boost records with status `available`
+3. User activates boost on a venue match → status becomes `used`, match shows "⚡ Sponsorisé" badge
+4. Boost expires automatically when match ends
+5. Analytics track views/bookings during boost period
+
+---
+
 ## 🏥 Health Route
 
 ### GET /api/health

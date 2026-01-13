@@ -27,6 +27,7 @@ import AnalyticsService from "./services/analytics/analytics.service";
 import CouponsService from "./services/coupons/coupons.service";
 import WebhooksService from "./services/webhooks/webhooks.service";
 import ReferralService from "./services/referral/referral.service";
+import BoostService from "./services/boost/boost.service";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -51,6 +52,7 @@ const analyticsRouter = new AnalyticsService();
 const couponsRouter = new CouponsService();
 const webhooksRouter = new WebhooksService();
 const referralRouter = new ReferralService();
+const boostRouter = new BoostService();
 
 const app = new Hono().basePath("/api");
 
@@ -127,5 +129,8 @@ app.route("/venues/:venueId/seats", seatsRouter.getRouter);
 
 // Referral System (for venue owners)
 app.route("/referral", referralRouter.getRouter);
+
+// Boost System (for venue owners)
+app.route("/boosts", boostRouter.getRouter);
 
 export default app;
