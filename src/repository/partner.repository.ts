@@ -52,6 +52,7 @@ export class PartnerRepository {
         email?: string;
         capacity?: number;
         type?: string;
+        coords?: { lat: number, lng: number };
     }) {
         const [newVenue] = await db.insert(venuesTable).values({
             name: data.name,
@@ -62,9 +63,9 @@ export class PartnerRepository {
             state_province: data.state_province || "",
             postal_code: data.postal_code,
             country: data.country,
-            location: sql`ST_SetSRID(ST_MakePoint(0, 0), 4326)`,
-            latitude: 0,
-            longitude: 0,
+            location: sql`ST_SetSRID(ST_MakePoint(${data.coords?.lat || 0}, ${data.coords?.lng || 0}), 4326)`,
+            latitude: data.coords?.lat || 0,
+            longitude: data.coords?.lng || 0,
             type: 'sports_bar',
             status: 'pending',
             is_active: true

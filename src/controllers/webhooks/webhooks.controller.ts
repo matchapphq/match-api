@@ -4,6 +4,7 @@ import stripe, { STRIPE_WEBHOOK_SECRET } from "../../config/stripe";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import { PartnerRepository } from "../../repository/partner.repository";
 import boostRepository from "../../repository/boost.repository";
+import { geocodeAddress } from "../../utils/geocoding";
 
 /**
  * Webhooks Controller
@@ -29,7 +30,7 @@ class WebhooksController {
      * - customer.subscription.updated: Subscription changed (upgrade/downgrade)
      * - customer.subscription.deleted: Subscription canceled
      */
-    readonly handleStripeWebhook = this.factory.createHandlers(async (ctx) => {
+    public readonly handleStripeWebhook = this.factory.createHandlers(async (ctx) => {
         const signature = ctx.req.header("stripe-signature");
 
         if (!signature) {
@@ -271,6 +272,16 @@ class WebhooksController {
                     commitment_end_date: commitmentEndDate,
                 });
                 
+                const coords = await geocodeAddress({
+                    street: venueData.street_address,
+                    city: venueData.city,
+                    country: venueData.country,
+                    state: venueData.state_province,
+                    postal_code: venueData.postal_code,
+                });
+                
+                const { lat, lng } = coords;
+                
                 // Now create the venue with the subscription
                 const newVenue = await partnerRepository.createVenue({
                     name: venueData.name,
@@ -284,6 +295,7 @@ class WebhooksController {
                     phone: venueData.phone,
                     email: venueData.email,
                     capacity: venueData.capacity,
+                    coords: { lat, lng }
                 });
                 
                 if (newVenue) {

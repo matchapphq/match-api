@@ -6,6 +6,7 @@ import { PartnerRepository } from "../../repository/partner.repository";
 import { WaitlistRepository } from "../../repository/waitlist.repository";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import stripe, { CHECKOUT_URLS, isStripeConfigured } from "../../config/stripe";
+import { geocodeAddress } from "../../utils/geocoding";
 
 class PartnerController {
     private readonly factory = createFactory<HonoEnv>();
@@ -27,7 +28,7 @@ class PartnerController {
 
     // POST /partners/venues
     // Creates a checkout session for venue creation - venue is only created after payment succeeds
-    readonly createVenue = this.factory.createHandlers(async (ctx) => {
+    public readonly createVenue = this.factory.createHandlers(async (ctx) => {
         const userId = ctx.get('user').id;
 
         try {
@@ -36,8 +37,8 @@ class PartnerController {
             // Basic validation
             if (!body.name || !body.street_address || !body.city || !body.postal_code || !body.country) {
                 return ctx.json({ error: "Missing required address fields" }, 400);
-            }
-
+            }            
+            
             // Check if Stripe is configured
             if (!isStripeConfigured()) {
                 return ctx.json({ error: "Payment system not configured" }, 503);
