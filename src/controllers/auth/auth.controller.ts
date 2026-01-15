@@ -103,7 +103,7 @@ class AuthController {
         const body = ctx.req.valid("json");
         const user = await this.userRepository.getUserByEmail(body.email);
 
-        if (!user || !user.first_name) {
+        if (!user) {
             return ctx.json({ error: "Invalid email or password" }, 401)
         }
 
@@ -113,6 +113,7 @@ class AuthController {
         }
 
         const tokenPayload = { id: user.id, email: user.email, role: user.role, firstName: user.first_name };
+
         const [accessToken, refreshToken] = await Promise.all([
             JwtUtils.generateAccessToken(tokenPayload),
             JwtUtils.generateRefreshToken(tokenPayload)

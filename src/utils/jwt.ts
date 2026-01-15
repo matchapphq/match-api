@@ -10,7 +10,7 @@ const REFRESH_TOKEN_EXPIRY = 60 * 60 * 24 * 30; // 7 days
 export type TokenPayload = {
     id: string;
     email: string;
-    firstName: string;
+    firstName: string | null;
     role: "user" | "venue_owner" | "admin";
 }
 

@@ -19,6 +19,7 @@ class OnboardingController {
     readonly complete = this.factory.createHandlers(
         validator("json", (value, ctx) => {
             const parsed = RegisterRequestSchema.safeParse(value);
+            console.log(value);
             if (!parsed.success) {
                 return ctx.json(
                     { error: "Invalid request body", details: parsed.error },

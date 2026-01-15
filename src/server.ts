@@ -28,6 +28,7 @@ import CouponsService from "./services/coupons/coupons.service";
 import WebhooksService from "./services/webhooks/webhooks.service";
 import ReferralService from "./services/referral/referral.service";
 import BoostService from "./services/boost/boost.service";
+import fidelityService from "./services/fidelity/fidelity.service";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -70,6 +71,7 @@ app.get("/health", (c) => c.text("OK"));
 app.use('/partners/*', authMiddleware);
 app.use('/users/*', authMiddleware);
 app.use('/reservations/*', authMiddleware);
+app.use('/fidelity/*', authMiddleware);
 
 // Mount routes
 // Base: /api is usually handled by the entry point or Nginx, but here we assume app is mounted at /api or root. 
@@ -158,5 +160,8 @@ app.route("/referral", referralRouter.getRouter);
 
 // Boost System (for venue owners)
 app.route("/boosts", boostRouter.getRouter);
+
+// Fidelity System (loyalty points, badges, challenges)
+app.route("/fidelity", fidelityService);
 
 export default app;

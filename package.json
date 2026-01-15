@@ -9,7 +9,7 @@
     "db:migrate": "bun run db:setup && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:push": "bun run db:setup && drizzle-kit push",
-    "db:seed": "bun run scripts/seed-sports.ts && bun run scripts/seed-data.ts",
+    "db:seed": "bun run scripts/seed-sports.ts && bun run scripts/seed-data.ts && bun run src/config/seeds/fidelity.seed.ts",
     "start": "bun run index.ts"
   },
   "devDependencies": {
