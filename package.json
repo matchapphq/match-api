@@ -30,6 +30,7 @@
     "@neondatabase/serverless": "^1.0.2",
     "@types/nodemailer": "^7.0.4",
     "axios": "^1.13.2",
+    "bullmq": "^5.66.5",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
     "handlebars": "^4.7.8",

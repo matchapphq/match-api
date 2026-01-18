@@ -27,10 +27,7 @@ class UserService {
 
         // Notification Preferences (Protected)
         this.router.put("/me/notification-preferences", authMiddleware, ...this.controller.updateNotificationPreferences);
-
-        // Onboarding (Protected)
-        this.router.put("/me/onboarding-complete", authMiddleware, ...this.controller.completeOnboarding);
-
+        
         // Addresses (Protected)
         this.router.get("/me/addresses", authMiddleware, ...this.controller.getAddresses);
         this.router.post("/me/addresses", authMiddleware, ...this.controller.addAddress);

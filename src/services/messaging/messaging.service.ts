@@ -18,7 +18,8 @@ class MessagingService {
     }
 
     private initRoutes() {
-        this.router.use("/*", authMiddleware);
+        this.router.use("/conversations/*", authMiddleware);
+        this.router.use("/messages/*", authMiddleware);
         // Conversations
         this.router.post("/conversations", ...this.controller.createConversation);
         this.router.get("/conversations", ...this.controller.getConversations);

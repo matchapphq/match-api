@@ -6,7 +6,6 @@ import { authMiddleware } from "./middleware/auth.middleware";
 
 import AuthService from "./services/auth/auth.service";
 import UserService from "./services/user/user.service";
-import OnboardingService from "./services/onboarding/onboarding.service";
 import DiscoveryService from "./services/discovery/discovery.service";
 import VenueService from "./services/venues/venues.service";
 import MatchesService from "./services/matches/matches.service";
@@ -32,7 +31,6 @@ import fidelityService from "./services/fidelity/fidelity.service";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
-const onboardingRouter = new OnboardingService();
 const discoveryRouter = new DiscoveryService();
 const venueRouter = new VenueService();
 const matchesRouter = new MatchesService();
@@ -78,7 +76,6 @@ app.use('/fidelity/*', authMiddleware);
 // If root, routes are /auth, /users, etc.
 app.route("/auth", authRouter.getRouter);
 app.route("/users", userRouter.getRouter); // Replaces /profile for user-centric routes
-app.route("/onboarding", onboardingRouter.getRouter);
 app.route("/discovery", discoveryRouter.getRouter);
 app.route("/venues", venueRouter.getRouter);
 // Global amenities route (public) - direct DB query

@@ -18,7 +18,8 @@ class BillingService {
     }
 
     private initRoutes() {
-        this.router.use("/*", authMiddleware);
+        this.router.use("/invoices/*", authMiddleware);
+        this.router.use("/transactions/*", authMiddleware);
         // Invoices
         this.router.get("/invoices", ...this.controller.getInvoices);
         this.router.get("/invoices/:invoiceId", ...this.controller.getInvoiceDetails);
