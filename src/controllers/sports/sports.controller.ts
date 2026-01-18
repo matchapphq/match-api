@@ -25,6 +25,14 @@ const TeamsQuerySchema = PaginationSchema.extend({
     is_active: z.enum(['true', 'false']).optional().transform(v => v === 'true' ? true : v === 'false' ? false : undefined),
 });
 
+const FixtureQuerySchema = PaginationSchema.extend({
+    sport_id: z.uuid().optional(),
+    league_id: z.uuid().optional(),
+    date: z.date().optional(),
+    status: z.enum(["scheduled", "live", "finished"]).optional()
+})
+
+
 /**
  * Controller for Sports operations.
  * Handles fetching sports, leagues, and teams.
@@ -40,7 +48,7 @@ class SportsController {
     /**
      * GET /sports - List all sports with pagination
      */
-    readonly getSports = this.factory.createHandlers(validator('query', (value, c) => {
+    public readonly getSports = this.factory.createHandlers(validator('query', (value, c) => {
         const parsed = SportsQuerySchema.safeParse(value);
         if (!parsed.success) {
             return c.json({ error: "Invalid query params", details: parsed.error }, 400);
@@ -60,6 +68,25 @@ class SportsController {
         } catch (error: any) {
             console.error("Error fetching sports:", error);
             return c.json({ error: "Failed to fetch sports" }, 500);
+        }
+    });
+    
+    /**
+     * GET /teams/fixture - Get team fixtures
+     */
+    public readonly getFixtures = this.factory.createHandlers(validator("query", (value, c) => {
+        const parsed = FixtureQuerySchema.safeParse(value);
+        if (!parsed.success) {
+            return c.json({ error: "Invalid query params", details: parsed.error }, 400);
+        }
+        return parsed.data;
+    }), async (c) => {
+        const { sport_id, status, date, league_id } = c.req.valid("query");
+        try {
+             
+        } catch (error: any) {
+            console.error("Error fetching team fixtures:", error);
+            return c.json({ error: "Failed to fetch team fixtures" }, 500);
         }
     });
 

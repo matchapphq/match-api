@@ -7,6 +7,9 @@ import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
 import { setCookie, getCookie, setSignedCookie, deleteCookie, getSignedCookie } from "hono/cookie";
 import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
+import referralRepository from "../../repository/referral.repository";
+import AuthRepository from "../../repository/auth/auth.repository";
+import { userOnaboarding } from "./auth.helper";
 
 /**
  * Controller for Authentication operations.
@@ -16,8 +19,9 @@ class AuthController {
     private readonly factory = createFactory();
     private readonly userRepository = new UserRepository();
     private readonly tokenRepository = new TokenRepository();
+    private readonly authRepository = new AuthRepository();
 
-    readonly register = this.factory.createHandlers(validator("json", (value, ctx) => {
+    public readonly register = this.factory.createHandlers(validator("json", (value, ctx) => {
         const parsed = RegisterRequestSchema.safeParse(value);
         if (!parsed.success) {
             return ctx.json({ error: "Invalid request body", details: parsed.error }, 401);
@@ -38,9 +42,26 @@ class AuthController {
         };
 
         try {
-            const user = await this.userRepository.createUser(userRequest);
+            const user = await this.userRepository.createUser({...userRequest, role: body.role});
             if (!user || !user.first_name) {
                 return ctx.json({ error: "Failed to create user" }, 500);
+            }
+
+            if (body.role === 'venue_owner') {
+            // Optional referral code handling (non-blocking)
+                if (body.referralCode) {
+                    try {
+                        const referralResult = await referralRepository.registerReferral(body.referralCode, user.id);
+                        if (!referralResult.success) {
+                            console.warn("Referral registration failed:", referralResult.error);
+                        }
+                    } catch (referralError) {
+                        console.error("Referral registration exception:", referralError);
+                        // Do not block user creation if referral flow fails
+                    }
+                }
+            } else if (body.role === "user") {
+                await userOnaboarding(body, this.authRepository, user.id);
             }
 
             // Generate Tokens
@@ -79,7 +100,7 @@ class AuthController {
         }
     })
 
-    readonly login = this.factory.createHandlers(validator('json', (value, ctx) => {
+    public readonly login = this.factory.createHandlers(validator('json', (value, ctx) => {
         const parsed = LoginRequestSchema.safeParse(value);
         if (!parsed.success) {
             return ctx.json({ error: "Invalid request body", details: parsed.error }, 400)
@@ -89,7 +110,7 @@ class AuthController {
         const body = ctx.req.valid("json");
         const user = await this.userRepository.getUserByEmail(body.email);
 
-        if (!user || !user.first_name) {
+        if (!user) {
             return ctx.json({ error: "Invalid email or password" }, 401)
         }
 
@@ -99,6 +120,7 @@ class AuthController {
         }
 
         const tokenPayload = { id: user.id, email: user.email, role: user.role, firstName: user.first_name };
+
         const [accessToken, refreshToken] = await Promise.all([
             JwtUtils.generateAccessToken(tokenPayload),
             JwtUtils.generateRefreshToken(tokenPayload)

@@ -15,6 +15,7 @@ export const usersTable = pgTable(
         password_hash: varchar('password_hash', { length: 255 }).notNull(),
 
         // Profile
+        username: varchar('username', { length: 100 }),
         first_name: varchar('first_name', { length: 100 }),
         last_name: varchar('last_name', { length: 100 }),
         phone: varchar('phone', { length: 20 }),

@@ -17,7 +17,7 @@ class AuthService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         this.router.post("/register", ...this.authController.register);
         this.router.post("/login", ...this.authController.login);
         this.router.post("/refresh-token", ...this.authController.refreshToken);

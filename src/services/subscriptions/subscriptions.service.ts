@@ -18,7 +18,7 @@ class SubscriptionsService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Public route - no auth required
         this.router.get("/plans", ...this.controller.getPlans);
         

@@ -9,7 +9,7 @@
     "db:migrate": "bun run db:setup && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:push": "bun run db:setup && drizzle-kit push",
-    "db:seed": "bun run scripts/seed-sports.ts && bun run scripts/seed-data.ts",
+    "db:seed": "bun run scripts/seed-sports.ts && bun run scripts/seed-data.ts && bun run src/config/seeds/fidelity.seed.ts",
     "start": "bun run index.ts"
   },
   "devDependencies": {
@@ -28,10 +28,14 @@
   "dependencies": {
     "@hono/zod-validator": "^0.7.2",
     "@neondatabase/serverless": "^1.0.2",
-    "axios": "^1.11.0",
+    "@types/nodemailer": "^7.0.4",
+    "axios": "^1.13.2",
+    "bullmq": "^5.66.5",
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
+    "handlebars": "^4.7.8",
     "hono": "^4.9.6",
+    "nodemailer": "^7.0.12",
     "pg": "^8.16.3",
     "qrcode": "^1.5.4",
     "stripe": "^20.1.0",

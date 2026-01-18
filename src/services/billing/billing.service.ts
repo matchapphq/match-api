@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import BillingController from "../../controllers/billing/billing.controller";
+import { authMiddleware } from "../../middleware/auth.middleware";
 
 /**
  * Service for defining Billing routes (Invoices & Transactions).
@@ -16,7 +17,9 @@ class BillingService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
+        this.router.use("/invoices/*", authMiddleware);
+        this.router.use("/transactions/*", authMiddleware);
         // Invoices
         this.router.get("/invoices", ...this.controller.getInvoices);
         this.router.get("/invoices/:invoiceId", ...this.controller.getInvoiceDetails);

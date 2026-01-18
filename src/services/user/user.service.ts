@@ -19,7 +19,7 @@ class UserService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Me routes (Protected)
         this.router.get("/me", authMiddleware, ...this.controller.getMe);
         this.router.put("/me", authMiddleware, ...this.controller.updateMe);
@@ -27,10 +27,7 @@ class UserService {
 
         // Notification Preferences (Protected)
         this.router.put("/me/notification-preferences", authMiddleware, ...this.controller.updateNotificationPreferences);
-
-        // Onboarding (Protected)
-        this.router.put("/me/onboarding-complete", authMiddleware, ...this.controller.completeOnboarding);
-
+        
         // Addresses (Protected)
         this.router.get("/me/addresses", authMiddleware, ...this.controller.getAddresses);
         this.router.post("/me/addresses", authMiddleware, ...this.controller.addAddress);

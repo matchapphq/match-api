@@ -94,6 +94,12 @@ export const venueMatchesTable = pgTable(
         is_featured: boolean('is_featured').default(false),
         show_on_map: boolean('show_on_map').default(true),
 
+        // Boost fields
+        is_boosted: boolean('is_boosted').default(false),
+        boost_id: uuid('boost_id'),
+        boosted_at: timestamp('boosted_at', { withTimezone: true }),
+        boost_expires_at: timestamp('boost_expires_at', { withTimezone: true }),
+
         // Metadata
         estimated_crowd_level: varchar('estimated_crowd_level', { length: 20 }),
         notes: text('notes'),
@@ -105,6 +111,8 @@ export const venueMatchesTable = pgTable(
         index('idx_venue_matches_venue_id').on(table.venue_id),
         index('idx_venue_matches_match_id').on(table.match_id),
         index('idx_venue_matches_is_active').on(table.is_active),
+        index('idx_venue_matches_is_boosted').on(table.is_boosted),
+        index('idx_venue_matches_boost_id').on(table.boost_id),
         unique('unique_venue_match').on(table.venue_id, table.match_id),
         foreignKey({
             columns: [table.venue_id],

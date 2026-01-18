@@ -1,8 +1,6 @@
 import { createFactory } from "hono/factory";
 import { db } from "../../config/config.db";
 import { matchesTable, venueMatchesTable } from "../../config/db/matches.table";
-import { venuesTable } from "../../config/db/venues.table";
-import { teamsTable, leaguesTable } from "../../config/db/sports.table";
 import { eq, and, gte, desc, asc, sql } from "drizzle-orm";
 
 /**
@@ -15,7 +13,7 @@ class MatchesController {
     /**
      * GET /matches - List all upcoming matches
      */
-    readonly getMatches = this.factory.createHandlers(async (c) => {
+    public readonly getMatches = this.factory.createHandlers(async (c) => {
         try {
             const { league_id, status, limit = "20", offset = "0" } = c.req.query();
 
@@ -46,7 +44,7 @@ class MatchesController {
     /**
      * GET /matches/:matchId - Get match details
      */
-    readonly getMatchDetails = this.factory.createHandlers(async (c) => {
+    public readonly getMatchDetails = this.factory.createHandlers(async (c) => {
         try {
             const matchId = c.req.param("matchId");
             if (!matchId) return c.json({ error: "Match ID required" }, 400);
@@ -75,7 +73,7 @@ class MatchesController {
      * GET /matches/:matchId/venues - Get venues showing this match
      * This is key for users to find where to watch a match and make reservations
      */
-    readonly getMatchVenues = this.factory.createHandlers(async (c) => {
+    public readonly getMatchVenues = this.factory.createHandlers(async (c) => {
         try {
             const matchId = c.req.param("matchId");
             if (!matchId) return c.json({ error: "Match ID required" }, 400);
@@ -128,7 +126,7 @@ class MatchesController {
     /**
      * GET /matches/upcoming - Get all upcoming matches
      */
-    readonly getUpcoming = this.factory.createHandlers(async (c) => {
+    public readonly getUpcoming = this.factory.createHandlers(async (c) => {
         try {
             const { limit = "20", offset = "0" } = c.req.query();
 
@@ -143,7 +141,7 @@ class MatchesController {
                 limit: parseInt(limit),
                 offset: parseInt(offset),
             });
-
+            
             return c.json({ 
                 data: matches,
                 count: matches.length
@@ -157,7 +155,7 @@ class MatchesController {
     /**
      * GET /matches/upcoming-nearby - Get upcoming matches at venues near user
      */
-    readonly getUpcomingNearby = this.factory.createHandlers(async (c) => {
+    public readonly getUpcomingNearby = this.factory.createHandlers(async (c) => {
         try {
             const { lat, lng, distance_km = "10", limit = "20" } = c.req.query();
 
@@ -220,7 +218,7 @@ class MatchesController {
     /**
      * GET /matches/:matchId/live-updates - Placeholder for live score updates
      */
-    readonly getLiveUpdates = this.factory.createHandlers(async (c) => {
+    public readonly getLiveUpdates = this.factory.createHandlers(async (c) => {
         const matchId = c.req.param("matchId");
         
         // This would typically connect to a live sports data API

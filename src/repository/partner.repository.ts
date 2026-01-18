@@ -2,7 +2,7 @@ import { db } from "../config/config.db";
 import { venuesTable } from "../config/db/venues.table";
 import { venueMatchesTable, matchesTable } from "../config/db/matches.table";
 import { reservationsTable } from "../config/db/reservations.table";
-import { eq, and, sql, inArray, count, countDistinct, gte, sum } from "drizzle-orm";
+import { eq, and, sql, inArray, count, countDistinct, gte, lte, sum } from "drizzle-orm";
 
 export class PartnerRepository {
 
@@ -52,6 +52,7 @@ export class PartnerRepository {
         email?: string;
         capacity?: number;
         type?: string;
+        coords?: { lat: number, lng: number };
     }) {
         const [newVenue] = await db.insert(venuesTable).values({
             name: data.name,
@@ -62,9 +63,9 @@ export class PartnerRepository {
             state_province: data.state_province || "",
             postal_code: data.postal_code,
             country: data.country,
-            location: sql`ST_SetSRID(ST_MakePoint(0, 0), 4326)`,
-            latitude: 0,
-            longitude: 0,
+            location: sql`ST_SetSRID(ST_MakePoint(${data.coords?.lat || 0}, ${data.coords?.lng || 0}), 4326)`,
+            latitude: data.coords?.lat || 0,
+            longitude: data.coords?.lng || 0,
             type: 'sports_bar',
             status: 'pending',
             is_active: true
@@ -433,5 +434,585 @@ export class PartnerRepository {
         });
 
         return { authorized: true, clients: reservations };
+    }
+
+    /**
+     * Update reservation status (for venue owners to confirm/decline PENDING reservations)
+     * Verifies venue ownership before allowing status change
+     */
+    async updateReservationStatus(
+        reservationId: string, 
+        ownerId: string, 
+        newStatus: 'CONFIRMED' | 'DECLINED'
+    ): Promise<{ success: boolean; reservation?: any; error?: string; statusCode?: number }> {
+        // Get the reservation with venue match and venue info
+        const reservation = await db.query.reservationsTable.findFirst({
+            where: eq(reservationsTable.id, reservationId),
+            with: {
+                venueMatch: {
+                    with: {
+                        venue: {
+                            columns: {
+                                id: true,
+                                owner_id: true,
+                                name: true,
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        if (!reservation) {
+            return { success: false, error: "Reservation not found", statusCode: 404 };
+        }
+
+        // Verify the user owns the venue
+        if (reservation.venueMatch?.venue?.owner_id !== ownerId) {
+            return { success: false, error: "Not authorized to manage this reservation", statusCode: 403 };
+        }
+
+        // Check current status is PENDING
+        if (reservation.status !== 'pending') {
+            return { 
+                success: false, 
+                error: `Cannot update reservation with status '${reservation.status}'. Only PENDING reservations can be confirmed or declined.`,
+                statusCode: 400 
+            };
+        }
+
+        // Map the new status to database format
+        const dbStatus = newStatus === 'CONFIRMED' ? 'confirmed' : 'canceled';
+
+        // Update the reservation
+        const [updated] = await db.update(reservationsTable)
+            .set({
+                status: dbStatus,
+                updated_at: new Date(),
+                ...(newStatus === 'DECLINED' ? { 
+                    canceled_at: new Date(),
+                    canceled_reason: 'Declined by venue owner'
+                } : {})
+            })
+            .where(eq(reservationsTable.id, reservationId))
+            .returning();
+
+        // TODO: If CONFIRMED, generate QR code and update reservation
+        // TODO: Notify user of status change
+
+        return { 
+            success: true, 
+            reservation: {
+                ...updated,
+                status: newStatus // Return the API-friendly status
+            }
+        };
+    }
+
+    /**
+     * Get all reservations for a specific venue
+     */
+    async getVenueReservations(venueId: string, ownerId: string, options: { page?: number; limit?: number; status?: string } = {}) {
+        // Verify ownership
+        const isOwner = await this.verifyVenueOwnership(venueId, ownerId);
+        if (!isOwner) {
+            return { authorized: false, reservations: [], total: 0 };
+        }
+
+        const page = options.page || 1;
+        const limit = options.limit || 20;
+        const offset = (page - 1) * limit;
+
+        // Get all venue_match IDs for this venue
+        const venueMatches = await db.select({ id: venueMatchesTable.id })
+            .from(venueMatchesTable)
+            .where(eq(venueMatchesTable.venue_id, venueId));
+
+        if (venueMatches.length === 0) {
+            return { authorized: true, reservations: [], total: 0, page, limit };
+        }
+
+        const vmIds = venueMatches.map(vm => vm.id);
+
+        // Build conditions
+        const conditions: any[] = [inArray(reservationsTable.venue_match_id, vmIds)];
+        if (options.status && options.status !== 'all') {
+            conditions.push(eq(reservationsTable.status, options.status as any));
+        }
+
+        // Get reservations with pagination
+        const reservations = await db.query.reservationsTable.findMany({
+            where: and(...conditions),
+            with: {
+                user: {
+                    columns: {
+                        id: true,
+                        first_name: true,
+                        last_name: true,
+                        email: true,
+                        phone: true,
+                    }
+                },
+                venueMatch: {
+                    with: {
+                        match: {
+                            with: {
+                                homeTeam: true,
+                                awayTeam: true,
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: (reservations, { desc }) => [desc(reservations.created_at)],
+            limit,
+            offset,
+        });
+
+        // Get total count
+        const countResult = await db.select({ count: sql<number>`count(*)` })
+            .from(reservationsTable)
+            .where(and(...conditions));
+
+        return {
+            authorized: true,
+            reservations,
+            total: Number(countResult[0]?.count) || 0,
+            page,
+            limit,
+        };
+    }
+
+    /**
+     * Update a venue match
+     */
+    async updateVenueMatch(venueId: string, matchId: string, ownerId: string, data: {
+        total_capacity?: number;
+        available_capacity?: number;
+        is_active?: boolean;
+        is_featured?: boolean;
+        allows_reservations?: boolean;
+        max_group_size?: number;
+        notes?: string;
+    }) {
+        // Verify ownership
+        const isOwner = await this.verifyVenueOwnership(venueId, ownerId);
+        if (!isOwner) {
+            return { success: false, error: "Not authorized", statusCode: 403 };
+        }
+
+        // Find the venue match
+        const venueMatch = await db.select()
+            .from(venueMatchesTable)
+            .where(and(
+                eq(venueMatchesTable.venue_id, venueId),
+                eq(venueMatchesTable.match_id, matchId)
+            ))
+            .limit(1);
+
+        if (!venueMatch[0]) {
+            return { success: false, error: "Venue match not found", statusCode: 404 };
+        }
+
+        // Update
+        const [updated] = await db.update(venueMatchesTable)
+            .set({
+                ...data,
+                updated_at: new Date(),
+            })
+            .where(and(
+                eq(venueMatchesTable.venue_id, venueId),
+                eq(venueMatchesTable.match_id, matchId)
+            ))
+            .returning();
+
+        return { success: true, venueMatch: updated };
+    }
+
+    /**
+     * Get complete analytics dashboard data
+     */
+    async getAnalyticsDashboard(ownerId: string, dateRange?: { start?: Date; end?: Date }) {
+        const venueIds = await this.getVenueIdsByOwnerId(ownerId);
+        
+        if (venueIds.length === 0) {
+            return {
+                overview: { total_venues: 0, total_matches: 0, total_reservations: 0, total_revenue: 0 },
+                reservations_by_status: {},
+                reservations_over_time: [],
+                top_matches: [],
+                capacity_utilization: 0,
+            };
+        }
+
+        // Get all venue_match IDs
+        const venueMatches = await db.select({
+            id: venueMatchesTable.id,
+            venue_id: venueMatchesTable.venue_id,
+            total_capacity: venueMatchesTable.total_capacity,
+            available_capacity: venueMatchesTable.available_capacity,
+        })
+            .from(venueMatchesTable)
+            .where(inArray(venueMatchesTable.venue_id, venueIds));
+
+        const vmIds = venueMatches.map(vm => vm.id);
+
+        // Overview stats
+        const totalMatches = venueMatches.length;
+
+        // Get reservation stats
+        let reservationConditions: any[] = [];
+        if (vmIds.length > 0) {
+            reservationConditions.push(inArray(reservationsTable.venue_match_id, vmIds));
+        }
+        if (dateRange?.start) {
+            reservationConditions.push(gte(reservationsTable.created_at, dateRange.start));
+        }
+
+        const reservationStats = vmIds.length > 0 ? await db.select({
+            status: reservationsTable.status,
+            count: count(),
+        })
+            .from(reservationsTable)
+            .where(and(...reservationConditions))
+            .groupBy(reservationsTable.status) : [];
+
+        // Process stats
+        const reservationsByStatus: Record<string, number> = {};
+        let totalReservations = 0;
+
+        for (const stat of reservationStats) {
+            reservationsByStatus[stat.status] = Number(stat.count);
+            totalReservations += Number(stat.count);
+        }
+
+        // Capacity utilization
+        const totalCapacity = venueMatches.reduce((sum, vm) => sum + (vm.total_capacity || 0), 0);
+        const usedCapacity = venueMatches.reduce((sum, vm) => {
+            const used = (vm.total_capacity || 0) - (vm.available_capacity || 0);
+            return sum + used;
+        }, 0);
+        const capacityUtilization = totalCapacity > 0 ? Math.round((usedCapacity / totalCapacity) * 100) : 0;
+
+        return {
+            overview: {
+                total_venues: venueIds.length,
+                total_matches: totalMatches,
+                total_reservations: totalReservations,
+            },
+            reservations_by_status: reservationsByStatus,
+            capacity_utilization: capacityUtilization,
+        };
+    }
+
+    /**
+     * Get matches calendar view for a venue
+     */
+    async getMatchesCalendar(venueId: string, ownerId: string, options?: { month?: string; status?: string }) {
+        // Verify ownership
+        const venue = await db.query.venuesTable.findFirst({
+            where: and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId))
+        });
+        if (!venue) {
+            return { success: false, error: "Not authorized", statusCode: 403 };
+        }
+
+        // Parse month filter
+        let startDate: Date | undefined;
+        let endDate: Date | undefined;
+        if (options?.month) {
+            const parts = options.month.split('-').map(Number);
+            const year = parts[0] ?? new Date().getFullYear();
+            const month = parts[1] ?? 1;
+            startDate = new Date(year, month - 1, 1);
+            endDate = new Date(year, month, 0, 23, 59, 59);
+        }
+
+        // Get venue matches with match details
+        const conditions = [eq(venueMatchesTable.venue_id, venueId)];
+
+        const venueMatches = await db.select({
+            id: venueMatchesTable.id,
+            venue_id: venueMatchesTable.venue_id,
+            match_id: venueMatchesTable.match_id,
+            total_capacity: venueMatchesTable.total_capacity,
+            available_capacity: venueMatchesTable.available_capacity,
+            is_active: venueMatchesTable.is_active,
+            created_at: venueMatchesTable.created_at,
+        })
+            .from(venueMatchesTable)
+            .where(and(...conditions));
+
+        // Get match details
+        const matchIds = venueMatches.map(vm => vm.match_id);
+        const matches = matchIds.length > 0 ? await db.select()
+            .from(matchesTable)
+            .where(inArray(matchesTable.id, matchIds)) : [];
+
+        const matchMap = new Map(matches.map(m => [m.id, m]));
+
+        // Filter by date range if month specified
+        let filteredMatches = venueMatches.map(vm => {
+            const match = matchMap.get(vm.match_id);
+            return { ...vm, match };
+        });
+
+        if (startDate && endDate) {
+            filteredMatches = filteredMatches.filter(vm => {
+                const matchDate = vm.match?.scheduled_at;
+                if (!matchDate) return false;
+                return matchDate >= startDate && matchDate <= endDate;
+            });
+        }
+
+        // Calculate summary
+        const totalSeatsAvailable = filteredMatches.reduce((sum, vm) => sum + (vm.available_capacity || 0), 0);
+        const totalSeatsReserved = filteredMatches.reduce((sum, vm) => {
+            return sum + ((vm.total_capacity || 0) - (vm.available_capacity || 0));
+        }, 0);
+        const totalSeats = filteredMatches.reduce((sum, vm) => sum + (vm.total_capacity || 0), 0);
+        const occupancyRate = totalSeats > 0 ? Math.round((totalSeatsReserved / totalSeats) * 100) : 0;
+
+        // Get unique dates with matches
+        const daysWithMatches = [...new Set(filteredMatches
+            .filter(vm => vm.match?.scheduled_at)
+            .map(vm => vm.match!.scheduled_at!.toISOString().split('T')[0])
+        )];
+
+        return {
+            success: true,
+            matches: filteredMatches,
+            summary: {
+                total_matches: filteredMatches.length,
+                total_seats_available: totalSeatsAvailable,
+                total_seats_reserved: totalSeatsReserved,
+                occupancy_rate: occupancyRate,
+            },
+            days_with_matches: daysWithMatches,
+        };
+    }
+
+    /**
+     * Get reservation statistics for a venue
+     */
+    async getReservationStats(venueId: string, ownerId: string, dateRange?: { from?: Date; to?: Date }) {
+        // Verify ownership
+        const venue = await db.query.venuesTable.findFirst({
+            where: and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId))
+        });
+        if (!venue) {
+            return { success: false, error: "Not authorized", statusCode: 403 };
+        }
+
+        // Get venue match IDs
+        const venueMatches = await db.select({ id: venueMatchesTable.id })
+            .from(venueMatchesTable)
+            .where(eq(venueMatchesTable.venue_id, venueId));
+
+        const vmIds = venueMatches.map(vm => vm.id);
+
+        if (vmIds.length === 0) {
+            return {
+                success: true,
+                stats: {
+                    period: { from: dateRange?.from?.toISOString(), to: dateRange?.to?.toISOString() },
+                    reservations: { total: 0, confirmed: 0, cancelled: 0, no_show: 0, cancellation_rate: 0, no_show_rate: 0 },
+                    capacity: { total_seats_available: 0, total_seats_reserved: 0, average_occupancy_rate: 0 },
+                    customers: { total_unique: 0, new_customers: 0, returning_customers: 0 },
+                }
+            };
+        }
+
+        // Build conditions
+        const conditions: any[] = [inArray(reservationsTable.venue_match_id, vmIds)];
+        if (dateRange?.from) {
+            conditions.push(gte(reservationsTable.created_at, dateRange.from));
+        }
+        if (dateRange?.to) {
+            conditions.push(lte(reservationsTable.created_at, dateRange.to));
+        }
+
+        // Get reservation stats by status
+        const reservationStats = await db.select({
+            status: reservationsTable.status,
+            count: count(),
+        })
+            .from(reservationsTable)
+            .where(and(...conditions))
+            .groupBy(reservationsTable.status);
+
+        const statsByStatus: Record<string, number> = {};
+        let total = 0;
+        for (const stat of reservationStats) {
+            statsByStatus[stat.status] = Number(stat.count);
+            total += Number(stat.count);
+        }
+
+        const confirmed = statsByStatus['CONFIRMED'] || 0;
+        const cancelled = statsByStatus['CANCELLED'] || 0;
+        const noShow = statsByStatus['NO_SHOW'] || 0;
+        const cancellationRate = total > 0 ? Math.round((cancelled / total) * 100) : 0;
+        const noShowRate = confirmed > 0 ? Math.round((noShow / confirmed) * 100) : 0;
+
+        // Get unique customers
+        const uniqueCustomers = await db.selectDistinct({ user_id: reservationsTable.user_id })
+            .from(reservationsTable)
+            .where(and(...conditions));
+
+        return {
+            success: true,
+            stats: {
+                period: { from: dateRange?.from?.toISOString(), to: dateRange?.to?.toISOString() },
+                reservations: {
+                    total,
+                    confirmed,
+                    cancelled,
+                    no_show: noShow,
+                    cancellation_rate: cancellationRate,
+                    no_show_rate: noShowRate,
+                },
+                customers: {
+                    total_unique: uniqueCustomers.length,
+                },
+            }
+        };
+    }
+
+    /**
+     * Update reservation details (full update)
+     */
+    async updateReservation(reservationId: string, ownerId: string, data: {
+        status?: string;
+        table_number?: string;
+        notes?: string;
+        party_size?: number;
+        special_requests?: string;
+    }) {
+        // Get reservation with venue info
+        const reservation = await db.query.reservationsTable.findFirst({
+            where: eq(reservationsTable.id, reservationId),
+            with: {
+                venueMatch: {
+                    with: {
+                        venue: true
+                    }
+                }
+            }
+        });
+
+        if (!reservation) {
+            return { success: false, error: "Reservation not found", statusCode: 404 };
+        }
+
+        // Verify ownership
+        const venueMatch = reservation.venueMatch;
+        if (!venueMatch || (venueMatch.venue as any)?.owner_id !== ownerId) {
+            return { success: false, error: "Not authorized to modify this reservation", statusCode: 403 };
+        }
+
+        // Check party size capacity if changing
+        if (data.party_size && data.party_size !== reservation.party_size) {
+            const sizeDiff = data.party_size - (reservation.party_size || 0);
+            if (sizeDiff > 0 && sizeDiff > (venueMatch.available_capacity || 0)) {
+                return {
+                    success: false,
+                    error: "Cannot increase party size: not enough available seats",
+                    statusCode: 400,
+                    available_seats: venueMatch.available_capacity,
+                    requested_increase: sizeDiff,
+                };
+            }
+
+            // Update venue match capacity
+            await db.update(venueMatchesTable)
+                .set({
+                    available_capacity: (venueMatch.available_capacity || 0) - sizeDiff,
+                    updated_at: new Date(),
+                })
+                .where(eq(venueMatchesTable.id, venueMatch.id));
+        }
+
+        // Update reservation
+        const [updated] = await db.update(reservationsTable)
+            .set({
+                ...(data.status && { status: data.status as any }),
+                ...(data.table_number !== undefined && { table_number: data.table_number }),
+                ...(data.notes !== undefined && { notes: data.notes }),
+                ...(data.party_size !== undefined && { party_size: data.party_size }),
+                ...(data.special_requests !== undefined && { special_requests: data.special_requests }),
+                updated_at: new Date(),
+            })
+            .where(eq(reservationsTable.id, reservationId))
+            .returning();
+
+        return { success: true, reservation: updated };
+    }
+
+    /**
+     * Mark reservation as no-show
+     */
+    async markReservationNoShow(reservationId: string, ownerId: string, reason?: string) {
+        // Get reservation with venue info
+        const reservation = await db.query.reservationsTable.findFirst({
+            where: eq(reservationsTable.id, reservationId),
+            with: {
+                venueMatch: {
+                    with: {
+                        venue: true
+                    }
+                }
+            }
+        });
+
+        if (!reservation) {
+            return { success: false, error: "Reservation not found", statusCode: 404 };
+        }
+
+        // Verify ownership
+        const venueMatch = reservation.venueMatch;
+        if (!venueMatch || (venueMatch.venue as any)?.owner_id !== ownerId) {
+            return { success: false, error: "Not authorized to mark this reservation as no-show", statusCode: 403 };
+        }
+
+        // Check if status allows marking as no-show
+        if (reservation.status !== 'confirmed' && reservation.status !== 'checked_in') {
+            return {
+                success: false,
+                error: "Can only mark confirmed or checked_in reservations as no-show",
+                statusCode: 400,
+                current_status: reservation.status,
+            };
+        }
+
+        const seatsToRelease = reservation.party_size || 0;
+
+        // Update reservation
+        const [updated] = await db.update(reservationsTable)
+            .set({
+                status: 'no_show' as any,
+                special_requests: reason ? `No-show reason: ${reason}` : reservation.special_requests,
+                updated_at: new Date(),
+            })
+            .where(eq(reservationsTable.id, reservationId))
+            .returning();
+
+        // Release seats back to available pool
+        await db.update(venueMatchesTable)
+            .set({
+                available_capacity: (venueMatch.available_capacity || 0) + seatsToRelease,
+                updated_at: new Date(),
+            })
+            .where(eq(venueMatchesTable.id, venueMatch.id));
+
+        return {
+            success: true,
+            reservation: {
+                id: updated?.id,
+                status: updated?.status,
+                marked_no_show_at: updated?.updated_at,
+                no_show_reason: reason || null,
+            },
+            seats_released: seatsToRelease,
+        };
     }
 }

@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import { db } from "../config/config.db";
-import { userPreferencesTable, type NewUserPreferences } from "../config/db/user.table";
+import { db } from "../../config/config.db";
+import { userPreferencesTable, type NewUserPreferences } from "../../config/db/user.table";
 
 export interface SavePreferencesData {
     ambiances?: string[];
@@ -12,11 +12,9 @@ export interface SavePreferencesData {
     fav_team_ids?: string[];
 }
 
-class OnboardingRepository {
-    async savePreferences(userId: string, preferences: SavePreferencesData) {
-
+class AuthRepository {
+    public async savePreferences(userId: string, preferences: SavePreferencesData) {
         const existing = await db.select().from(userPreferencesTable).where(eq(userPreferencesTable.user_id, userId));
-
         const preferenceData: Partial<NewUserPreferences> = {
             home_lat: preferences.home_lat ?? undefined,
             home_lng: preferences.home_lng ?? undefined,
@@ -26,20 +24,20 @@ class OnboardingRepository {
             venue_types: preferences.venue_types ?? undefined,
             budget: preferences.budget ?? undefined,
             updated_at: new Date()
-        };
-
+        }
+        
         if (existing.length > 0 && existing[0]) {
             return (await db.update(userPreferencesTable)
                 .set(preferenceData)
                 .where(eq(userPreferencesTable.id, existing[0].id))
-                .returning())[0];
+                .returning())[0]
         } else {
             return (await db.insert(userPreferencesTable).values({
                 user_id: userId,
                 ...preferenceData,
-            } as NewUserPreferences).returning())[0];
+            } as NewUserPreferences).returning())[0]
         }
     }
 }
 
-export default OnboardingRepository;
+export default AuthRepository;

@@ -30,7 +30,7 @@ class UserController {
         return user.id;
     }
 
-    readonly getMe = this.factory.createHandlers(async (ctx) => {
+    public readonly getMe = this.factory.createHandlers(async (ctx) => {
         const user = ctx.get('user');
         if (!user) {
             return ctx.json({ error: "Unauthorized" }, 401);
@@ -91,10 +91,6 @@ class UserController {
 
     readonly deleteAddress = this.factory.createHandlers(async (ctx) => {
         return ctx.json({ msg: "Delete address" });
-    });
-
-    readonly completeOnboarding = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Mark onboarding as complete" });
     });
 
     /**
