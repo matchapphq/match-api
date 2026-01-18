@@ -42,3 +42,6 @@ drizzle/
 postman/
 scripts/seed.ts
 scripts/
+*.txt
+INTE_PLAN.md
+API_VERIFICATION_REPORT.md
