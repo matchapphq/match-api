@@ -17,10 +17,12 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # dotenv environment variable files
 .env
+.env.dev
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
+.env.example
 
 # caches
 .eslintcache
@@ -32,3 +34,14 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
+.drizzle/
+drizzle/
+.agent/
+.zed/
+.vscode/
+postman/
+scripts/seed.ts
+scripts/
+*.txt
+INTE_PLAN.md
+API_VERIFICATION_REPORT.md
