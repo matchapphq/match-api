@@ -50,6 +50,25 @@ Response: 200
 }
 ```
 
+### POST /api/subscriptions/mock
+**Toggle mock subscription state (development/testing only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  plan?: 'basic' | 'pro' | 'enterprise';
+  active?: boolean;
+}
+
+Response: 200
+{
+  subscription: Subscription;
+  message: string;
+}
+```
+
 ### POST /api/auth/login
 **Login with email and password**
 
@@ -901,6 +920,22 @@ Response: 200
 Response: 200
 {
   leagues: League[];
+}
+```
+
+### GET /api/sports/fixture
+**Get upcoming fixtures across sports**
+
+```typescript
+Query params:
+  sport_id?: uuid
+  league_id?: uuid
+  from?: string   // ISO date
+  to?: string
+
+Response: 200
+{
+  fixtures: FixtureSummary[];
 }
 ```
 
@@ -1986,16 +2021,34 @@ Response: 200
 ```
 
 ### GET /api/partners/venues/matches
-**Get all matches for partner's venues**
+**List every match scheduled across the current partner's venues**
 
 ```typescript
 Headers: Authorization: Bearer <token>
 
 Response: 200
 {
-  matches: VenueMatch[];
+  data: [
+    {
+      id: string;
+      venue: { id: string; name: string } | null;
+      match: {
+        id: string;
+        homeTeam: string;
+        awayTeam: string;
+        scheduled_at: string;
+        league?: string | null;
+      } | null;
+      total_capacity: number;
+      reserved_seats: number;
+      available_capacity: number;
+      status: 'upcoming' | 'live' | 'finished';
+    }
+  ];
 }
 ```
+
+> The backend aggregates all venues owned by the authenticated partner, resolves their `venue_matches`, and returns normalized stats (`reserved_seats`, `available_capacity`, status, etc.).
 
 ### POST /api/partners/venues/:venueId/matches
 **Schedule a match at a venue**
@@ -2005,8 +2058,8 @@ Headers: Authorization: Bearer <token>
 
 Request body:
 {
-  match_id: uuid;
-  total_seats: number;
+  match_id: string;
+  total_capacity: number;
 }
 
 Response: 201
@@ -2014,6 +2067,8 @@ Response: 201
   venueMatch: VenueMatch;
 }
 ```
+
+**Validation:** `venueId`, `match_id`, and `total_capacity` are required. On success the API automatically sets `available_capacity = total_capacity`.
 
 ### PUT /api/partners/venues/:venueId/matches/:matchId
 **Update a venue match**
@@ -2473,6 +2528,87 @@ Response: 200
 1. `invited` → User has been invited but hasn't signed up yet
 2. `signed_up` → User has created an account using the referral code
 3. `converted` → User has completed their first payment → **Referrer gets 1 boost**
+
+---
+
+## 🎖️ Fidelity Routes (`/api/fidelity`)
+
+*All routes require authentication*
+
+### GET /api/fidelity/summary
+**Get current user's points, level, and streak overview**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  points_balance: number;
+  current_level: string;
+  next_level: {
+    name: string;
+    points_required: number;
+  };
+  streak: {
+    active: boolean;
+    days: number;
+  };
+}
+```
+
+### GET /api/fidelity/points-history
+**List recent points transactions**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Query params:
+  limit?: number (default: 25)
+  offset?: number
+
+Response: 200
+{
+  transactions: FidelityTransaction[];
+  total: number;
+}
+```
+
+### GET /api/fidelity/badges
+**Get unlocked and upcoming badges**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  unlocked: FidelityBadge[];
+  upcoming: FidelityBadge[];
+}
+```
+
+### GET /api/fidelity/challenges
+**Get active challenges for the user**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  challenges: FidelityChallenge[];
+}
+```
+
+### GET /api/fidelity/levels
+**List all available loyalty levels**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  levels: FidelityLevel[];
+}
+```
 
 ---
 
