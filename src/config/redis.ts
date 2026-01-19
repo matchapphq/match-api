@@ -1,13 +1,11 @@
-import IOredis from "ioredis";
+import type { ConnectionOptions } from "bullmq";
 
-const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
-
-export const redisConnection = new IOredis(redisUrl, {
+export const redisConnection: ConnectionOptions = {
+    host: process.env.REDIS_HOST || "localhost",
+    port: parseInt(process.env.REDIS_PORT || "6379"),
+    password: Bun.env.REDIS_PASSWORD || undefined,
+    db: parseInt(Bun.env.REDIS_DB || '0'),
     lazyConnect: true,
-    maxRetriesPerRequest: null, 
-});
-
-process.on("SIGTERM", async () => {
-    await redisConnection.quit();
-    process.exit(0);
-});
+    maxRetriesPerRequest: null,
+    enableReadyCheck: false,
+};
