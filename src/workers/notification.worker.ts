@@ -21,6 +21,5 @@ notificationWorker.on("completed", async (job: Job) => {
 });
 
 export {
-    notificationWorker
+    notificationWorker,
 }
-
