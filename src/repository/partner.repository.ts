@@ -2,9 +2,117 @@ import { db } from "../config/config.db";
 import { venuesTable } from "../config/db/venues.table";
 import { venueMatchesTable, matchesTable } from "../config/db/matches.table";
 import { reservationsTable } from "../config/db/reservations.table";
+import { reviewsTable } from "../config/db/reviews.table";
+import { analyticsTable } from "../config/db/admin.table";
 import { eq, and, sql, inArray, count, countDistinct, gte, lte, sum } from "drizzle-orm";
 
 export class PartnerRepository {
+
+    /**
+     * Get recent activity (reservations and reviews) for a partner across all their venues
+     */
+    async getRecentActivity(ownerId: string, limit: number = 20) {
+        const venueIds = await this.getVenueIdsByOwnerId(ownerId);
+        
+        if (venueIds.length === 0) {
+            return [];
+        }
+
+        // 1. Get recent reservations
+        const reservations = await db.query.reservationsTable.findMany({
+            where: inArray(reservationsTable.venue_match_id, 
+                db.select({ id: venueMatchesTable.id })
+                  .from(venueMatchesTable)
+                  .where(inArray(venueMatchesTable.venue_id, venueIds))
+            ),
+            with: {
+                user: {
+                    columns: {
+                        first_name: true,
+                        last_name: true,
+                    }
+                },
+                venueMatch: {
+                    with: {
+                        venue: {
+                            columns: {
+                                id: true,
+                                name: true,
+                            }
+                        },
+                        match: {
+                           columns: {
+                               id: true
+                           },
+                           with: {
+                               homeTeam: true,
+                               awayTeam: true
+                           }
+                        }
+                    }
+                }
+            },
+            orderBy: (reservations, { desc }) => [desc(reservations.created_at)],
+            limit: limit,
+        });
+
+        // 2. Get recent reviews
+        const reviews = await db.query.reviewsTable.findMany({
+            where: inArray(reviewsTable.venue_id, venueIds),
+            with: {
+                user: {
+                    columns: {
+                        first_name: true,
+                        last_name: true,
+                    }
+                },
+                venue: {
+                    columns: {
+                        id: true,
+                        name: true,
+                    }
+                }
+            },
+            orderBy: (reviews, { desc }) => [desc(reviews.created_at)],
+            limit: limit,
+        });
+        
+        // 3. Combine and sort
+        const activity = [
+            ...reservations.map(r => ({
+                type: 'reservation',
+                id: r.id,
+                created_at: r.created_at,
+                venue_id: r.venueMatch?.venue?.id,
+                venue_name: r.venueMatch?.venue?.name,
+                user_name: `${r.user?.first_name || 'Guest'} ${r.user?.last_name || ''}`.trim(),
+                details: {
+                    status: r.status,
+                    party_size: r.party_size,
+                    match: r.venueMatch?.match ? `${r.venueMatch.match.homeTeam?.name} vs ${r.venueMatch.match.awayTeam?.name}` : null
+                }
+            })),
+            ...reviews.map(r => ({
+                type: 'review',
+                id: r.id,
+                created_at: r.created_at,
+                venue_id: r.venue?.id,
+                venue_name: r.venue?.name,
+                user_name: `${r.user?.first_name || 'Guest'} ${r.user?.last_name || ''}`.trim(),
+                details: {
+                    rating: r.rating,
+                    content: r.content,
+                    title: r.title
+                }
+            }))
+        ].sort((a, b) => {
+            const dateA = new Date(a.created_at).getTime();
+            const dateB = new Date(b.created_at).getTime();
+            return dateB - dateA;
+        }).slice(0, limit);
+
+        return activity;
+    }
 
     /**
      * Get all venues owned by a user
@@ -280,46 +388,103 @@ export class PartnerRepository {
     }
 
     /**
-     * Get complete analytics summary for a partner
+     * Get complete analytics summary for a partner including trends
      * Note: neon-http driver doesn't support transactions, using sequential queries
      */
-    async getAnalyticsSummary(venueIds: string[]) {
+    async getAnalyticsSummary(venueIds: string[], days: number = 30) {
         if (venueIds.length === 0) {
             return {
                 venueMatches: [],
                 clientStats: { uniqueUsers: 0, totalReservations: 0 },
                 matchStats: [],
+                totalViews: 0,
+                trends: {
+                    clients: 0,
+                    reservations: 0,
+                    matches: 0,
+                    views: 0
+                }
             };
         }
 
-        // Get venue matches with capacity
+        const now = new Date();
+        const currentPeriodStart = new Date();
+        currentPeriodStart.setDate(now.getDate() - days);
+        
+        const previousPeriodStart = new Date();
+        previousPeriodStart.setDate(now.getDate() - (days * 2));
+
+        // Helper to calculate percentage change
+        const calculateTrend = (current: number, previous: number) => {
+            if (previous === 0) return current > 0 ? 100 : 0;
+            return Math.round(((current - previous) / previous) * 100 * 10) / 10;
+        };
+
+        // 1. Get venue matches with capacity
         const venueMatches = await db.select({
             id: venueMatchesTable.id,
             total_capacity: venueMatchesTable.total_capacity,
             reserved_capacity: venueMatchesTable.reserved_capacity,
-        })
-            .from(venueMatchesTable)
-            .where(inArray(venueMatchesTable.venue_id, venueIds));
+        }).from(venueMatchesTable).where(inArray(venueMatchesTable.venue_id, venueIds));
 
         const vmIds = venueMatches.map(vm => vm.id);
 
-        // Get client statistics
+        // 2. Client Statistics (Current vs Previous)
         let clientStats = { uniqueUsers: 0, totalReservations: 0 };
+        let prevClientStats = { uniqueUsers: 0, totalReservations: 0 };
+        
         if (vmIds.length > 0) {
+            // Current period
             const stats = await db.select({
                 uniqueUsers: countDistinct(reservationsTable.user_id),
                 totalReservations: count(reservationsTable.id),
-            })
-                .from(reservationsTable)
-                .where(inArray(reservationsTable.venue_match_id, vmIds));
+            }).from(reservationsTable).where(and(
+                inArray(reservationsTable.venue_match_id, vmIds),
+                gte(reservationsTable.created_at, currentPeriodStart)
+            ));
 
             clientStats = {
                 uniqueUsers: Number(stats[0]?.uniqueUsers) || 0,
                 totalReservations: Number(stats[0]?.totalReservations) || 0,
             };
+
+            // Previous period
+            const prevStats = await db.select({
+                uniqueUsers: countDistinct(reservationsTable.user_id),
+                totalReservations: count(reservationsTable.id),
+            }).from(reservationsTable).where(and(
+                inArray(reservationsTable.venue_match_id, vmIds),
+                gte(reservationsTable.created_at, previousPeriodStart),
+                lte(reservationsTable.created_at, currentPeriodStart)
+            ));
+
+            prevClientStats = {
+                uniqueUsers: Number(prevStats[0]?.uniqueUsers) || 0,
+                totalReservations: Number(prevStats[0]?.totalReservations) || 0,
+            };
         }
 
-        // Get match statistics
+        // 3. Match Statistics (Completed matches in periods)
+        const currentMatches = await db.select({ count: count() })
+            .from(venueMatchesTable)
+            .innerJoin(matchesTable, eq(venueMatchesTable.match_id, matchesTable.id))
+            .where(and(
+                inArray(venueMatchesTable.venue_id, venueIds),
+                eq(matchesTable.status, 'finished'),
+                gte(matchesTable.scheduled_at, currentPeriodStart)
+            ));
+
+        const prevMatches = await db.select({ count: count() })
+            .from(venueMatchesTable)
+            .innerJoin(matchesTable, eq(venueMatchesTable.match_id, matchesTable.id))
+            .where(and(
+                inArray(venueMatchesTable.venue_id, venueIds),
+                eq(matchesTable.status, 'finished'),
+                gte(matchesTable.scheduled_at, previousPeriodStart),
+                lte(matchesTable.scheduled_at, currentPeriodStart)
+            ));
+
+        // Get all match stats for overall counts (upcoming/completed total)
         const matchStats = await db.select({
             matchId: venueMatchesTable.match_id,
             scheduledAt: matchesTable.scheduled_at,
@@ -329,10 +494,42 @@ export class PartnerRepository {
             .innerJoin(matchesTable, eq(venueMatchesTable.match_id, matchesTable.id))
             .where(inArray(venueMatchesTable.venue_id, venueIds));
 
+        // 4. View Statistics (Current vs Previous)
+        const currentViews = await db.select({ count: count() })
+            .from(analyticsTable)
+            .where(and(
+                inArray(analyticsTable.venue_id, venueIds),
+                eq(analyticsTable.event_type, 'venue_view'),
+                gte(analyticsTable.created_at, currentPeriodStart)
+            ));
+
+        const prevViews = await db.select({ count: count() })
+            .from(analyticsTable)
+            .where(and(
+                inArray(analyticsTable.venue_id, venueIds),
+                eq(analyticsTable.event_type, 'venue_view'),
+                gte(analyticsTable.created_at, previousPeriodStart),
+                lte(analyticsTable.created_at, currentPeriodStart)
+            ));
+
+        const totalViewsResult = await db.select({ count: count() })
+            .from(analyticsTable)
+            .where(and(
+                inArray(analyticsTable.venue_id, venueIds),
+                eq(analyticsTable.event_type, 'venue_view')
+            ));
+
         return {
             venueMatches,
             clientStats,
             matchStats,
+            totalViews: Number(totalViewsResult[0]?.count) || 0,
+            trends: {
+                clients: calculateTrend(clientStats.uniqueUsers, prevClientStats.uniqueUsers),
+                reservations: calculateTrend(clientStats.totalReservations, prevClientStats.totalReservations),
+                matches: calculateTrend(Number(currentMatches[0]?.count) || 0, Number(prevMatches[0]?.count) || 0),
+                views: calculateTrend(Number(currentViews[0]?.count) || 0, Number(prevViews[0]?.count) || 0),
+            }
         };
     }
 

@@ -15,6 +15,7 @@ import stripe, {
 } from "../../config/stripe";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import UserRepository from "../../repository/user.repository";
+import type { Context } from "hono";
 
 /**
  * Subscriptions Controller

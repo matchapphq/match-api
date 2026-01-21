@@ -404,10 +404,11 @@ class PartnerController {
     });
 
     // GET /partners/analytics/summary
-    readonly getAnalyticsSummary = this.factory.createHandlers(async (ctx) => {
+    public readonly getAnalyticsSummary = this.factory.createHandlers(async (ctx) => {
         const userId = ctx.get("user").id;
 
         try {
+            const period = parseInt(ctx.req.query('period') || '30', 10);
             const venueIds = await this.repository.getVenueIdsByOwnerId(userId);
             
             if (venueIds.length === 0) {
@@ -418,11 +419,17 @@ class PartnerController {
                     matches_completed: 0,
                     matches_upcoming: 0,
                     average_occupancy: 0,
+                    trends: {
+                        clients: 0,
+                        reservations: 0,
+                        matches: 0,
+                        views: 0
+                    }
                 });
             }
 
-            // Get all analytics data in a single transaction
-            const { venueMatches, clientStats, matchStats } = await this.repository.getAnalyticsSummary(venueIds);
+            // Get all analytics data with trends
+            const { venueMatches, clientStats, matchStats, totalViews, trends } = await this.repository.getAnalyticsSummary(venueIds, period);
 
             // Calculate match counts
             const now = new Date();
@@ -443,14 +450,29 @@ class PartnerController {
             return ctx.json({
                 total_clients: clientStats.uniqueUsers,
                 total_reservations: clientStats.totalReservations,
-                total_views: 0, // TODO: Implement view tracking
+                total_views: totalViews,
                 matches_completed: matchesCompleted,
                 matches_upcoming: matchesUpcoming,
                 average_occupancy: averageOccupancy,
+                trends,
             });
         } catch (error: any) {
             console.error("Error fetching analytics summary:", error);
             return ctx.json({ error: "Failed to fetch analytics", details: error.message }, 500);
+        }
+    });
+
+    // GET /partners/activity
+    readonly getRecentActivity = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        
+        try {
+            const limit = parseInt(ctx.req.query('limit') || '20', 10);
+            const activity = await this.repository.getRecentActivity(userId, limit);
+            return ctx.json({ activity });
+        } catch (error: any) {
+            console.error("Error fetching recent activity:", error);
+            return ctx.json({ error: "Failed to fetch recent activity", details: error.message }, 500);
         }
     });
 

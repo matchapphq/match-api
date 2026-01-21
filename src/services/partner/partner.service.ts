@@ -49,6 +49,7 @@ class PartnerService {
         this.router.get("/stats/customers", ...this.controller.getCustomerStats);
         this.router.get("/analytics/summary", ...this.controller.getAnalyticsSummary);
         this.router.get("/analytics/dashboard", ...this.controller.getAnalyticsDashboard);
+        this.router.get("/activity", ...this.controller.getRecentActivity);
 
         // Reservation Management (accept/decline PENDING reservations)
         this.router.patch("/reservations/:reservationId/status", ...this.controller.updateReservationStatus);
