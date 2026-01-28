@@ -13,7 +13,7 @@ import {
 import { venueMatchesTable } from "../config/db/matches.table";
 import { matchesTable } from "../config/db/matches.table";
 import { teamsTable } from "../config/db/sports.table";
-import { eq, and, sql, desc, inArray, lt } from "drizzle-orm";
+import { eq, and, sql, desc, inArray, lt, or } from "drizzle-orm";
 
 export class BoostRepository {
 
@@ -501,13 +501,32 @@ export class BoostRepository {
         // Quick summary for dashboard
         const available = await this.getAvailableBoostsCount(userId);
 
-        // Get active boosts count
+        // Get active boosts count (status = 'used' means currently active)
         const activeResult = await db.select({ count: sql<number>`count(*)` })
             .from(boostsTable)
             .where(and(
                 eq(boostsTable.user_id, userId),
                 eq(boostsTable.status, 'used')
             ));
+
+        // Get total used boosts count (used + expired)
+        const usedResult = await db.select({ count: sql<number>`count(*)` })
+            .from(boostsTable)
+            .where(and(
+                eq(boostsTable.user_id, userId),
+                or(
+                    eq(boostsTable.status, 'used'),
+                    eq(boostsTable.status, 'expired')
+                )
+            ));
+
+        // Get analytics summary for views and reservations
+        const analyticsSummary = await db.select({
+            total_views: sql<number>`COALESCE(SUM(views_during_boost), 0)`,
+            total_bookings: sql<number>`COALESCE(SUM(bookings_during_boost), 0)`,
+        })
+            .from(boostAnalyticsTable)
+            .where(eq(boostAnalyticsTable.user_id, userId));
 
         // Get last purchase date
         const lastPurchase = await db.select({ paid_at: boostPurchasesTable.paid_at })
@@ -522,6 +541,9 @@ export class BoostRepository {
         return {
             available_boosts: available,
             active_boosts: Number(activeResult[0]?.count) || 0,
+            total_boosts_used: Number(usedResult[0]?.count) || 0,
+            total_views_generated: Number(analyticsSummary[0]?.total_views) || 0,
+            total_reservations_generated: Number(analyticsSummary[0]?.total_bookings) || 0,
             last_purchase_date: lastPurchase[0]?.paid_at?.toISOString() || null,
         };
     }
