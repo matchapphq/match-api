@@ -400,10 +400,16 @@ class PartnerController {
     });
 
     // GET /partners/stats/customers
+    // Accepts ?period=7|30|90 query parameter (default: 30)
     readonly getCustomerStats = this.factory.createHandlers(async (ctx) => {
         const userId = ctx.get("user").id;
 
         try {
+            // Parse period from query params (default: 30 days)
+            const periodParam = ctx.req.query('period');
+            const period = periodParam ? parseInt(periodParam, 10) : 30;
+            const validPeriod = [7, 30, 90].includes(period) ? period : 30;
+
             const venueIds = await this.repository.getVenueIdsByOwnerId(userId);
             
             if (venueIds.length === 0) {
@@ -411,15 +417,15 @@ class PartnerController {
                     customerCount: 0,
                     totalGuests: 0,
                     totalReservations: 0,
-                    period: "last_30_days"
+                    period: validPeriod
                 });
             }
 
-            const stats = await this.repository.getCustomerCountLast30Days(venueIds);
+            const stats = await this.repository.getCustomerStats(venueIds, validPeriod);
 
             return ctx.json({
                 ...stats,
-                period: "last_30_days"
+                period: validPeriod
             });
         } catch (error: any) {
             console.error("Error fetching customer stats:", error);

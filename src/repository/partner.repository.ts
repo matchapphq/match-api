@@ -538,15 +538,17 @@ export class PartnerRepository {
      * Combines ownership verification and data fetching
      */
     /**
-     * Get customer count for last 30 days for given venue IDs
+     * Get customer count for a configurable period for given venue IDs
+     * @param venueIds - Array of venue IDs to get stats for
+     * @param days - Number of days to look back (default: 30)
      */
-    async getCustomerCountLast30Days(venueIds: string[]) {
+    async getCustomerStats(venueIds: string[], days: number = 30) {
         if (venueIds.length === 0) {
             return { customerCount: 0, totalGuests: 0, totalReservations: 0 };
         }
 
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
 
         // Get venue match IDs for these venues (no transaction needed)
         const venueMatches = await db.select({ id: venueMatchesTable.id })
@@ -559,7 +561,7 @@ export class PartnerRepository {
 
         const vmIds = venueMatches.map(vm => vm.id);
 
-        // Count unique customers and total guests in last 30 days
+        // Count unique customers and total guests in the specified period
         const stats = await db.select({
             uniqueCustomers: countDistinct(reservationsTable.user_id),
             totalReservations: count(reservationsTable.id),
@@ -568,7 +570,7 @@ export class PartnerRepository {
             .from(reservationsTable)
             .where(and(
                 inArray(reservationsTable.venue_match_id, vmIds),
-                gte(reservationsTable.created_at, thirtyDaysAgo)
+                gte(reservationsTable.created_at, startDate)
             ));
 
         return {
