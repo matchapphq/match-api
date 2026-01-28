@@ -28,6 +28,7 @@ import WebhooksService from "./services/webhooks/webhooks.service";
 import ReferralService from "./services/referral/referral.service";
 import BoostService from "./services/boost/boost.service";
 import fidelityService from "./services/fidelity/fidelity.service";
+import HealthService from "./services/health/health.service";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -52,6 +53,7 @@ const couponsRouter = new CouponsService();
 const webhooksRouter = new WebhooksService();
 const referralRouter = new ReferralService();
 const boostRouter = new BoostService();
+const healthRouter = new HealthService();
 
 const app = new Hono().basePath("/api");
 
@@ -62,7 +64,7 @@ app.use('*', cors({
 }));
 
 app.use(logger());
-app.get("/health", (c) => c.text("OK"));
+app.route("/health", healthRouter.getRouter);
 
 // Auth Middleware for protected routes
 

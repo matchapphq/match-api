@@ -15,6 +15,7 @@ import stripe, {
 } from "../../config/stripe";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import UserRepository from "../../repository/user.repository";
+import type { Context } from "hono";
 
 /**
  * Subscriptions Controller
@@ -58,6 +59,8 @@ class SubscriptionsController {
             const schema = z.object({
                 plan_id: z.enum(["monthly", "annual"]),
                 venue_id: z.string().uuid().optional(),
+                success_url: z.string().url().optional(),
+                cancel_url: z.string().url().optional(),
             });
             const parsed = schema.safeParse(value);
             if (!parsed.success) {
@@ -85,7 +88,7 @@ class SubscriptionsController {
                 );
             }
 
-            const { plan_id, venue_id } = ctx.req.valid("json");
+            const { plan_id, venue_id, success_url, cancel_url } = ctx.req.valid("json");
             const plan = getPlanById(plan_id);
 
             if (!plan || !plan.stripePriceId) {
@@ -147,12 +150,18 @@ class SubscriptionsController {
                           ];
 
                 // Log checkout parameters for debugging
-                console.log("Creating checkout session:", {
+                console.log("Creating generic checkout session:", {
                     user_id: user.id,
                     plan_id: plan_id,
                     venue_id: venue_id,
-                    plan_name: plan.name,
                 });
+
+                // Use provided redirect URLs or fallback to config
+                const finalSuccessUrl = success_url 
+                    ? `${success_url}?checkout=success&session_id={CHECKOUT_SESSION_ID}` 
+                    : `${CHECKOUT_URLS.SUCCESS}&session_id={CHECKOUT_SESSION_ID}`;
+                
+                const finalCancelUrl = cancel_url || CHECKOUT_URLS.CANCEL;
 
                 // Create Checkout Session
                 const session = await stripe.checkout.sessions.create({
@@ -164,8 +173,8 @@ class SubscriptionsController {
                     ],
                     mode: "subscription",
                     line_items: lineItems,
-                    success_url: `${CHECKOUT_URLS.SUCCESS}&session_id={CHECKOUT_SESSION_ID}`,
-                    cancel_url: CHECKOUT_URLS.CANCEL,
+                    success_url: finalSuccessUrl,
+                    cancel_url: finalCancelUrl,
                     metadata: {
                         user_id: user.id,
                         plan_id: plan_id,

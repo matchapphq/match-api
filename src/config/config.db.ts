@@ -1,6 +1,10 @@
-import { drizzle } from "drizzle-orm/neon-http";
+import { drizzle as neonDrizzle } from "drizzle-orm/neon-http";
+import { drizzle as pgDrizzle } from "drizzle-orm/node-postgres";
 import * as schema from "./db/schema";
 import { neon } from "@neondatabase/serverless";
+import { Pool } from "pg";
+import type { NodePgDatabase } from "drizzle-orm/node-postgres"; // Correct import
+import type { NeonHttpDatabase } from "drizzle-orm/neon-http";
 
 const getDatabaseConfig = () => {
     const config = {
@@ -24,6 +28,16 @@ const getDatabaseConfig = () => {
 const config = getDatabaseConfig();
 const connectionString = `postgres://${config.user}:${config.password}@${config.host}:${config.port}/${config.database}`;
 
+type Schema = typeof schema;
 
-const sql = neon(connectionString)
-export const db = drizzle({client: sql, schema});
+export function getDb(): NodePgDatabase<Schema> | NeonHttpDatabase<Schema> {
+    if (process.env.NODE_ENV === 'development') {
+        const pool = new Pool({ connectionString });
+        return pgDrizzle(pool, { schema }) as NodePgDatabase<Schema>;
+    } else {
+        const sql = neon(connectionString);
+        return neonDrizzle(sql, { schema }) as NeonHttpDatabase<Schema>;
+    }
+}
+
+export const db = getDb();

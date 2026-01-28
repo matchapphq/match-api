@@ -45,10 +45,10 @@ export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || "";
 export const CHECKOUT_URLS = {
     SUCCESS: process.env.FRONTEND_URL
         ? `${process.env.FRONTEND_URL}?checkout=success`
-        : "http://localhost:5173?checkout=success",
+        : "http://localhost:3001?checkout=success",
     CANCEL: process.env.FRONTEND_URL
         ? `${process.env.FRONTEND_URL}?checkout=cancel`
-        : "http://localhost:5173?checkout=cancel",
+        : "http://localhost:3001?checkout=cancel",
 } as const;
 
 /**

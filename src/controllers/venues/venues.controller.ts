@@ -6,6 +6,7 @@ import type { Context } from "hono";
 
 import { VenueRepository } from "../../repository/venue.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
+import { AnalyticsRepository } from "../../repository/analytics.repository";
 import {
     CreateVenueSchema,
     UpdateVenueSchema,
@@ -32,6 +33,7 @@ class VenueController {
     private readonly factory = createFactory<HonoEnv>();
     private readonly venueRepository = new VenueRepository();
     private readonly favoritesRepository = new FavoritesRepository();
+    private readonly analyticsRepository = new AnalyticsRepository();
 
     // Helper to get user ID from context (assuming auth middleware sets it)
     private getUserId(ctx: Context<HonoEnv>): string {
@@ -291,6 +293,17 @@ class VenueController {
         if (!venue) {
             return ctx.json({ error: "Venue not found" }, 404);
         }
+
+        // Track view event (non-blocking)
+        const user = ctx.get("user");
+        this.analyticsRepository.trackEvent({
+            venue_id: venueId,
+            user_id: user?.id,
+            event_type: 'venue_view',
+            event_name: 'View Venue Details',
+            user_agent: ctx.req.header('user-agent'),
+            ip_address: ctx.req.header('x-forwarded-for') || ctx.req.header('remote-addr'),
+        }).catch(err => console.error("Failed to track view event:", err));
 
         // Logic to return stats if needed (currently included in venue object from DB if joined, or we can fetch separately)
         // For now, returning the venue object which matches schemas.

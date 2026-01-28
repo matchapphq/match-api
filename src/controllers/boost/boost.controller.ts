@@ -349,6 +349,7 @@ class BoostController {
     /**
      * POST /boosts/purchase/verify
      * Verify a Stripe payment after checkout
+     * Also creates boosts if payment is confirmed but boosts don't exist (fallback for webhooks)
      */
     readonly verifyPurchase = this.factory.createHandlers(async (ctx) => {
         const userId = ctx.get('user').id;
@@ -361,10 +362,53 @@ class BoostController {
                 return ctx.json({ error: "session_id is required" }, 400);
             }
 
+            // First verify the purchase exists
             const result = await boostRepository.verifyPurchase(session_id, userId);
 
             if (!result.success) {
                 return ctx.json({ success: false, error: result.error }, 404);
+            }
+
+            // Check if boosts need to be created (fallback for when webhook hasn't processed yet)
+            const purchase = result.purchase;
+            if (purchase && purchase.payment_status === 'pending') {
+                // Retrieve the Stripe session to check payment status
+                try {
+                    const stripeSession = await stripe.checkout.sessions.retrieve(session_id);
+                    
+                    if (stripeSession.payment_status === 'paid') {
+                        // Update purchase and create boosts
+                        const purchaseId = purchase.id;
+                        await boostRepository.updatePurchase(purchaseId, {
+                            payment_status: 'paid',
+                            payment_intent_id: stripeSession.payment_intent as string,
+                            stripe_customer_id: stripeSession.customer as string,
+                            paid_at: new Date(),
+                        });
+
+                        // Create the boosts
+                        const boostIds = await boostRepository.createBoostsFromPurchase(
+                            purchaseId,
+                            userId,
+                            purchase.quantity,
+                            'stripe_payment'
+                        );
+
+                        console.log(`Created ${boostIds.length} boosts for user ${userId} from purchase ${purchaseId} (via verify fallback)`);
+
+                        // Return updated result
+                        return ctx.json({
+                            success: true,
+                            purchase: {
+                                ...purchase,
+                                payment_status: 'paid',
+                            },
+                            boosts_created: boostIds.length,
+                        });
+                    }
+                } catch (stripeError: any) {
+                    console.error("Error checking Stripe session:", stripeError.message);
+                }
             }
 
             return ctx.json(result);
