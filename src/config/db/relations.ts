@@ -16,6 +16,8 @@ import { reviewsTable, reviewHelpfulTable } from './reviews.table';
 import { notificationsTable, conversationsTable, messagesTable } from './notifications.table';
 import { paymentMethodsTable, invoicesTable, transactionsTable } from './billing.table';
 import { analyticsTable, auditLogsTable, bannedUsersTable } from './admin.table';
+import { referralCodesTable, referralsTable, referralStatsTable, boostsTable } from './referral.table';
+import { boostPurchasesTable, boostPricesTable, boostAnalyticsTable } from './boost.table';
 
 export const usersRelations = relations(usersTable, ({ one, many }) => ({
     preferences: one(userPreferencesTable, {
@@ -324,3 +326,77 @@ export const waitlistRelations = relations(waitlistTable, ({ one }) => ({
         references: [venueMatchesTable.id],
     }),
 }));
+
+// ============================================
+// REFERRAL RELATIONS
+// ============================================
+
+export const referralCodesRelations = relations(referralCodesTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [referralCodesTable.user_id],
+        references: [usersTable.id],
+    }),
+}));
+
+export const referralsRelations = relations(referralsTable, ({ one }) => ({
+    referrer: one(usersTable, {
+        fields: [referralsTable.referrer_id],
+        references: [usersTable.id],
+        relationName: 'referrer',
+    }),
+    referredUser: one(usersTable, {
+        fields: [referralsTable.referred_user_id],
+        references: [usersTable.id],
+        relationName: 'referredUser',
+    }),
+}));
+
+export const referralStatsRelations = relations(referralStatsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [referralStatsTable.user_id],
+        references: [usersTable.id],
+    }),
+}));
+
+export const boostsRelations = relations(boostsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [boostsTable.user_id],
+        references: [usersTable.id],
+    }),
+    venueMatch: one(venueMatchesTable, {
+        fields: [boostsTable.venue_match_id],
+        references: [venueMatchesTable.id],
+    }),
+    purchase: one(boostPurchasesTable, {
+        fields: [boostsTable.purchase_id],
+        references: [boostPurchasesTable.id],
+    }),
+    referral: one(referralsTable, {
+        fields: [boostsTable.referral_id],
+        references: [referralsTable.id],
+    }),
+}));
+
+export const boostPurchasesRelations = relations(boostPurchasesTable, ({ one, many }) => ({
+    user: one(usersTable, {
+        fields: [boostPurchasesTable.user_id],
+        references: [usersTable.id],
+    }),
+    boosts: many(boostsTable),
+}));
+
+export const boostAnalyticsRelations = relations(boostAnalyticsTable, ({ one }) => ({
+    boost: one(boostsTable, {
+        fields: [boostAnalyticsTable.boost_id],
+        references: [boostsTable.id],
+    }),
+    venueMatch: one(venueMatchesTable, {
+        fields: [boostAnalyticsTable.venue_match_id],
+        references: [venueMatchesTable.id],
+    }),
+    user: one(usersTable, {
+        fields: [boostAnalyticsTable.user_id],
+        references: [usersTable.id],
+    }),
+}));
+

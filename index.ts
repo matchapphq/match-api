@@ -1,6 +1,12 @@
 import app from "./src/server";
+import isEnvsDefined from "./src/utils/checkEnv";
+
+if (!isEnvsDefined()) {
+    console.error("[ERROR]: Environment variables are not defined.");
+    process.exit(84);
+}
 
 Bun.serve({
-    port:8008,
+    port: parseInt(Bun.env.PORT || "8008"),
     fetch: app.fetch,
 })

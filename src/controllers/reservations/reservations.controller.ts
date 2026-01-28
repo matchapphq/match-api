@@ -1,5 +1,6 @@
 import { createFactory } from "hono/factory";
 import { validator } from "hono/validator";
+import { z } from "zod";
 import type { HonoEnv } from "../../types/hono.types";
 import { CapacityRepository } from "../../repository/capacity.repository";
 import { ReservationRepository } from "../../repository/reservation.repository";
@@ -12,12 +13,18 @@ class ReservationsController {
     private readonly capacityRepo = new CapacityRepository();
     private readonly reservationRepo = new ReservationRepository();
     private readonly waitlistRepo = new WaitlistRepository();
+    private readonly qrUtils = {
+        createQRPayload,
+        generateQRCodeImage,
+        parseQRContent,
+        verifyQRPayload
+    };
 
     /**
-     * 1. Hold Capacity (Atomic - handles concurrent requests safely)
-     * Decrements available capacity atomically to prevent overbooking
+     * 1. Create Reservation (instant or request mode)
+     * Backend decides PENDING vs CONFIRMED based on venue.booking_mode
      */
-    readonly holdTable = this.factory.createHandlers(validator('json', (value, c) => {
+    readonly create = this.factory.createHandlers(validator('json', (value, c) => {
         const parsed = HoldTableSchema.safeParse(value);
         if (!parsed.success) return c.json({ error: parsed.error }, 400);
         return parsed.data;
@@ -25,128 +32,127 @@ class ReservationsController {
         const user = c.get('user');
         if (!user || !user.id) return c.json({ error: "Unauthorized" }, 401);
 
-        const { venueMatchId, partySize } = c.req.valid('json');
+        const { venueMatchId, partySize, requiresAccessibility, specialRequests } = c.req.valid('json');
 
-        // Check availability first
+        // Get venue match details including venue's booking_mode
+        const venueMatch = await this.capacityRepo.getVenueMatch(venueMatchId);
+        if (!venueMatch) {
+            return c.json({ error: "Venue match not found" }, 404);
+        }
+
+        // Get venue booking mode (default to INSTANT if not set)
+        const bookingMode = venueMatch.venue?.booking_mode || 'INSTANT';
+
+        // Check availability
         const availability = await this.capacityRepo.checkAvailability(venueMatchId, partySize);
         
         if (!availability.available) {
             return c.json({ 
                 error: availability.message || "No capacity available",
-                canJoinWaitlist: true,
                 availableCapacity: availability.availableCapacity,
                 maxGroupSize: availability.maxGroupSize,
-                message: "Would you like to join the waitlist? You'll be notified when space becomes available."
             }, 409);
         }
 
-        // Create atomic hold
-        const result = await this.capacityRepo.createHold(venueMatchId, user.id, partySize);
-
-        if (!result.success || !result.hold) {
-            return c.json({ 
-                error: result.message || "Failed to create hold",
-                canJoinWaitlist: true
-            }, 409);
-        }
-
-        return c.json({
-            message: "Reservation held for 15 minutes. Please confirm your booking.",
-            holdId: result.hold.id,
-            expiresAt: result.hold.expiresAt,
-            partySize: result.hold.partySize,
-            venueMatchId: result.hold.venueMatchId
-        });
-    });
-
-    /**
-     * 2. Confirm Reservation from Hold
-     * Converts a temporary hold into a confirmed reservation with signed QR code
-     */
-    readonly confirmReservation = this.factory.createHandlers(validator('json', (value, c) => {
-        const parsed = ConfirmReservationSchema.safeParse(value);
-        if (!parsed.success) return c.json({ error: parsed.error }, 400);
-        return parsed.data;
-    }), async (c) => {
-        const user = c.get('user');
-        if (!user || !user.id) return c.json({ error: "Unauthorized" }, 401);
-
-        const { holdId, specialRequests } = c.req.valid('json');
-
-        // Get and validate hold
-        const hold = this.capacityRepo.getHold(holdId);
-
-        if (!hold) {
-            return c.json({ error: "Hold not found or expired" }, 404);
-        }
-
-        if (hold.userId !== user.id) {
-            return c.json({ error: "Forbidden" }, 403);
-        }
-
-        // Confirm the hold (moves capacity from held to reserved)
-        const confirmResult = await this.capacityRepo.confirmHold(holdId);
-        
-        if (!confirmResult.success) {
-            return c.json({ error: confirmResult.message || "Failed to confirm hold" }, 400);
-        }
-
-        // Get venue match details for context
-        const venueMatch = await this.capacityRepo.getVenueMatch(hold.venueMatchId);
-        const matchStartTime = venueMatch?.match?.scheduled_at 
+        // Generate reservation ID
+        const reservationId = crypto.randomUUID();
+        const matchStartTime = venueMatch.match?.scheduled_at 
             ? new Date(venueMatch.match.scheduled_at)
             : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-        // Generate reservation ID first so we can create QR payload
-        const reservationId = crypto.randomUUID();
+        if (bookingMode === 'INSTANT') {
+            // INSTANT mode: Create hold and immediately confirm
+            const holdResult = await this.capacityRepo.createHold(venueMatchId, user.id, partySize);
+            
+            if (!holdResult.success || !holdResult.hold) {
+                return c.json({ 
+                    error: holdResult.message || "Failed to reserve capacity"
+                }, 409);
+            }
 
-        // Generate signed QR code payload BEFORE creating reservation
-        const qrPayload = createQRPayload(
-            reservationId,
-            user.id,
-            hold.venueMatchId,
-            "", // No table_id
-            matchStartTime
-        );
-        const qrPayloadString = JSON.stringify(qrPayload);
+            // Confirm the hold immediately
+            const confirmResult = await this.capacityRepo.confirmHold(holdResult.hold.id);
+            if (!confirmResult.success) {
+                return c.json({ error: confirmResult.message || "Failed to confirm reservation" }, 400);
+            }
 
-        // Create reservation record with QR code included
-        const reservation = await this.reservationRepo.createWithQR(
-            reservationId,
-            user.id, 
-            hold.venueMatchId, 
-            hold.partySize, 
-            specialRequests || "",
-            qrPayloadString
-        );
+            // Generate QR code for confirmed reservation
+            const qrPayload = createQRPayload(
+                reservationId,
+                user.id,
+                venueMatchId,
+                "",
+                matchStartTime
+            );
+            const qrPayloadString = JSON.stringify(qrPayload);
 
-        if (!reservation) {
-            // Rollback: release the capacity
-            await this.capacityRepo.releaseReservedCapacity(hold.venueMatchId, hold.partySize);
-            return c.json({ error: "Failed to create reservation" }, 500);
+            // Create reservation with CONFIRMED status
+            const reservation = await this.reservationRepo.createWithQR(
+                reservationId,
+                user.id, 
+                venueMatchId, 
+                partySize, 
+                specialRequests || "",
+                qrPayloadString
+            );
+
+            if (!reservation) {
+                await this.capacityRepo.releaseReservedCapacity(venueMatchId, partySize);
+                return c.json({ error: "Failed to create reservation" }, 500);
+            }
+
+            const qrCodeImage = await generateQRCodeImage(qrPayload);
+
+            return c.json({
+                message: "Reservation confirmed! Show this QR code at the venue.",
+                reservation: {
+                    id: reservation.id,
+                    status: 'CONFIRMED',
+                    partySize,
+                    venueMatchId,
+                    venue: venueMatch.venue?.name,
+                    match: venueMatch.match ? {
+                        scheduledAt: venueMatch.match.scheduled_at
+                    } : null
+                },
+                qr_code: qrCodeImage
+            }, 201);
+        } else {
+            // REQUEST mode: Create reservation as PENDING
+            // No capacity hold yet - venue owner will confirm
+            const reservation = await this.reservationRepo.createPending(
+                reservationId,
+                user.id,
+                venueMatchId,
+                partySize,
+                specialRequests || "",
+                requiresAccessibility ?? false
+            );
+
+            if (!reservation) {
+                return c.json({ error: "Failed to create reservation request" }, 500);
+            }
+
+            // TODO: Notify venue owner of new reservation request
+
+            return c.json({
+                message: "Reservation request submitted. The venue will confirm shortly.",
+                reservation: {
+                    id: reservation.id,
+                    status: 'PENDING',
+                    partySize,
+                    venueMatchId,
+                    venue: venueMatch.venue?.name,
+                    match: venueMatch.match ? {
+                        scheduledAt: venueMatch.match.scheduled_at
+                    } : null
+                }
+            }, 201);
         }
-        
-        // Generate image for response only
-        const qrCodeImage = await generateQRCodeImage(qrPayload);
-        
-        return c.json({
-            message: "Reservation confirmed! Show this QR code at the venue.",
-            reservation: {
-                id: reservation.id,
-                status: 'confirmed',
-                partySize: hold.partySize,
-                venueMatchId: hold.venueMatchId,
-                venue: venueMatch?.venue?.name,
-                match: venueMatch?.match ? {
-                    scheduledAt: venueMatch.match.scheduled_at
-                } : null
-            },
-            qrCode: qrCodeImage
-        });
     });
 
     /**
-     * 3. List User Reservations
+     * 4. List User Reservations
      */
     readonly list = this.factory.createHandlers(async (c) => {
         const user = c.get('user');
@@ -440,6 +446,7 @@ class ReservationsController {
             stats
         });
     });
+
 }
 
 export default ReservationsController;

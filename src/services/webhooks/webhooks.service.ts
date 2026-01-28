@@ -16,7 +16,7 @@ class WebhooksService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         this.router.post("/stripe", ...this.controller.handleStripeWebhook);
     }
 }

@@ -5,8 +5,19 @@ import { createFactory } from "hono/factory";
 import type { userRegisterData } from "../../utils/userData";
 import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
-import { setCookie, getCookie, setSignedCookie, deleteCookie, getSignedCookie } from "hono/cookie";
-import { RegisterRequestSchema, LoginRequestSchema } from "../../utils/auth.valid";
+import {
+    setCookie,
+    setSignedCookie,
+    deleteCookie,
+    getSignedCookie,
+} from "hono/cookie";
+import {
+    RegisterRequestSchema,
+    LoginRequestSchema,
+} from "../../utils/auth.valid";
+import referralRepository from "../../repository/referral.repository";
+import AuthRepository from "../../repository/auth/auth.repository";
+import { userOnaboarding } from "./auth.helper";
 
 /**
  * Controller for Authentication operations.
@@ -16,122 +27,231 @@ class AuthController {
     private readonly factory = createFactory();
     private readonly userRepository = new UserRepository();
     private readonly tokenRepository = new TokenRepository();
+    private readonly authRepository = new AuthRepository();
 
-    readonly register = this.factory.createHandlers(validator("json", (value, ctx) => {
-        const parsed = RegisterRequestSchema.safeParse(value);
-        if (!parsed.success) {
-            return ctx.json({ error: "Invalid request body", details: parsed.error }, 401);
-        }
-        return parsed.data;
-    }), async (ctx) => {
-        const body = ctx.req.valid("json");
+    public readonly register = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const parsed = RegisterRequestSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json(
+                    { error: "Invalid request body", details: parsed.error },
+                    401,
+                );
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const body = ctx.req.valid("json");
 
-        // Check if user already exists
-        const existingUser = await this.userRepository.getUserByEmail(body.email);
-        if (existingUser) {
-            return ctx.json({ error: "User with this email already exists" }, 409);
-        }
-
-        const userRequest: userRegisterData = {
-            ...body,
-            role: body.role as 'user' | 'venue_owner' | 'admin' || 'user'
-        };
-
-        try {
-            const user = await this.userRepository.createUser(userRequest);
-            if (!user || !user.first_name) {
-                return ctx.json({ error: "Failed to create user" }, 500);
+            // Check if user already exists
+            const existingUser = await this.userRepository.getUserByEmail(
+                body.email,
+            );
+            if (existingUser) {
+                return ctx.json(
+                    { error: "User with this email already exists" },
+                    409,
+                );
             }
 
-            // Generate Tokens
-            const tokenPayload = { id: user.id, email: user.email, role: user.role, firstName: user.first_name };
+            const userRequest: userRegisterData = {
+                ...body,
+                role: (body.role as "user" | "venue_owner" | "admin") || "user",
+            };
 
-            const deviceId = ctx.req.header("User-Agent") || "Unknown";
+            try {
+                const user = await this.userRepository.createUser({
+                    ...userRequest,
+                    role: body.role,
+                });
+                if (!user || !user.first_name) {
+                    return ctx.json({ error: "Failed to create user" }, 500);
+                }
+
+                if (body.role === "venue_owner") {
+                    // Optional referral code handling (non-blocking)
+                    if (body.referralCode) {
+                        try {
+                            const referralResult =
+                                await referralRepository.registerReferral(
+                                    body.referralCode,
+                                    user.id,
+                                );
+                            if (!referralResult.success) {
+                                console.warn(
+                                    "Referral registration failed:",
+                                    referralResult.error,
+                                );
+                            }
+                        } catch (referralError) {
+                            console.error(
+                                "Referral registration exception:",
+                                referralError,
+                            );
+                            // Do not block user creation if referral flow fails
+                        }
+                    }
+                } else if (body.role === "user") {
+                    await userOnaboarding(body, this.authRepository, user.id);
+                }
+
+                // Generate Tokens
+                const tokenPayload = {
+                    id: user.id,
+                    email: user.email,
+                    role: user.role,
+                    firstName: user.first_name,
+                };
+
+                const deviceId = ctx.req.header("User-Agent") || "Unknown";
+
+                const [accessToken, refreshToken] = await Promise.all([
+                    JwtUtils.generateAccessToken(tokenPayload),
+                    JwtUtils.generateRefreshToken(tokenPayload),
+                ]);
+
+                await this.tokenRepository.createToken(
+                    refreshToken,
+                    user.id,
+                    deviceId,
+                );
+
+                await Promise.all([
+                    setSignedCookie(
+                        ctx,
+                        "refresh_token",
+                        refreshToken,
+                        JwtUtils.REFRESH_JWT_SIGN_KEY,
+                        {
+                            httpOnly: true,
+                            secure: process.env.NODE_ENV === "production",
+                            sameSite: "Strict",
+                            path: "/auth/refresh",
+                            maxAge: JwtUtils.REFRESH_TOKEN_EXP,
+                        },
+                    ),
+                    setSignedCookie(
+                        ctx,
+                        "access_token",
+                        accessToken,
+                        JwtUtils.ACCESS_JWT_SIGN_KEY,
+                        {
+                            httpOnly: true,
+                            secure: process.env.NODE_ENV === "production",
+                            sameSite: "Strict",
+                            path: "/",
+                            maxAge: JwtUtils.ACCESS_TOKEN_EXP,
+                        },
+                    ),
+                ]);
+
+                return ctx.json({ user, token: accessToken }, 201);
+            } catch (error) {
+                console.error("Registration error:", error);
+                return ctx.json({ error: "Registration failed" }, 500);
+            }
+        },
+    );
+
+    public readonly login = this.factory.createHandlers(
+        validator("json", (value, ctx) => {
+            const parsed = LoginRequestSchema.safeParse(value);
+            if (!parsed.success) {
+                return ctx.json(
+                    { error: "Invalid request body", details: parsed.error },
+                    400,
+                );
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const body = ctx.req.valid("json");
+            const user = await this.userRepository.getUserByEmail(body.email);
+
+            if (!user) {
+                return ctx.json({ error: "Invalid email or password" }, 401);
+            }
+
+            const passwordMatch = await password.verify(
+                body.password,
+                user.password_hash,
+            );
+            if (!passwordMatch) {
+                return ctx.json({ error: "Invalid email or password" }, 401);
+            }
+
+            const tokenPayload = {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                firstName: user.first_name,
+            };
 
             const [accessToken, refreshToken] = await Promise.all([
                 JwtUtils.generateAccessToken(tokenPayload),
-                JwtUtils.generateRefreshToken(tokenPayload)
+                JwtUtils.generateRefreshToken(tokenPayload),
             ]);
 
-            await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
-          
+            const deviceId = ctx.req.header("User-Agent") || "Unknown";
+
+            await this.tokenRepository.createToken(
+                refreshToken,
+                user.id,
+                deviceId,
+            );
+
             await Promise.all([
-              setSignedCookie(ctx, "refresh_token", refreshToken, JwtUtils.REFRESH_JWT_SIGN_KEY, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: "Strict",
-                path: "/auth/refresh",
-                maxAge: JwtUtils.REFRESH_TOKEN_EXP
-              }),
-              setSignedCookie(ctx, "access_token", accessToken, JwtUtils.ACCESS_JWT_SIGN_KEY, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: "Strict",
-                path: "/",
-                maxAge: JwtUtils.ACCESS_TOKEN_EXP
-              })
-            ])
-
-            return ctx.json({ user }, 201);
-        } catch (error) {
-            console.error("Registration error:", error);
-            return ctx.json({ error: "Registration failed" }, 500);
-        }
-    })
-
-    readonly login = this.factory.createHandlers(validator('json', (value, ctx) => {
-        const parsed = LoginRequestSchema.safeParse(value);
-        if (!parsed.success) {
-            return ctx.json({ error: "Invalid request body", details: parsed.error }, 400)
-        }
-        return parsed.data;
-    }), async (ctx) => {
-        const body = ctx.req.valid("json");
-        const user = await this.userRepository.getUserByEmail(body.email);
-
-        if (!user ||!user.first_name) {
-            return ctx.json({ error: "Invalid email or password" }, 401)
-        }
-
-        const passwordMatch = await password.verify(body.password, user.password_hash);
-        if (!passwordMatch) {
-            return ctx.json({ error: "Invalid email or password" }, 401)
-        }
-
-        const tokenPayload = { id: user.id, email: user.email, role: user.role, firstName: user.first_name};
-        const [accessToken, refreshToken] = await Promise.all([
-            JwtUtils.generateAccessToken(tokenPayload),
-            JwtUtils.generateRefreshToken(tokenPayload)
-        ])
-
-        const deviceId = ctx.req.header("User-Agent") || "Unknown";
-
-        await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
-        
-        await Promise.all([
-          setSignedCookie(ctx, "access_token", accessToken, JwtUtils.ACCESS_JWT_SIGN_KEY, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: "Strict",
-            path: "/",
-            maxAge: JwtUtils.ACCESS_TOKEN_EXP
-          }),
-          setSignedCookie(ctx, "refresh_token", refreshToken, JwtUtils.REFRESH_JWT_SIGN_KEY, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: "Strict",
-            path: "/auth/refresh",
-            maxAge: JwtUtils.REFRESH_TOKEN_EXP
-          })
-        ]);
+                setSignedCookie(
+                    ctx,
+                    "access_token",
+                    accessToken,
+                    JwtUtils.ACCESS_JWT_SIGN_KEY,
+                    {
+                        httpOnly: true,
+                        secure: process.env.NODE_ENV === "production",
+                        sameSite: "Strict",
+                        path: "/",
+                        maxAge: JwtUtils.ACCESS_TOKEN_EXP,
+                    },
+                ),
+                setSignedCookie(
+                    ctx,
+                    "refresh_token",
+                    refreshToken,
+                    JwtUtils.REFRESH_JWT_SIGN_KEY,
+                    {
+                        httpOnly: true,
+                        secure: process.env.NODE_ENV === "production",
+                        sameSite: "Strict",
+                        path: "/auth/refresh",
+                        maxAge: JwtUtils.REFRESH_TOKEN_EXP,
+                    },
+                ),
+            ]);
 
         return ctx.json({
-            user: { id: user.id, email: user.email, role: user.role }, // returning partial user for safety
+            user: { id: user.id, email: user.email, role: user.role, firstName: user.first_name },
+            token: accessToken,
+            refresh_token: refreshToken
         });
     });
 
-    readonly refreshToken = this.factory.createHandlers(async (ctx) => {
-        const oldRefreshToken = await getSignedCookie(ctx, JwtUtils.REFRESH_JWT_SIGN_KEY, 'refresh_token');
+    public readonly refreshToken = this.factory.createHandlers(async (ctx) => {
+        let oldRefreshToken = await getSignedCookie(
+            ctx,
+            JwtUtils.REFRESH_JWT_SIGN_KEY,
+            "refresh_token",
+        );
+
+        if (!oldRefreshToken) {
+            try {
+                const body = await ctx.req.json();
+                oldRefreshToken = body.refresh_token;
+            } catch (e) {
+                // Ignore json parse error, maybe it was just missing
+                console.error("Invalid request body:", e);
+            }
+        }
 
         if (!oldRefreshToken) {
             return ctx.json({ error: "Refresh token is required" }, 401);
@@ -144,7 +264,9 @@ class AuthController {
 
         // Consistency check: Verify token exists in DB and matches
         // We retrieve all tokens for the user and check if any match the provided refresh token.
-        const dbTokens = await this.tokenRepository.getAllTokensByUserId(payload.id);
+        const dbTokens = await this.tokenRepository.getAllTokensByUserId(
+            payload.id,
+        );
 
         if (!dbTokens || dbTokens.length === 0) {
             // Token claimed to be valid (signature-wise) but no record in DB -> Revoked or invalid state
@@ -153,7 +275,10 @@ class AuthController {
 
         let matchedToken = null;
         for (const t of dbTokens) {
-            const isValid = await password.verify(oldRefreshToken, t.hash_token);
+            const isValid = await password.verify(
+                oldRefreshToken,
+                t.hash_token,
+            );
             if (isValid) {
                 matchedToken = t;
                 break;
@@ -168,44 +293,54 @@ class AuthController {
         }
 
         // Generate new tokens (Rotate)
-        const newPayload = { id: payload.id, email: payload.email, role: payload.role, firstName: payload.firstName };
+        const newPayload = {
+            id: payload.id,
+            email: payload.email,
+            role: payload.role,
+            firstName: payload.firstName,
+        };
         const [newAccessToken, newRefreshToken] = await Promise.all([
             JwtUtils.generateAccessToken(newPayload),
-            JwtUtils.generateRefreshToken(newPayload)
+            JwtUtils.generateRefreshToken(newPayload),
         ]);
 
         // Update the existing token record (the matched one)
-        const deviceId = ctx.req.header("User-Agent") || matchedToken.device || "Unknown";
-        await this.tokenRepository.updateToken(newRefreshToken, payload.id, deviceId, matchedToken.id);
+        const deviceId =
+            ctx.req.header("User-Agent") || matchedToken.device || "Unknown";
+        await this.tokenRepository.updateToken(
+            newRefreshToken,
+            payload.id,
+            deviceId,
+            matchedToken.id,
+        );
 
         setCookie(ctx, "refresh_token", newRefreshToken, {
             httpOnly: true,
             secure: true,
             sameSite: "lax",
             path: "/auth/refresh",
-            maxAge: JwtUtils.REFRESH_TOKEN_EXP
+            maxAge: JwtUtils.REFRESH_TOKEN_EXP,
         });
 
         ctx.header("Authorization", `Bearer ${newAccessToken}`);
 
         return ctx.json({
             token: newAccessToken,
-            refresh_token: newRefreshToken
+            refresh_token: newRefreshToken,
         });
     });
 
     readonly logout = this.factory.createHandlers(async (ctx) => {
-        // In JWT stateless auth, logout is client-side. 
+        // In JWT stateless auth, logout is client-side.
         // Optional: Blacklist token in Redis if implemented.
         deleteCookie(ctx, "refresh_token");
         deleteCookie(ctx, "access_token");
         return ctx.json({ message: "Logged out successfully" });
     });
 
-    // Stubs for other methods
+    // Stub - use /users/me instead
     readonly getMe = this.factory.createHandlers(async (ctx) => {
-        // Middleware should have attached user to context
-        return ctx.json({ msg: "Current user profile" });
+        return ctx.json({ msg: "Use /users/me endpoint instead" }, 301);
     });
 
     readonly updateMe = this.factory.createHandlers(async (ctx) => {

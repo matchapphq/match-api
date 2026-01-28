@@ -16,7 +16,7 @@ class CouponsService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         this.router.get("/validate", ...this.controller.validateCoupon);
     }
 }

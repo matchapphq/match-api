@@ -5,8 +5,7 @@ import { authMiddleware } from "./middleware/auth.middleware";
 
 
 import AuthService from "./services/auth/auth.service";
-import UserService from "./services/user/user.service"; // Renamed from ProfileService
-import OnboardingService from "./services/onboarding/onboarding.service";
+import UserService from "./services/user/user.service";
 import DiscoveryService from "./services/discovery/discovery.service";
 import VenueService from "./services/venues/venues.service";
 import MatchesService from "./services/matches/matches.service";
@@ -26,10 +25,13 @@ import BillingService from "./services/billing/billing.service";
 import AnalyticsService from "./services/analytics/analytics.service";
 import CouponsService from "./services/coupons/coupons.service";
 import WebhooksService from "./services/webhooks/webhooks.service";
+import ReferralService from "./services/referral/referral.service";
+import BoostService from "./services/boost/boost.service";
+import fidelityService from "./services/fidelity/fidelity.service";
+import HealthService from "./services/health/health.service";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
-const onboardingRouter = new OnboardingService();
 const discoveryRouter = new DiscoveryService();
 const venueRouter = new VenueService();
 const matchesRouter = new MatchesService();
@@ -49,32 +51,61 @@ const billingRouter = new BillingService();
 const analyticsRouter = new AnalyticsService();
 const couponsRouter = new CouponsService();
 const webhooksRouter = new WebhooksService();
+const referralRouter = new ReferralService();
+const boostRouter = new BoostService();
+const healthRouter = new HealthService();
 
 const app = new Hono().basePath("/api");
 
 // CORS - must be first (with credentials for cookies)
 app.use('*', cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', "matchapp.fr", process.env.VPS_URL as string],
   credentials: true,
 }));
 
 app.use(logger());
-app.get("/health", (c) => c.text("OK"));
+app.route("/health", healthRouter.getRouter);
 
 // Auth Middleware for protected routes
 
 app.use('/partners/*', authMiddleware);
 app.use('/users/*', authMiddleware);
 app.use('/reservations/*', authMiddleware);
+app.use('/fidelity/*', authMiddleware);
 
 // Mount routes
 // Base: /api is usually handled by the entry point or Nginx, but here we assume app is mounted at /api or root. 
 // If root, routes are /auth, /users, etc.
 app.route("/auth", authRouter.getRouter);
 app.route("/users", userRouter.getRouter); // Replaces /profile for user-centric routes
-app.route("/onboarding", onboardingRouter.getRouter);
 app.route("/discovery", discoveryRouter.getRouter);
 app.route("/venues", venueRouter.getRouter);
+// Global amenities route (public) - direct DB query
+app.get("/amenities", async (c) => {
+    try {
+        const { VenueRepository } = await import("./repository/venue.repository");
+        const venueRepository = new VenueRepository();
+        const amenities = await venueRepository.getAllAmenities();
+        
+        // Group by category
+        const categories: Record<string, { slug: string; name: string; amenities: string[] }> = {};
+        for (const amenity of amenities) {
+            if (!categories[amenity.category]) {
+                categories[amenity.category] = {
+                    slug: amenity.category,
+                    name: amenity.category.charAt(0).toUpperCase() + amenity.category.slice(1),
+                    amenities: [],
+                };
+            }
+            categories[amenity.category]!.amenities.push(amenity.id);
+        }
+        
+        return c.json({ amenities, categories: Object.values(categories) });
+    } catch (error) {
+        console.error("Get all amenities error:", error);
+        return c.json({ error: "Failed to fetch amenities" }, 500);
+    }
+});
 app.route("/matches", matchesRouter.getRouter);
 app.route("/sports", sportsRouter.getRouter);
 app.route("/leagues", leaguesRouter.getRouter);
@@ -122,5 +153,14 @@ app.route("/venues/:venueId/analytics", analyticsRouter.getRouter);
 // Now we strictly want /venues/:venueId/seats
 app.route("/venues/:venueId/seats", seatsRouter.getRouter);
 // Note: if SeatService defines "/" as get seats, this works.
+
+// Referral System (for venue owners)
+app.route("/referral", referralRouter.getRouter);
+
+// Boost System (for venue owners)
+app.route("/boosts", boostRouter.getRouter);
+
+// Fidelity System (loyalty points, badges, challenges)
+app.route("/fidelity", fidelityService);
 
 export default app;

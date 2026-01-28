@@ -15,6 +15,7 @@ export const usersTable = pgTable(
         password_hash: varchar('password_hash', { length: 255 }).notNull(),
 
         // Profile
+        username: varchar('username', { length: 100 }),
         first_name: varchar('first_name', { length: 100 }),
         last_name: varchar('last_name', { length: 100 }),
         phone: varchar('phone', { length: 20 }),
@@ -66,6 +67,11 @@ export const userPreferencesTable = pgTable(
         // Interests
         fav_sports: jsonb('fav_sports').$type<string[] | null>(),
         fav_team_ids: jsonb('fav_team_ids').$type<string[] | null>(),
+        
+        ambiances: jsonb('ambiances').$type<string[] | null>(),
+        budget: varchar('budget', { length: 50 }),
+        venue_types: jsonb('venue_types').$type<string[] | null>(),
+
 
         // Notifications
         notification_settings: jsonb('notification_settings').default({

@@ -5,6 +5,7 @@ node_modules
 out
 dist
 *.tgz
+target/
 
 # code coverage
 coverage
@@ -17,10 +18,13 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # dotenv environment variable files
 .env
+.env.dev
+.env.prod
 .env.development.local
 .env.test.local
 .env.production.local
 .env.local
+.env.example
 
 # caches
 .eslintcache
@@ -39,3 +43,9 @@ drizzle/
 .vscode/
 postman/
 scripts/seed.ts
+scripts/
+*.txt
+INTE_PLAN.md
+API_VERIFICATION_REPORT.md
+seeds/
+

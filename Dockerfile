@@ -10,4 +10,6 @@ COPY . .
 
 EXPOSE 8001
 
-ENTRYPOINT [ "bun", "dev" ]
+#ENTRYPOINT ["sh", "-c", "(bun run db:generate || true) && (bun run db:migrate || true) && (bun run db:seed || true) && bun run dev"]
+
+ENTRYPOINT ["sh", "-c", "bun run start"]

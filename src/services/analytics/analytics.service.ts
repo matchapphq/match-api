@@ -20,7 +20,7 @@ class AnalyticsService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // All analytics routes require authentication
         this.router.use("/*", authMiddleware);
 

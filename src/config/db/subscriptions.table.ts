@@ -34,6 +34,9 @@ export const subscriptionsTable = pgTable(
         // Auto-renewal
         auto_renew: boolean('auto_renew').default(true),
 
+        // Commitment period (1 year minimum engagement)
+        commitment_end_date: timestamp('commitment_end_date', { withTimezone: true }),
+
         // Metadata
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
         updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

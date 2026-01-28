@@ -3,6 +3,7 @@ import { reservationsTable } from "../config/db/reservations.table";
 import { venueMatchesTable, matchesTable } from "../config/db/matches.table";
 import { venuesTable } from "../config/db/venues.table";
 import { teamsTable } from "../config/db/sports.table";
+import { analyticsTable } from "../config/db/admin.table";
 import { eq, and, gte, lte, sql, count, desc, inArray } from "drizzle-orm";
 
 // ============================================
@@ -57,6 +58,55 @@ export interface RevenueTrend {
 }
 
 export class AnalyticsRepository {
+
+    /**
+     * Track an analytics event
+     */
+    async trackEvent(data: {
+        venue_id?: string;
+        user_id?: string;
+        event_type: string;
+        event_name: string;
+        properties?: any;
+        session_id?: string;
+        user_agent?: string;
+        ip_address?: string;
+    }) {
+        try {
+            const [newEvent] = await db.insert(analyticsTable).values({
+                venue_id: data.venue_id,
+                user_id: data.user_id,
+                event_type: data.event_type,
+                event_name: data.event_name,
+                properties: data.properties,
+                session_id: data.session_id,
+                user_agent: data.user_agent,
+                ip_address: data.ip_address,
+            }).returning();
+            return newEvent;
+        } catch (error) {
+            console.error("Error tracking event:", error);
+            return null;
+        }
+    }
+
+    /**
+     * Get total views for a list of venues
+     */
+    async getVenueViews(venueIds: string[]) {
+        if (venueIds.length === 0) return 0;
+
+        const result = await db.select({
+            count: count()
+        })
+        .from(analyticsTable)
+        .where(and(
+            inArray(analyticsTable.venue_id, venueIds),
+            eq(analyticsTable.event_type, 'venue_view')
+        ));
+
+        return Number(result[0]?.count) || 0;
+    }
 
     /**
      * Check if user is the owner of the venue

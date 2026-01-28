@@ -30,23 +30,34 @@ class UserController {
         return user.id;
     }
 
-    readonly getMe = this.factory.createHandlers(async (ctx) => {
+    public readonly getMe = this.factory.createHandlers(async (ctx) => {
         const user = ctx.get('user');
-        let _userData;
         if (!user) {
-            throw new Error("Unauthorized");
+            return ctx.json({ error: "Unauthorized" }, 401);
         }
         
         try {
-          _userData = await this.userRepository.getMe({id: user.id});
+          const users = await this.userRepository.getMe({ id: user.id });
           
-          if (!_userData) {
-            throw new Error("User not found");
+          if (!users || users.length === 0) {
+            return ctx.json({ error: "User not found" }, 404);
           }
           
-          return ctx.json({ msg: "Get current user profile", user: _userData });
+          const userData = users[0]!;
+          return ctx.json({ 
+            user: {
+              id: userData.id,
+              email: userData.email,
+              first_name: userData.first_name,
+              last_name: userData.last_name,
+              phone: userData.phone,
+              role: userData.role,
+              has_completed_onboarding: true
+            }
+          });
         } catch (error) {
-            throw new Error("Failed to fetch user data");
+            console.error("Error fetching user:", error);
+            return ctx.json({ error: "Failed to fetch user data" }, 500);
         }
     });
 
@@ -80,10 +91,6 @@ class UserController {
 
     readonly deleteAddress = this.factory.createHandlers(async (ctx) => {
         return ctx.json({ msg: "Delete address" });
-    });
-
-    readonly completeOnboarding = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Mark onboarding as complete" });
     });
 
     /**

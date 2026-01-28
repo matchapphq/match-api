@@ -17,9 +17,10 @@ class SportsService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes(): void {
         // Sports
         this.router.get("/", ...this.controller.getSports);
+        this.router.get("/fixture", ...this.controller.getFixtures);
         this.router.get("/:sportId", ...this.controller.getSportById);
         this.router.get("/:sportId/leagues", ...this.controller.getLeaguesBySport);
     }

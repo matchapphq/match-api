@@ -18,6 +18,7 @@ export const venueTypeEnum = pgEnum('venue_type', [
 ]);
 export const venueStatusEnum = pgEnum('venue_status', ['pending', 'approved', 'rejected', 'suspended']);
 export const subscriptionLevelEnum = pgEnum('subscription_level', ['basic', 'pro', 'enterprise']);
+export const bookingModeEnum = pgEnum('booking_mode', ['INSTANT', 'REQUEST']);
 
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'finished', 'canceled', 'postponed']);
 
@@ -86,6 +87,10 @@ export const transactionStatusEnum = pgEnum('transaction_status', [
 ]);
 
 export const couponTypeEnum = pgEnum('coupon_type', ['percentage', 'fixed']);
+
+export const referralStatusEnum = pgEnum('referral_status', ['invited', 'signed_up', 'converted']);
+export const boostTypeEnum = pgEnum('boost_type', ['purchased', 'referral', 'promotional']);
+export const boostStatusEnum = pgEnum('boost_status', ['available', 'used', 'expired']);
 
 export const auditActionEnum = pgEnum('audit_action', [
     'create',

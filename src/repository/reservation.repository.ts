@@ -35,6 +35,34 @@ export class ReservationRepository {
     }
 
     /**
+     * Create reservation with PENDING status (for REQUEST booking mode)
+     * No QR code generated until venue owner confirms
+     */
+    async createPending(
+        reservationId: string,
+        userId: string,
+        venueMatchId: string,
+        partySize: number,
+        specialRequests: string,
+        requiresAccessibility: boolean
+    ) {
+        const [reservation] = await db.insert(reservationsTable).values({
+            id: reservationId,
+            user_id: userId,
+            venue_match_id: venueMatchId,
+            table_id: null,
+            party_size: partySize,
+            status: 'pending',
+            seat_ids: [],
+            quantity: partySize,
+            special_requests: specialRequests || null,
+            qr_code: null // No QR until confirmed by venue
+        }).returning();
+
+        return reservation;
+    }
+
+    /**
      * Create reservation from a confirmed hold (legacy)
      * Note: table_id is optional - capacity-based system doesn't use physical tables
      */

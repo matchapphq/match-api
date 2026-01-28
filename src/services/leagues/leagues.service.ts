@@ -17,7 +17,7 @@ class LeaguesService {
         this.initRoutes();
     }
 
-    initRoutes() {
+    private initRoutes() {
         // Leagues
         this.router.get("/:leagueId", ...this.controller.getLeagueById);
         this.router.get("/:leagueId/teams", ...this.controller.getTeamsByLeague);
