@@ -59,8 +59,15 @@ const app = new Hono().basePath("/api");
 
 // CORS - must be first (with credentials for cookies)
 app.use('*', cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174', "matchapp.fr", process.env.VPS_URL as string],
-  credentials: true,
+    origin: [
+        'http://localhost:3000',
+        'https://matchapp.fr',
+        'http://matchapp.fr',
+        'http://localhost:5174',
+        'matchapp.fr',
+        process.env.FRONTEND_URL as string
+    ],
+    credentials: true,
 }));
 
 app.use(logger());
