@@ -69,8 +69,8 @@ class PartnerController {
                 await subscriptionsRepository.setStripeCustomerId(userId, stripeCustomerId);
             }
 
-            // Store venue data in checkout session metadata (will be used to create venue after payment)
-            const venueData = JSON.stringify({
+            // Store venue data in checkout session metadata
+            const venueData = {
                 name: body.name,
                 street_address: body.street_address,
                 city: body.city,
@@ -80,7 +80,20 @@ class PartnerController {
                 phone: body.phone || '',
                 email: body.email || '',
                 capacity: body.capacity || 0,
-            });
+            };
+            const venueDataStr = JSON.stringify(venueData);
+
+            console.log(`[Create Venue] Creating session for user ${userId}. Data length: ${venueDataStr.length}`);
+            if (venueDataStr.length > 500) {
+                console.warn("[Create Venue] Warning: venue_data metadata exceeds 500 chars, might be truncated by Stripe");
+            }
+
+            // Use provided redirect URLs or fallback to config
+            const successUrl = body.success_url 
+                ? `${body.success_url}?checkout=success&session_id={CHECKOUT_SESSION_ID}` 
+                : `${CHECKOUT_URLS.SUCCESS}&session_id={CHECKOUT_SESSION_ID}`;
+            
+            const cancelUrl = body.cancel_url || CHECKOUT_URLS.CANCEL;
 
             // Create Checkout Session
             const session = await stripe.checkout.sessions.create({
@@ -101,12 +114,12 @@ class PartnerController {
                     },
                     quantity: 1,
                 }],
-                success_url: `${CHECKOUT_URLS.SUCCESS}&session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: CHECKOUT_URLS.CANCEL,
+                success_url: successUrl,
+                cancel_url: cancelUrl,
                 metadata: {
                     user_id: userId,
                     plan_id: planId,
-                    venue_data: venueData, // Store venue data to create after payment
+                    venue_data: venueDataStr,
                     action: 'create_venue',
                 },
                 subscription_data: {
@@ -117,6 +130,8 @@ class PartnerController {
                 },
                 allow_promotion_codes: true,
             });
+
+            console.log(`[Create Venue] Session created: ${session.id}. Success URL: ${successUrl}`);
 
             return ctx.json({ 
                 checkout_url: session.url,
@@ -142,17 +157,19 @@ class PartnerController {
                 return ctx.json({ error: "session_id is required" }, 400);
             }
 
+            console.log(`[Verify Checkout] Verifying session ${session_id} for user ${userId}`);
+
             // Retrieve the checkout session from Stripe
             const session = await stripe.checkout.sessions.retrieve(session_id, {
                 expand: ['subscription']
             });
 
-            console.log("Verifying checkout session:", session.id);
-            console.log("Session status:", session.status);
-            console.log("Payment status:", session.payment_status);
+            console.log(`[Verify Checkout] Session status: ${session.status}, Payment status: ${session.payment_status}`);
+            console.log(`[Verify Checkout] Metadata:`, session.metadata);
 
             // Verify the session belongs to this user
             if (session.metadata?.user_id !== userId) {
+                console.error(`[Verify Checkout] User mismatch. Session user: ${session.metadata?.user_id}, Current user: ${userId}`);
                 return ctx.json({ error: "Session does not belong to this user" }, 403);
             }
 
@@ -163,12 +180,19 @@ class PartnerController {
 
             // Check if this is a venue creation action
             if (session.metadata?.action !== 'create_venue') {
-                return ctx.json({ error: "Invalid session type" }, 400);
+                console.error(`[Verify Checkout] Action mismatch. Action: ${session.metadata?.action}`);
+                return ctx.json({ error: "Invalid session type or missing venue data" }, 400);
+            }
+
+            const venueDataStr = session.metadata.venue_data;
+            if (!venueDataStr) {
+                console.error(`[Verify Checkout] Missing venue_data in metadata`);
+                return ctx.json({ error: "Missing venue data" }, 400);
             }
 
             // Check if venue was already created (idempotency)
             const existingVenues = await this.repository.getVenuesByOwnerId(userId);
-            const venueData = JSON.parse(session.metadata.venue_data || '{}');
+            const venueData = JSON.parse(venueDataStr || '{}');
             const alreadyExists = existingVenues.some(v => 
                 v.name === venueData.name && 
                 v.street_address === venueData.street_address
