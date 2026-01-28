@@ -7,6 +7,7 @@ import { ReservationRepository } from "../../repository/reservation.repository";
 import { WaitlistRepository } from "../../repository/waitlist.repository";
 import { HoldTableSchema, ConfirmReservationSchema, CancelReservationSchema, VerifyQRSchema } from "../../utils/reservation.valid";
 import { createQRPayload, generateQRCodeImage, parseQRContent, verifyQRPayload } from "../../utils/qr.utils";
+import { notifyNewReservation, notifyReservationCancelled, notifyCheckIn } from "../../services/notifications/notification.triggers";
 
 class ReservationsController {
     private readonly factory = createFactory<HonoEnv>();
@@ -29,10 +30,13 @@ class ReservationsController {
         if (!parsed.success) return c.json({ error: parsed.error }, 400);
         return parsed.data;
     }), async (c) => {
+        console.log('[Reservations] ========== CREATE RESERVATION CALLED ==========');
         const user = c.get('user');
+        console.log('[Reservations] User:', user?.id);
         if (!user || !user.id) return c.json({ error: "Unauthorized" }, 401);
 
         const { venueMatchId, partySize, requiresAccessibility, specialRequests } = c.req.valid('json');
+        console.log('[Reservations] Request data:', { venueMatchId, partySize, requiresAccessibility, specialRequests });
 
         // Get venue match details including venue's booking_mode
         const venueMatch = await this.capacityRepo.getVenueMatch(venueMatchId);
@@ -103,6 +107,18 @@ class ReservationsController {
 
             const qrCodeImage = await generateQRCodeImage(qrPayload);
 
+            // Notify venue owner of new reservation
+            console.log('[Reservations] About to call notifyNewReservation for INSTANT booking');
+            notifyNewReservation({
+                venueMatchId,
+                reservationId: reservation.id,
+                userId: user.id,
+                partySize,
+                status: 'confirmed'
+            }).then(result => {
+                console.log('[Reservations] notifyNewReservation completed:', result);
+            }).catch(err => console.error('[Reservations] Failed to send notification:', err));
+
             return c.json({
                 message: "Reservation confirmed! Show this QR code at the venue.",
                 reservation: {
@@ -133,7 +149,17 @@ class ReservationsController {
                 return c.json({ error: "Failed to create reservation request" }, 500);
             }
 
-            // TODO: Notify venue owner of new reservation request
+            // Notify venue owner of new reservation request
+            console.log('[Reservations] About to call notifyNewReservation for REQUEST booking');
+            notifyNewReservation({
+                venueMatchId,
+                reservationId: reservation.id,
+                userId: user.id,
+                partySize,
+                status: 'pending'
+            }).then(result => {
+                console.log('[Reservations] notifyNewReservation completed:', result);
+            }).catch(err => console.error('[Reservations] Failed to send notification:', err));
 
             return c.json({
                 message: "Reservation request submitted. The venue will confirm shortly.",
@@ -231,6 +257,15 @@ class ReservationsController {
                 canceled.venue_match_id, 
                 canceled.party_size
             );
+
+            // Notify venue owner of cancellation
+            notifyReservationCancelled({
+                venueMatchId: canceled.venue_match_id,
+                reservationId: canceled.id,
+                userId: user.id,
+                partySize: canceled.party_size,
+                reason
+            }).catch(err => console.error('Failed to send cancellation notification:', err));
         }
 
         // TODO: Notify next person in waitlist that space is available
