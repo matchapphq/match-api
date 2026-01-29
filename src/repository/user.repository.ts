@@ -60,6 +60,13 @@ class UserRepository {
 
         return newUser;
     }
+
+    public async updateUserPassword(userId: string, passwordHash: string) {
+        return (await db.update(usersTable)
+            .set({ password_hash: passwordHash, updated_at: new Date() })
+            .where(eq(usersTable.id, userId))
+            .returning())[0];
+    }
     
     public async saveUserPreferences(userId: string, preferences: SavePreferencesData) {
 
