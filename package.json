@@ -34,7 +34,7 @@
     "typescript": "^5.9.2"
   },
   "dependencies": {
-    "@hono/zod-validator": "^0.7.2",
+    "@hono/zod-validator": "^0.7.6",
     "@neondatabase/serverless": "^1.0.2",
     "@types/nodemailer": "^7.0.4",
     "axios": "^1.13.2",
