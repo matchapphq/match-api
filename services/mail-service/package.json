@@ -1,0 +1,17 @@
+{
+  "name": "mail-service",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "bullmq": "^5.67.2",
+    "drizzle-orm": "^0.45.1",
+    "kafkajs": "^2.2.4"
+  }
+}
