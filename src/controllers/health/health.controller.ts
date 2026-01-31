@@ -28,11 +28,21 @@ class HealthController {
         //         removeOnComplete: 50,
         //     },
         // );
-        await mailQueue.add("test-mail", {
-            from: "noreply@match.com",
-            to: "test@example.com",
-            subject: "Test Email",
+        await mailQueue.add("reservation-confirmation", {
+            to: "rafael.sapalo07@gmail.com",
+            subject: "Réinitialisation de mot de passe",
             text: "This is a test email.",
+            type: "reset-password",
+            data: {
+              userName: "Alex",
+              venueName: "The Sports Bar",
+              matchName: "France vs Spain",
+              date: "14/07/2024",
+              time: "21:00",
+              guests: 4,
+              bookingId: "RES-98765",
+              address: "123 Main St, Paris"
+            }
         }, {
             attempts: 3,
             backoff: { type: "exponential", delay: 2000 },
