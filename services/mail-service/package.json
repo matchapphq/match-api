@@ -12,6 +12,7 @@
   "dependencies": {
     "bullmq": "^5.67.2",
     "drizzle-orm": "^0.45.1",
-    "kafkajs": "^2.2.4"
+    "kafkajs": "^2.2.4",
+    "nodemailer": "^7.0.13"
   }
 }
