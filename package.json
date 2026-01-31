@@ -1,8 +1,5 @@
 {
   "name": "match-api",
-  "workspaces": [
-    "services/*"
-  ],
   "module": "index.ts",
   "type": "module",
   "private": true,
