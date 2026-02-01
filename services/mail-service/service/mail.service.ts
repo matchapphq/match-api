@@ -1,5 +1,5 @@
 import { type Transporter, createTransport } from "nodemailer";
-import { isMailEnvVarsInit, mailEnvVars } from "../../types/env.types";
+import { isMailEnvVarsInit, mailEnvVars } from "../types/mail.types";
 
 class MailService {
     private readonly transporter: Transporter;

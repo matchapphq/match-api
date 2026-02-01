@@ -3,3 +3,4 @@ import { redisConnection } from "../config/redis";
 import type { NotificationPayload } from "../types/jobs.type";
 
 export const notificationQueue = new Queue<NotificationPayload>("notification", { connection: redisConnection });
+export const mailQueue = new Queue("mail-queue", { connection: redisConnection });
