@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "bullmq": "^5.66.5",
+    "hono": "^4.11.7",
     "nodemailer": "^7.0.12"
   },
   "devDependencies": {

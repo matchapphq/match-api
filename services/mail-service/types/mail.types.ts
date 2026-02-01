@@ -4,6 +4,7 @@ export interface MailEnvVars {
     SMTP_SECURE: boolean;
     SMTP_USER: string;
     SMTP_PASSWORD: string;
+    SMTP_SEND_MAIL: string;
 }
 
 export enum EmailType {
@@ -19,6 +20,7 @@ export const mailEnvVars: MailEnvVars = {
     SMTP_SECURE: process.env.SMTP_SECURE === 'true',
     SMTP_USER: process.env.SMTP_USER!,
     SMTP_PASSWORD: process.env.SMTP_PASSWORD!,
+    SMTP_SEND_MAIL: process.env.SMTP_SEND_MAIL!,
 };
 
 export function isMailEnvVarsInit(): boolean {
