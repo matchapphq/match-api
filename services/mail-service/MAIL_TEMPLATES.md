@@ -44,19 +44,19 @@ const jobData = {
 
 ### 2. Reset / Forgot Password
 **Enum:** `EmailType.RESET_PASSWORD` (`'reset-password'`) or `EmailType.FORGOT_PASSWORD` (`'forgot-password'`)
-**Description:** Sent when a user requests a password reset link.
+**Description:** Sent when a user requests a password reset code.
 
 #### Data Payload (`ResetPasswordData`)
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `resetLink` | `string` | Yes | The unique URL containing the reset token. |
+| `code` | `string` | Yes | The 6-digit verification code. |
 | `userName` | `string` | No | The user's name (optional). |
 
 **Example:**
 ```json
 {
-  "resetLink": "https://match.app/auth/reset-password?token=xyz123",
+  "code": "123456",
   "userName": "Alex"
 }
 ```
