@@ -4,14 +4,11 @@ import MailService from "../service/mail.service";
 import { getEmailTemplate } from "../templates";
 import { type EmailType } from "../types/mail.types";
 
-export const mailWorker = new Worker(
-    "mail-queue",
-    async (job) => {
-        console.log(`Processing job: ${job.name} to ${job.data.to}`);
+export const mailWorker = new Worker("mail-queue", async (job) => {
         const mailservice = new MailService();
-        // Destructure job data. 'type' should match EmailType enum values.
-        // 'data' contains the dynamic values for the template (e.g. resetLink, userName).
         const { to, subject, text, data } = job.data;
+    
+        console.log(`Processing job: ${job.name} with id: ${job.id}`);
         let html = job.data.html;
 
         // If a specific template type is provided, generate the HTML
@@ -35,7 +32,7 @@ export const mailWorker = new Worker(
 
         // Ensure text body exists for clients that don't support HTML
         const textBody = text || data?.text || subject;
-
+        console.log(`Sending email to ${to}`);
         await mailservice.sendMail(to, subject, textBody, html);
     }, {
         connection: redisConfig,
