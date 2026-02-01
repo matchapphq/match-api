@@ -27,13 +27,14 @@ class UserRepository {
         }).from(usersTable).where(eq(usersTable.id, user.id));
     }
     
-    public async getUserByEmail(email: string): Promise<{ id: string; email: string; password_hash: string; role: 'user' | 'venue_owner' | 'admin'; first_name: string | null; } | undefined> {
+    public async getUserByEmail(email: string): Promise<{ id: string; email: string; password_hash: string; role: 'user' | 'venue_owner' | 'admin'; first_name: string | null; last_name: string | null } | undefined> {
         return (await db.select({
             id: usersTable.id,
             email: usersTable.email,
             password_hash: usersTable.password_hash,
             role: usersTable.role,
-            first_name: usersTable.first_name
+            first_name: usersTable.first_name,
+            last_name: usersTable.last_name
         }).from(usersTable).where(eq(usersTable.email, email)))[0];
     }
 
