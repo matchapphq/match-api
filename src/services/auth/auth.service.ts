@@ -25,6 +25,7 @@ class AuthService {
         this.router.post("/forgot-password", ...this.authController.forgotPassword);
         this.router.post("/verify-reset-code", ...this.authController.verifyResetCode);
         this.router.post("/reset-password", ...this.authController.resetPassword);
+        this.router.post("/validate-email", ...this.authController.validateEmail);
     }
 }
 

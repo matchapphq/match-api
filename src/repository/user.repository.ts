@@ -95,6 +95,12 @@ class UserRepository {
             } as NewUserPreferences).returning())[0];
         }
     }
+    
+    public async doesUserExist(email: string): Promise<boolean> {
+        const user = await this.getUserByEmail(email);
+        return !!user;
+    }
+
 }
 
 export default UserRepository;

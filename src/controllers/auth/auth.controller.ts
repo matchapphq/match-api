@@ -25,6 +25,7 @@ import { zValidator } from "@hono/zod-validator"
 import { Redis } from "ioredis";
 import { redisConnection } from "../../config/redis";
 import MailService from "../../services/mail/mail.service";
+import z from "zod";
 
 /**
  * Controller for Authentication operations.
@@ -35,7 +36,7 @@ class AuthController {
     private readonly userRepository = new UserRepository();
     private readonly tokenRepository = new TokenRepository();
     private readonly authRepository = new AuthRepository();
-    private readonly redis = new Redis(redisConnection);
+    private readonly redis = new Redis({ host: `${process.env.REDIS_HOST}` || 'localhost', port: parseInt(process.env.REDIS_PORT || '6379') });
     private readonly mailService = new MailService();
 
     public readonly register = this.factory.createHandlers(
@@ -433,6 +434,21 @@ class AuthController {
             console.error("Password reset error:", error);
             return ctx.json({ error: "Failed to reset password" }, 500);
         }
+    });
+    
+    public readonly validateEmail = this.factory.createHandlers(zValidator("json", z.object(
+        {
+            email: z.email().min(5).max(255)
+        }
+    )), async (ctx) => {
+        const { email } = ctx.req.valid("json");
+        
+        const user = await this.userRepository.doesUserExist(email);
+        if (!user) {
+            return ctx.json({ error: "User not found" }, 404);
+        }
+        
+        return ctx.json({ message: "Email is valid" }, 200);
     });
 }
 
