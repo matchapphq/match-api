@@ -1,4 +1,4 @@
-import { password } from "bun";
+import { password, randomUUIDv7 } from "bun";
 import { JwtUtils } from "../../utils/jwt";
 import { validator } from "hono/validator";
 import { createFactory } from "hono/factory";
@@ -24,7 +24,8 @@ import { userOnaboarding } from "./auth.helper";
 import { zValidator } from "@hono/zod-validator"
 import { Redis } from "ioredis";
 import { redisConnection } from "../../config/redis";
-import MailService from "../../services/mail/mail.service";
+import z from "zod";
+import { mailQueue } from "../../queue/notification.queue";
 
 /**
  * Controller for Authentication operations.
@@ -35,8 +36,7 @@ class AuthController {
     private readonly userRepository = new UserRepository();
     private readonly tokenRepository = new TokenRepository();
     private readonly authRepository = new AuthRepository();
-    private readonly redis = new Redis(redisConnection);
-    private readonly mailService = new MailService();
+    private readonly redis = new Redis({ host: `${process.env.REDIS_HOST}` || 'localhost', port: parseInt(process.env.REDIS_PORT || '6379') });
 
     public readonly register = this.factory.createHandlers(
         validator("json", (value, ctx) => {
@@ -100,8 +100,49 @@ class AuthController {
                             // Do not block user creation if referral flow fails
                         }
                     }
+
+                    // Send Welcome Email for Venue Owner
+                    try {
+                        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+                        await mailQueue.add("welcome-partner", {
+                            to: user.email,
+                            subject: "Welcome to Match Partner!",
+                            data: {
+                                userName: user.first_name,
+                                actionLink: `${frontendUrl}/dashboard`
+                            }
+                        }, {
+                            attempts: 3,
+                            backoff: { type: "exponential", delay: 5000 },
+                            priority: 2,
+                            jobId: `welcome-${user.id}`
+                        });
+                    } catch (error) {
+                         console.error("Failed to enqueue welcome email for venue_owner:", error);
+                    }
+
                 } else if (body.role === "user") {
                     await userOnaboarding(body, this.authRepository, user.id);
+
+                    // Send Welcome Email for User
+                    try {
+                        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+                        await mailQueue.add("welcome", {
+                            to: user.email,
+                            subject: "Welcome to Match!",
+                            data: {
+                                userName: user.first_name,
+                                actionLink: `${frontendUrl}/discovery`
+                            }
+                        }, {
+                            attempts: 3,
+                            backoff: { type: "exponential", delay: 5000 },
+                            priority: 2,
+                            jobId: `welcome-${user.id}`
+                        });
+                    } catch (error) {
+                         console.error("Failed to enqueue welcome email for user:", error);
+                    }
                 }
 
                 // Generate Tokens
@@ -363,21 +404,23 @@ class AuthController {
         await this.redis.set(`RESET_CODE:${email}`, code, "EX", 15 * 60);
         
         try {
-            await this.mailService.sendMail(
-                email,
-                "Réinitialisation de votre mot de passe - Match",
-                `Votre code de réinitialisation est : ${code}`,
-                `<div style="font-family: Arial, sans-serif; color: #333;">
-                    <h2>Réinitialisation de mot de passe</h2>
-                    <p>Vous avez demandé la réinitialisation de votre mot de passe sur Match.</p>
-                    <p>Votre code de vérification est :</p>
-                    <div style="background-color: #f4f4f4; padding: 10px; font-size: 24px; letter-spacing: 5px; font-weight: bold; text-align: center; border-radius: 5px;">
-                        ${code}
-                    </div>
-                    <p>Ce code est valide pendant 15 minutes.</p>
-                    <p>Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>
-                </div>`
-            );
+            await mailQueue.add("forgot-password", {
+                to: email,
+                data: {
+                    firstName: user.first_name,
+                    lastName: user.last_name,
+                    subject: "Reset Password",
+                    code,
+                }
+            }, {
+                attempts: 3,
+                backoff: {
+                    type: "exponential",
+                    delay: 5000
+                },
+                priority: 3,
+                jobId: randomUUIDv7() as string,
+            });
         } catch (error) {
             console.error("Failed to send reset email:", error);
             // In a real scenario, we might want to alert monitoring but still return success or appropriate error
@@ -415,24 +458,32 @@ class AuthController {
         
         try {
             const passwordHash = await password.hash(new_password);
-            
-            // Assuming we have a method to update user password in repository
-            // Since userRepository.updateUser might not exist or verify, let's check
-            // If not, we might need to add it. For now assuming updateUser exists or adding query here.
-            // Wait, userRepository has createUser and getUserByEmail. Let's check update.
-            // If not, I'll need to modify userRepository as well. 
-            // Checking methods available...
-            // I'll assume for now I can update it via userRepository.
-            await this.userRepository.updateUserPassword(user.id, passwordHash);
-            
-            // Delete code from Redis
-            await this.redis.del(`RESET_CODE:${email}`);
-            
+    
+            await Promise.all([
+                this.userRepository.updateUserPassword(user.id, passwordHash),
+                this.redis.del(`RESET_CODE:${email}`)
+            ]);
+
             return ctx.json({ message: "Password reset successfully" });
         } catch (error) {
             console.error("Password reset error:", error);
             return ctx.json({ error: "Failed to reset password" }, 500);
         }
+    });
+    
+    public readonly validateEmail = this.factory.createHandlers(zValidator("json", z.object(
+        {
+            email: z.email().min(5).max(255)
+        }
+    )), async (ctx) => {
+        const { email } = ctx.req.valid("json");
+        
+        const user = await this.userRepository.doesUserExist(email);
+        if (!user) {
+            return ctx.json({ error: "User not found" }, 404);
+        }
+        
+        return ctx.json({ message: "Email is valid" }, 200);
     });
 }
 

@@ -1,7 +1,7 @@
 # Match Project — Complete API Routes Documentation
 
 **Production-ready API routes for Match platform**  
-*Last updated: January 2026*
+*Last updated: February 2026*
 
 ## 💼 Business Model
 
@@ -155,6 +155,93 @@ Headers: Authorization: Bearer <token>
 Response: 200
 {
   message: string;
+}
+```
+
+### POST /api/auth/forgot-password
+**Request password reset code**
+
+Sends a 6-digit verification code to the user's email. Code expires after 15 minutes.
+
+```typescript
+Request body:
+{
+  email: string;
+}
+
+Response: 200
+{
+  message: "If the email exists, a code has been sent.";
+}
+```
+
+> **Note:** Returns success even if email doesn't exist to prevent user enumeration attacks.
+
+### POST /api/auth/verify-reset-code
+**Verify password reset code**
+
+```typescript
+Request body:
+{
+  email: string;
+  code: string;           // 6-digit code
+}
+
+Response: 200
+{
+  valid: boolean;
+}
+
+Error: 400 Bad Request
+{
+  error: "Invalid or expired code";
+}
+```
+
+### POST /api/auth/reset-password
+**Reset password with verification code**
+
+```typescript
+Request body:
+{
+  email: string;
+  code: string;           // 6-digit code
+  new_password: string;   // min 6 characters
+}
+
+Response: 200
+{
+  message: "Password reset successfully";
+}
+
+Error: 400 Bad Request
+{
+  error: "Invalid or expired code";
+}
+
+Error: 404 Not Found
+{
+  error: "User not found";
+}
+```
+
+### POST /api/auth/validate-email
+**Check if email exists in system**
+
+```typescript
+Request body:
+{
+  email: string;
+}
+
+Response: 200
+{
+  message: "Email is valid";
+}
+
+Error: 404 Not Found
+{
+  error: "User not found";
 }
 ```
 

@@ -1,14 +1,16 @@
 import { Worker } from "bullmq";
 import { redisConfig } from "../config/redis";
-import MailService from "../service/mail.service";
 import { getEmailTemplate } from "../templates";
+import MailService from "../service/mail.service";
 import { type EmailType } from "../types/mail.types";
 
 export const mailWorker = new Worker("mail-queue", async (job) => {
         const mailservice = new MailService();
         const { to, subject, text, data } = job.data;
-    
-        console.log(`Processing job: ${job.name} with id: ${job.id}`);
+
+        console.log(
+            `[MAIL WORKER]: Processing job: ${job.name} with id: ${job.id}`,
+        );
         let html = job.data.html;
 
         // If a specific template type is provided, generate the HTML
@@ -17,7 +19,7 @@ export const mailWorker = new Worker("mail-queue", async (job) => {
                 html = getEmailTemplate(job.name as EmailType, data || {});
             } catch (error) {
                 console.warn(
-                    `Template generation failed for type '${job.name}'. Falling back to simple text.`, 
+                    `Template generation failed for type '${job.name}'. Falling back to simple text.`,
                     error,
                 );
             }
@@ -32,7 +34,6 @@ export const mailWorker = new Worker("mail-queue", async (job) => {
 
         // Ensure text body exists for clients that don't support HTML
         const textBody = text || data?.text || subject;
-        console.log(`Sending email to ${to}`);
         await mailservice.sendMail(to, subject, textBody, html);
     }, {
         connection: redisConfig,

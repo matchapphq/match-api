@@ -4,7 +4,10 @@ import stripe, { STRIPE_WEBHOOK_SECRET } from "../../config/stripe";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import { PartnerRepository } from "../../repository/partner.repository";
 import boostRepository from "../../repository/boost.repository";
+import UserRepository from "../../repository/user.repository";
 import { geocodeAddress } from "../../utils/geocoding";
+import { mailQueue } from "../../queue/notification.queue";
+import { randomUUIDv7 } from "bun";
 
 /**
  * Webhooks Controller
@@ -18,6 +21,7 @@ import { geocodeAddress } from "../../utils/geocoding";
  */
 class WebhooksController {
     private readonly factory = createFactory();
+    private readonly userRepository = new UserRepository();
 
     /**
      * POST /webhooks/stripe
@@ -157,9 +161,13 @@ class WebhooksController {
             return;
         }
 
+        // Fetch User for emails
+        const user = await this.userRepository.getUserById(userId);
+
         // Get subscription details from Stripe
         const stripeSubscription = (await stripe.subscriptions.retrieve(
             subscriptionId,
+            { expand: ['latest_invoice'] }
         )) as any;
         const amount =
             stripeSubscription.items?.data?.[0]?.price?.unit_amount || 0;
@@ -214,6 +222,32 @@ class WebhooksController {
                 console.log(
                     `Subscription updated for venue ${venueId} with plan ${plan}`,
                 );
+
+                // Send Email
+                if (user) {
+                    try {
+                        await mailQueue.add("venue-payment-success", {
+                            to: user.email,
+                            subject: "Confirmation de paiement - Match",
+                            data: {
+                                userName: user.first_name,
+                                venueName: venue.name,
+                                amount: `${(amount / 100).toFixed(2)}€`,
+                                planName: plan === 'pro' ? 'Annuel (Pro)' : 'Mensuel (Basic)',
+                                date: new Date().toLocaleDateString('fr-FR'),
+                                invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf
+                            }
+                        }, {
+                            attempts: 3,
+                            backoff: { type: "exponential", delay: 5000 },
+                            priority: 2,
+                            jobId: `payment-${subscriptionId}`
+                        });
+                    } catch (err) {
+                        console.error("Failed to send payment success email:", err);
+                    }
+                }
+
             } else {
                 // Venue not found or no subscription - create new subscription and link
                 const newSubscription =
@@ -300,6 +334,31 @@ class WebhooksController {
                 
                 if (newVenue) {
                     console.log(`Venue created after payment: ${newVenue.id} - ${newVenue.name}`);
+                    
+                    // Send Email
+                    if (user) {
+                        try {
+                            await mailQueue.add("venue-payment-success", {
+                                to: user.email,
+                                subject: "Confirmation de paiement - Match",
+                                data: {
+                                    userName: user.first_name,
+                                    venueName: newVenue.name,
+                                    amount: `${(amount / 100).toFixed(2)}€`,
+                                    planName: plan === 'pro' ? 'Annuel (Pro)' : 'Mensuel (Basic)',
+                                    date: new Date().toLocaleDateString('fr-FR'),
+                                    invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf
+                                }
+                            }, {
+                                attempts: 3,
+                                backoff: { type: "exponential", delay: 5000 },
+                                priority: 2,
+                                jobId: `payment-${subscriptionId}`
+                            });
+                        } catch (err) {
+                            console.error("Failed to send payment success email:", err);
+                        }
+                    }
                 }
             } catch (parseError: any) {
                 console.error("Error creating venue after payment:", parseError);

@@ -24,14 +24,15 @@ class MailService {
         });
     }
     
-    async sendMail(to: string, subject: string, text: string, html: string): Promise<void> {
-        await this.transporter.sendMail({
-            from: mailEnvVars.SMTP_USER,
-            to,
-            subject,
-            text,
-            html
-        });
+    async sendMail(to: string, subject: string, _text: string, html: string): Promise<void> {
+        await this.transporter.sendMail(
+            {
+                from: mailEnvVars.SMTP_SEND_MAIL,
+                to,
+                subject: subject,
+                html
+            }
+        );
     }
 }
 

@@ -8,6 +8,7 @@ import { WaitlistRepository } from "../../repository/waitlist.repository";
 import { HoldTableSchema, ConfirmReservationSchema, CancelReservationSchema, VerifyQRSchema } from "../../utils/reservation.valid";
 import { createQRPayload, generateQRCodeImage, parseQRContent, verifyQRPayload } from "../../utils/qr.utils";
 import { notifyNewReservation, notifyReservationCancelled, notifyCheckIn } from "../../services/notifications/notification.triggers";
+import { mailQueue } from "../../queue/notification.queue";
 
 class ReservationsController {
     private readonly factory = createFactory<HonoEnv>();
@@ -25,7 +26,7 @@ class ReservationsController {
      * 1. Create Reservation (instant or request mode)
      * Backend decides PENDING vs CONFIRMED based on venue.booking_mode
      */
-    readonly create = this.factory.createHandlers(validator('json', (value, c) => {
+    public readonly create = this.factory.createHandlers(validator('json', (value, c) => {
         const parsed = HoldTableSchema.safeParse(value);
         if (!parsed.success) return c.json({ error: parsed.error }, 400);
         return parsed.data;
@@ -118,7 +119,26 @@ class ReservationsController {
             }).then(result => {
                 console.log('[Reservations] notifyNewReservation completed:', result);
             }).catch(err => console.error('[Reservations] Failed to send notification:', err));
-
+            await mailQueue.add("reservation-confirmation", {
+                to: user.email,
+                data: {
+                    userName: user.firstName,
+                    venueName: venueMatch.venue?.name,
+                    matchName: `${venueMatch.match.home_team_id} vs ${venueMatch.match.away_team_id}`,
+                    date: venueMatch.match.scheduled_at,
+                    time: venueMatch.match.scheduled_at.toLocaleTimeString(),
+                    guests: partySize,
+                    bookingId: reservation.id,
+                    address: venueMatch.venue?.street_address
+                }
+            }, {
+                attempts: 3,
+                backoff: {
+                    type: 'exponential',
+                    delay: 5000
+                }
+            });
+            
             return c.json({
                 message: "Reservation confirmed! Show this QR code at the venue.",
                 reservation: {
