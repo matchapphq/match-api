@@ -9,6 +9,8 @@ export interface MailEnvVars {
 
 export enum EmailType {
     WELCOME = 'welcome',
+    WELCOME_PARTNER = 'welcome-partner',
+    VENUE_PAYMENT_SUCCESS = 'venue-payment-success',
     FORGOT_PASSWORD = 'forgot-password',
     RESET_PASSWORD = 'reset-password',
     RESERVATION_CONFIRMATION = 'reservation-confirmation',

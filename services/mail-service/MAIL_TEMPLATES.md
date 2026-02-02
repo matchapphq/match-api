@@ -42,7 +42,57 @@ const jobData = {
 
 ---
 
-### 2. Reset / Forgot Password
+### 2. Welcome Partner
+**Enum:** `EmailType.WELCOME_PARTNER` (`'welcome-partner'`)
+**Description:** Sent to new venue owners upon successful registration.
+
+#### Data Payload (`WelcomePartnerData`)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `userName` | `string` | Yes | The partner's display name. |
+| `actionLink` | `string` | Yes | URL for the dashboard. |
+
+**Example:**
+```json
+{
+  "userName": "Jean",
+  "actionLink": "https://match.app/dashboard"
+}
+```
+
+---
+
+### 3. Venue Payment Success
+**Enum:** `EmailType.VENUE_PAYMENT_SUCCESS` (`'venue-payment-success'`)
+**Description:** Sent when a venue subscription payment is successful.
+
+#### Data Payload (`VenuePaymentSuccessData`)
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `userName` | `string` | Yes | The partner's name. |
+| `venueName` | `string` | Yes | The venue name. |
+| `amount` | `string` | Yes | The paid amount (e.g. "29.99€"). |
+| `planName` | `string` | Yes | The name of the plan (e.g. "Annuel (Pro)"). |
+| `date` | `string` | Yes | Payment date. |
+| `invoiceUrl` | `string` | No | URL to the invoice PDF. |
+
+**Example:**
+```json
+{
+  "userName": "Jean",
+  "venueName": "The Sports Bar",
+  "amount": "29.99€",
+  "planName": "Annuel (Pro)",
+  "date": "14/07/2024",
+  "invoiceUrl": "https://stripe.com/..."
+}
+```
+
+---
+
+### 4. Reset / Forgot Password
 **Enum:** `EmailType.RESET_PASSWORD` (`'reset-password'`) or `EmailType.FORGOT_PASSWORD` (`'forgot-password'`)
 **Description:** Sent when a user requests a password reset code.
 
@@ -63,7 +113,7 @@ const jobData = {
 
 ---
 
-### 3. Reservation Confirmation
+### 5. Reservation Confirmation
 **Enum:** `EmailType.RESERVATION_CONFIRMATION` (`'reservation-confirmation'`)
 **Description:** Sent when a venue booking is successfully confirmed.
 
