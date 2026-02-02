@@ -100,8 +100,49 @@ class AuthController {
                             // Do not block user creation if referral flow fails
                         }
                     }
+
+                    // Send Welcome Email for Venue Owner
+                    try {
+                        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+                        await mailQueue.add("welcome-partner", {
+                            to: user.email,
+                            subject: "Welcome to Match Partner!",
+                            data: {
+                                userName: user.first_name,
+                                actionLink: `${frontendUrl}/dashboard`
+                            }
+                        }, {
+                            attempts: 3,
+                            backoff: { type: "exponential", delay: 5000 },
+                            priority: 2,
+                            jobId: `welcome-${user.id}`
+                        });
+                    } catch (error) {
+                         console.error("Failed to enqueue welcome email for venue_owner:", error);
+                    }
+
                 } else if (body.role === "user") {
                     await userOnaboarding(body, this.authRepository, user.id);
+
+                    // Send Welcome Email for User
+                    try {
+                        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+                        await mailQueue.add("welcome", {
+                            to: user.email,
+                            subject: "Welcome to Match!",
+                            data: {
+                                userName: user.first_name,
+                                actionLink: `${frontendUrl}/discovery`
+                            }
+                        }, {
+                            attempts: 3,
+                            backoff: { type: "exponential", delay: 5000 },
+                            priority: 2,
+                            jobId: `welcome-${user.id}`
+                        });
+                    } catch (error) {
+                         console.error("Failed to enqueue welcome email for user:", error);
+                    }
                 }
 
                 // Generate Tokens
