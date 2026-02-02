@@ -1,4 +1,4 @@
-import { password } from "bun";
+import { password, randomUUIDv7 } from "bun";
 import { JwtUtils } from "../../utils/jwt";
 import { validator } from "hono/validator";
 import { createFactory } from "hono/factory";
@@ -14,10 +14,18 @@ import {
 import {
     RegisterRequestSchema,
     LoginRequestSchema,
+    ForgotPasswordRequestSchema,
+    VerifyResetCodeSchema,
+    ResetPasswordSchema,
 } from "../../utils/auth.valid";
 import referralRepository from "../../repository/referral.repository";
 import AuthRepository from "../../repository/auth/auth.repository";
 import { userOnaboarding } from "./auth.helper";
+import { zValidator } from "@hono/zod-validator"
+import { Redis } from "ioredis";
+import { redisConnection } from "../../config/redis";
+import z from "zod";
+import { mailQueue } from "../../queue/notification.queue";
 
 /**
  * Controller for Authentication operations.
@@ -28,6 +36,7 @@ class AuthController {
     private readonly userRepository = new UserRepository();
     private readonly tokenRepository = new TokenRepository();
     private readonly authRepository = new AuthRepository();
+    private readonly redis = new Redis({ host: `${process.env.REDIS_HOST}` || 'localhost', port: parseInt(process.env.REDIS_PORT || '6379') });
 
     public readonly register = this.factory.createHandlers(
         validator("json", (value, ctx) => {
@@ -91,8 +100,49 @@ class AuthController {
                             // Do not block user creation if referral flow fails
                         }
                     }
+
+                    // Send Welcome Email for Venue Owner
+                    try {
+                        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+                        await mailQueue.add("welcome-partner", {
+                            to: user.email,
+                            subject: "Welcome to Match Partner!",
+                            data: {
+                                userName: user.first_name,
+                                actionLink: `${frontendUrl}/dashboard`
+                            }
+                        }, {
+                            attempts: 3,
+                            backoff: { type: "exponential", delay: 5000 },
+                            priority: 2,
+                            jobId: `welcome-${user.id}`
+                        });
+                    } catch (error) {
+                         console.error("Failed to enqueue welcome email for venue_owner:", error);
+                    }
+
                 } else if (body.role === "user") {
                     await userOnaboarding(body, this.authRepository, user.id);
+
+                    // Send Welcome Email for User
+                    try {
+                        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+                        await mailQueue.add("welcome", {
+                            to: user.email,
+                            subject: "Welcome to Match!",
+                            data: {
+                                userName: user.first_name,
+                                actionLink: `${frontendUrl}/discovery`
+                            }
+                        }, {
+                            attempts: 3,
+                            backoff: { type: "exponential", delay: 5000 },
+                            priority: 2,
+                            jobId: `welcome-${user.id}`
+                        });
+                    } catch (error) {
+                         console.error("Failed to enqueue welcome email for user:", error);
+                    }
                 }
 
                 // Generate Tokens
@@ -330,25 +380,110 @@ class AuthController {
         });
     });
 
-    readonly logout = this.factory.createHandlers(async (ctx) => {
+    public readonly logout = this.factory.createHandlers(async (ctx) => {
         // In JWT stateless auth, logout is client-side.
         // Optional: Blacklist token in Redis if implemented.
         deleteCookie(ctx, "refresh_token");
         deleteCookie(ctx, "access_token");
         return ctx.json({ message: "Logged out successfully" });
     });
-
-    // Stub - use /users/me instead
-    readonly getMe = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Use /users/me endpoint instead" }, 301);
+    
+    public readonly forgotPassword = this.factory.createHandlers(zValidator("json", ForgotPasswordRequestSchema), async (ctx) => {
+        const { email } = ctx.req.valid("json");
+        
+        const user = await this.userRepository.getUserByEmail(email);
+        if (!user) {
+            // Return success even if user not found to prevent enumeration
+            return ctx.json({ message: "If the email exists, a code has been sent." });
+        }
+        
+        // Generate 6-digit code
+        const code = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Store in Redis with 15 minutes expiration
+        await this.redis.set(`RESET_CODE:${email}`, code, "EX", 15 * 60);
+        
+        try {
+            await mailQueue.add("forgot-password", {
+                to: email,
+                data: {
+                    firstName: user.first_name,
+                    lastName: user.last_name,
+                    subject: "Reset Password",
+                    code,
+                }
+            }, {
+                attempts: 3,
+                backoff: {
+                    type: "exponential",
+                    delay: 5000
+                },
+                priority: 3,
+                jobId: randomUUIDv7() as string,
+            });
+        } catch (error) {
+            console.error("Failed to send reset email:", error);
+            // In a real scenario, we might want to alert monitoring but still return success or appropriate error
+            return ctx.json({ error: "Failed to send email" }, 500);
+        }
+        
+        return ctx.json({ message: "If the email exists, a code has been sent." });
     });
 
-    readonly updateMe = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Profile updated" });
+    public readonly verifyResetCode = this.factory.createHandlers(zValidator("json", VerifyResetCodeSchema), async (ctx) => {
+        const { email, code } = ctx.req.valid("json");
+        
+        const storedCode = await this.redis.get(`RESET_CODE:${email}`);
+        
+        if (!storedCode || storedCode !== code) {
+            return ctx.json({ error: "Invalid or expired code" }, 400);
+        }
+        
+        return ctx.json({ valid: true });
     });
 
-    readonly deleteMe = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Account deleted" });
+    public readonly resetPassword = this.factory.createHandlers(zValidator("json", ResetPasswordSchema), async (ctx) => {
+        const { email, code, new_password } = ctx.req.valid("json");
+        
+        const storedCode = await this.redis.get(`RESET_CODE:${email}`);
+        
+        if (!storedCode || storedCode !== code) {
+            return ctx.json({ error: "Invalid or expired code" }, 400);
+        }
+        
+        const user = await this.userRepository.getUserByEmail(email);
+        if (!user) {
+            return ctx.json({ error: "User not found" }, 404);
+        }
+        
+        try {
+            const passwordHash = await password.hash(new_password);
+    
+            await Promise.all([
+                this.userRepository.updateUserPassword(user.id, passwordHash),
+                this.redis.del(`RESET_CODE:${email}`)
+            ]);
+
+            return ctx.json({ message: "Password reset successfully" });
+        } catch (error) {
+            console.error("Password reset error:", error);
+            return ctx.json({ error: "Failed to reset password" }, 500);
+        }
+    });
+    
+    public readonly validateEmail = this.factory.createHandlers(zValidator("json", z.object(
+        {
+            email: z.email().min(5).max(255)
+        }
+    )), async (ctx) => {
+        const { email } = ctx.req.valid("json");
+        
+        const user = await this.userRepository.doesUserExist(email);
+        if (!user) {
+            return ctx.json({ error: "User not found" }, 404);
+        }
+        
+        return ctx.json({ message: "Email is valid" }, 200);
     });
 }
 

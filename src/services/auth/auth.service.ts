@@ -21,10 +21,11 @@ class AuthService {
         this.router.post("/register", ...this.authController.register);
         this.router.post("/login", ...this.authController.login);
         this.router.post("/refresh-token", ...this.authController.refreshToken);
-        this.router.get("/me", ...this.authController.getMe);
-        this.router.put("/me", ...this.authController.updateMe);
-        this.router.delete("/me", ...this.authController.deleteMe);
         this.router.post("/logout", ...this.authController.logout);
+        this.router.post("/forgot-password", ...this.authController.forgotPassword);
+        this.router.post("/verify-reset-code", ...this.authController.verifyResetCode);
+        this.router.post("/reset-password", ...this.authController.resetPassword);
+        this.router.post("/validate-email", ...this.authController.validateEmail);
     }
 }
 

@@ -17,8 +17,8 @@ export type TokenPayload = {
 export class JwtUtils {
     public static readonly ACCESS_TOKEN_EXP = ACCESS_TOKEN_EXPIRY;
     public static readonly REFRESH_TOKEN_EXP = REFRESH_TOKEN_EXPIRY;
-    public static readonly ACCESS_JWT_SIGN_KEY = process.env.ACCESS_JWT_SIGN_KEY;
-    public static readonly REFRESH_JWT_SIGN_KEY = process.env.REFRESH_JWT_SIGN_KEY;
+    public static readonly ACCESS_JWT_SIGN_KEY = process.env.ACCESS_JWT_SIGN_KEY!;
+    public static readonly REFRESH_JWT_SIGN_KEY = process.env.REFRESH_JWT_SIGN_KEY!;
 
     static async generateAccessToken(payload: TokenPayload): Promise<string> {
         if (!Bun.env.SECRET_KEY) {

@@ -26,4 +26,23 @@ export const LoginRequestSchema = z.object({
     password: z.string().min(1, { message: "Password is required" }),
 })
 
+export const ForgotPasswordRequestSchema = z.object({
+    email: z.email().min(1, { message: "Email is required" }),
+})
+
+export const VerifyResetCodeSchema = z.object({
+    email: z.email().min(1, { message: "Email is required" }),
+    code: z.string().length(6, { message: "Code must be 6 digits" }),
+})
+
+export const ResetPasswordSchema = z.object({
+    email: z.email().min(1, { message: "Email is required" }),
+    code: z.string().length(6, { message: "Code must be 6 digits" }),
+    new_password: z.string().min(6, { message: "Password must be at least 6 characters" }),
+})
+
 export type RegisterRequestSchemaType = z.infer<typeof RegisterRequestSchema>;
+export type LoginRequestSchemaType = z.infer<typeof LoginRequestSchema>;
+export type ForgotPasswordRequestSchemaType = z.infer<typeof ForgotPasswordRequestSchema>;
+export type VerifyResetCodeSchemaType = z.infer<typeof VerifyResetCodeSchema>;
+export type ResetPasswordSchemaType = z.infer<typeof ResetPasswordSchema>;
