@@ -27,7 +27,10 @@ class MailService {
     async sendMail(to: string, subject: string, _text: string, html: string): Promise<void> {
         await this.transporter.sendMail(
             {
-                from: mailEnvVars.SMTP_SEND_MAIL,
+                from: {
+                    name: mailEnvVars.SMTP_SEND_NAME,
+                    address: mailEnvVars.SMTP_USER
+                },
                 to,
                 subject: subject,
                 html

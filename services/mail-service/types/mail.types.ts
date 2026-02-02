@@ -5,6 +5,7 @@ export interface MailEnvVars {
     SMTP_USER: string;
     SMTP_PASSWORD: string;
     SMTP_SEND_MAIL: string;
+    SMTP_SEND_NAME: string;
 }
 
 export enum EmailType {
@@ -23,6 +24,7 @@ export const mailEnvVars: MailEnvVars = {
     SMTP_USER: process.env.SMTP_USER!,
     SMTP_PASSWORD: process.env.SMTP_PASSWORD!,
     SMTP_SEND_MAIL: process.env.SMTP_SEND_MAIL!,
+    SMTP_SEND_NAME: process.env.SMTP_SEND_NAME!,
 };
 
 export function isMailEnvVarsInit(): boolean {
@@ -31,6 +33,8 @@ export function isMailEnvVarsInit(): boolean {
         process.env.SMTP_PORT !== undefined &&
         process.env.SMTP_SECURE !== undefined &&
         process.env.SMTP_USER !== undefined &&
-        process.env.SMTP_PASSWORD !== undefined
+        process.env.SMTP_PASSWORD !== undefined &&
+        process.env.SMTP_SEND_MAIL !== undefined &&
+        process.env.SMTP_SEND_NAME !== undefined
     );
 }
