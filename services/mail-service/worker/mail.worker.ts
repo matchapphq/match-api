@@ -1,8 +1,10 @@
-import { Worker } from "bullmq";
+import { Queue, Worker } from "bullmq";
 import { redisConfig } from "../config/redis";
 import { getEmailTemplate } from "../templates";
 import MailService from "../service/mail.service";
 import { type EmailType } from "../types/mail.types";
+
+export const mailQueue = new Queue("mail-queue", { connection: redisConfig });
 
 export const mailWorker = new Worker("mail-queue", async (job) => {
         const mailservice = new MailService();
@@ -37,7 +39,8 @@ export const mailWorker = new Worker("mail-queue", async (job) => {
         await mailservice.sendMail(to, subject, textBody, html);
     }, {
         connection: redisConfig,
-        concurrency: 50,
+        concurrency: 5,
+        // limiter: { max: 10, duration: 1000 },
         removeOnFail: {
             age: 2 * 24 * 3600,
             count: 1000,

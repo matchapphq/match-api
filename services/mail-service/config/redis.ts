@@ -15,4 +15,5 @@ export const redisConfig: ConnectionOptions = {
         console.error("Redis connection error:", error);
         return true;
     },
+    shardedSubscribers: true
 }
