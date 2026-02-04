@@ -13,7 +13,6 @@ import SportsService from "./services/sports/sports.service";
 import LeaguesService from "./services/leagues/leagues.service";
 import TeamsService from "./services/teams/teams.service";
 import ReservationsService from "./services/reservations/reservations.service";
-import SeatsService from "./services/seats/seats.service";
 import PartnerService from "./services/partner/partner.service";
 
 // New Services
@@ -39,7 +38,6 @@ const sportsRouter = new SportsService();
 const leaguesRouter = new LeaguesService();
 const teamsRouter = new TeamsService();
 const reservationsRouter = new ReservationsService();
-const seatsRouter = new SeatsService();
 const partnerRouter = new PartnerService();
 
 // New Service Instances
@@ -151,15 +149,6 @@ app.route("/", billingRouter.getRouter);
 // Service has /overview, /reservations, /revenue
 // Mount at /venues/:venueId/analytics
 app.route("/venues/:venueId/analytics", analyticsRouter.getRouter);
-
-// Seats
-// Docs: /api/venues/:venueId/seats
-// Also /api/matches/:matchId/seat-holds (Seat Holds Routes)
-// SeatService seems to have been existing. Let's ensure it handles both or check if we need to split.
-// Assuming SeatService was correctly implemented for /venues/:venueId/matches/:matchId/seats previously
-// Now we strictly want /venues/:venueId/seats
-app.route("/venues/:venueId/seats", seatsRouter.getRouter);
-// Note: if SeatService defines "/" as get seats, this works.
 
 // Referral System (for venue owners)
 app.route("/referral", referralRouter.getRouter);

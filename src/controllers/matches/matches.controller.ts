@@ -72,13 +72,17 @@ class MatchesController {
     /**
      * GET /matches/:matchId/venues - Get venues showing this match
      * This is key for users to find where to watch a match and make reservations
+     * Supports optional lat/lng params to calculate and sort by distance
      */
     public readonly getMatchVenues = this.factory.createHandlers(async (c) => {
         try {
             const matchId = c.req.param("matchId");
             if (!matchId) return c.json({ error: "Match ID required" }, 400);
 
-            const { lat, lng, distance_km = "10" } = c.req.query();
+            const { lat, lng, distance_km = "50" } = c.req.query();
+            const userLat = lat ? parseFloat(lat) : null;
+            const userLng = lng ? parseFloat(lng) : null;
+            const maxDistanceKm = parseFloat(distance_km);
 
             // Get venue matches with venue details
             const venueMatches = await db.query.venueMatchesTable.findMany({
@@ -97,21 +101,56 @@ class MatchesController {
                             phone: true,
                             latitude: true,
                             longitude: true,
+                            average_rating: true,
+                            cover_image_url: true,
                         }
                     },
                 },
             });
 
-            // Transform to include availability info
-            const venues = venueMatches.map(vm => ({
-                venueMatchId: vm.id,
-                venue: vm.venue,
-                totalCapacity: vm.total_capacity,
-                availableCapacity: vm.available_capacity,
-                maxGroupSize: vm.max_group_size,
-                isFeatured: vm.is_featured,
-                allowsReservations: vm.allows_reservations,
-            }));
+            // Transform to include availability info and calculate distance
+            let venues = venueMatches.map((vm: any) => {
+                let distance: number | null = null;
+                
+                // Calculate distance if user location provided and venue has coordinates
+                if (userLat !== null && userLng !== null && vm.venue?.latitude && vm.venue?.longitude) {
+                    distance = this.calculateDistance(
+                        userLat,
+                        userLng,
+                        vm.venue.latitude,
+                        vm.venue.longitude
+                    );
+                }
+                
+                return {
+                    venueMatchId: vm.id,
+                    venue: {
+                        ...vm.venue,
+                        rating: vm.venue?.average_rating ? parseFloat(vm.venue.average_rating) : null,
+                        image_url: vm.venue?.cover_image_url,
+                        distance: distance !== null ? parseFloat(distance.toFixed(2)) : null,
+                    },
+                    totalCapacity: vm.total_capacity,
+                    availableCapacity: vm.available_capacity,
+                    maxGroupSize: vm.max_group_size,
+                    isFeatured: vm.is_featured,
+                    allowsReservations: vm.allows_reservations,
+                };
+            });
+
+            // Filter by max distance if user location provided
+            if (userLat !== null && userLng !== null) {
+                venues = venues.filter(v => 
+                    v.venue.distance === null || v.venue.distance <= maxDistanceKm
+                );
+                
+                // Sort by distance (closest first)
+                venues.sort((a, b) => {
+                    if (a.venue.distance === null) return 1;
+                    if (b.venue.distance === null) return -1;
+                    return a.venue.distance - b.venue.distance;
+                });
+            }
 
             return c.json({ 
                 data: venues,
@@ -122,6 +161,25 @@ class MatchesController {
             return c.json({ error: "Failed to fetch venues" }, 500);
         }
     });
+
+    // Haversine formula to calculate distance between two points in km
+    private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+        const R = 6371; // Radius of Earth in km
+        const dLat = this.toRad(lat2 - lat1);
+        const dLon = this.toRad(lon2 - lon1);
+        const a =
+            Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(this.toRad(lat1)) *
+                Math.cos(this.toRad(lat2)) *
+                Math.sin(dLon / 2) *
+                Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
+    private toRad(deg: number): number {
+        return deg * (Math.PI / 180);
+    }
 
     /**
      * GET /matches/upcoming - Get all upcoming matches
