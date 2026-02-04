@@ -1,7 +1,5 @@
-import { Worker } from "bullmq";
 import app from "./src/server";
 import isEnvsDefined from "./src/utils/checkEnv";
-import { redisConnection } from "./src/config/redis";
 
 if (!isEnvsDefined()) {
     console.error("[ERROR]: Environment variables are not defined.");
