@@ -12,7 +12,8 @@ export const usersTable = pgTable(
 
         // Auth
         email: varchar('email', { length: 255 }).notNull().unique(),
-        password_hash: varchar('password_hash', { length: 255 }).notNull(),
+        password_hash: varchar('password_hash', { length: 255 }),
+        google_id: varchar('google_id', { length: 255 }).unique(),
 
         // Profile
         username: varchar('username', { length: 100 }),

@@ -485,6 +485,186 @@ class AuthController {
         
         return ctx.json({ message: "Email is valid" }, 200);
     });
+
+    /**
+     * Google Sign-In (Mobile/Client-side)
+     * The mobile app handles the Google login and sends the user profile data here.
+     */
+    public readonly googleSignIn = this.factory.createHandlers(
+        zValidator("json", z.object({
+            google_id: z.string(),
+            email: z.string().email(),
+            first_name: z.string(),
+            last_name: z.string(),
+            avatar_url: z.string().url().optional(),
+        })),
+        async (ctx) => {
+            const body = ctx.req.valid("json");
+
+            try {
+                // Find or create user in DB
+                const user = await this.userRepository.findOrCreateByGoogleId({
+                    google_id: body.google_id,
+                    email: body.email,
+                    first_name: body.first_name,
+                    last_name: body.last_name,
+                    avatar_url: body.avatar_url
+                });
+
+                if (!user) {
+                    return ctx.json({ error: "Failed to process user data" }, 500);
+                }
+
+                // Generate Match tokens
+                const tokenPayload = {
+                    id: user.id,
+                    email: user.email,
+                    role: user.role,
+                    firstName: user.first_name,
+                };
+
+                const deviceId = ctx.req.header("User-Agent") || "Unknown-Mobile";
+                const [accessToken, refreshToken] = await Promise.all([
+                    JwtUtils.generateAccessToken(tokenPayload),
+                    JwtUtils.generateRefreshToken(tokenPayload),
+                ]);
+
+                await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
+
+                return ctx.json({
+                    user: { 
+                        id: user.id, 
+                        email: user.email, 
+                        role: user.role, 
+                        first_name: user.first_name,
+                        last_name: user.last_name,
+                        avatar_url: user.avatar_url
+                    },
+                    token: accessToken,
+                    refresh_token: refreshToken
+                });
+            } catch (err: any) {
+                console.error("Google Mobile Sign-In Error:", err);
+                return ctx.json({ error: "Internal server error during Google Sign-In" }, 500);
+            }
+        }
+    );
+
+    /**
+     * Google OAuth Login Redirect
+     */
+    public readonly googleLogin = this.factory.createHandlers(async (ctx) => {
+        const clientId = process.env.GOOGLE_CLIENT_ID;
+        const callbackUrl = process.env.GOOGLE_CALLBACK_URL;
+        
+        const params = new URLSearchParams({
+            client_id: clientId!,
+            redirect_uri: callbackUrl!,
+            response_type: 'code',
+            scope: 'openid email profile',
+            access_type: 'offline',
+            prompt: 'select_account'
+        });
+
+        return ctx.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`);
+    });
+
+    /**
+     * Google OAuth Callback
+     */
+    public readonly googleCallback = this.factory.createHandlers(async (ctx) => {
+        const code = ctx.req.query('code');
+        const error = ctx.req.query('error');
+
+        if (error) {
+            return ctx.json({ error: "Google OAuth error", details: error }, 400);
+        }
+
+        if (!code) {
+            return ctx.json({ error: "No code provided" }, 400);
+        }
+
+        try {
+            // Exchange code for tokens
+            const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({
+                    code,
+                    client_id: process.env.GOOGLE_CLIENT_ID!,
+                    client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+                    redirect_uri: process.env.GOOGLE_CALLBACK_URL!,
+                    grant_type: 'authorization_code'
+                })
+            });
+
+            const tokens = await tokenResponse.json();
+            
+            if (tokens.error) {
+                return ctx.json({ error: "Token exchange failed", details: tokens.error_description }, 400);
+            }
+
+            // Get user info
+            const userResponse = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+                headers: { Authorization: `Bearer ${tokens.access_token}` }
+            });
+
+            const googleUser = await userResponse.json();
+
+            // Find or create user in DB
+            const user = await this.userRepository.findOrCreateByGoogleId({
+                google_id: googleUser.sub,
+                email: googleUser.email,
+                first_name: googleUser.given_name,
+                last_name: googleUser.family_name,
+                avatar_url: googleUser.picture
+            });
+
+            if (!user) {
+                return ctx.json({ error: "Failed to process user data" }, 500);
+            }
+
+            // Generate Match tokens
+            const tokenPayload = {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                firstName: user.first_name,
+            };
+
+            const deviceId = ctx.req.header("User-Agent") || "Unknown";
+            const [accessToken, refreshToken] = await Promise.all([
+                JwtUtils.generateAccessToken(tokenPayload),
+                JwtUtils.generateRefreshToken(tokenPayload),
+            ]);
+
+            await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
+
+            // Set cookies and redirect to frontend
+            await Promise.all([
+                setSignedCookie(ctx, "access_token", accessToken, JwtUtils.ACCESS_JWT_SIGN_KEY, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: "Strict",
+                    path: "/",
+                    maxAge: JwtUtils.ACCESS_TOKEN_EXP,
+                }),
+                setSignedCookie(ctx, "refresh_token", refreshToken, JwtUtils.REFRESH_JWT_SIGN_KEY, {
+                    httpOnly: true,
+                    secure: process.env.NODE_ENV === "production",
+                    sameSite: "Strict",
+                    path: "/auth/refresh",
+                    maxAge: JwtUtils.REFRESH_TOKEN_EXP,
+                }),
+            ]);
+
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            return ctx.redirect(`${frontendUrl}/auth/callback?token=${accessToken}`);
+        } catch (err: any) {
+            console.error("Google Callback Error:", err);
+            return ctx.json({ error: "Internal server error during OAuth" }, 500);
+        }
+    });
 }
 
 export default AuthController;

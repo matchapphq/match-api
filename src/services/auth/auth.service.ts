@@ -26,6 +26,11 @@ class AuthService {
         this.router.post("/verify-reset-code", ...this.authController.verifyResetCode);
         this.router.post("/reset-password", ...this.authController.resetPassword);
         this.router.post("/validate-email", ...this.authController.validateEmail);
+        
+        // Google OAuth
+        this.router.get("/google", ...this.authController.googleLogin);
+        this.router.get("/google/callback", ...this.authController.googleCallback);
+        this.router.post("/google/signin", ...this.authController.googleSignIn);
     }
 }
 

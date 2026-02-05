@@ -42,6 +42,55 @@ class UserRepository {
         return (await db.select().from(usersTable).where(eq(usersTable.id, id)))[0];
     }
 
+    public async findOrCreateByGoogleId(googleData: {
+        google_id: string;
+        email: string;
+        first_name: string;
+        last_name: string;
+        avatar_url?: string;
+    }) {
+        // Try to find by Google ID first
+        const [existingByGoogle] = await db.select()
+            .from(usersTable)
+            .where(eq(usersTable.google_id, googleData.google_id));
+
+        if (existingByGoogle) {
+            return existingByGoogle;
+        }
+
+        // If not found by Google ID, try to find by email
+        const [existingByEmail] = await db.select()
+            .from(usersTable)
+            .where(eq(usersTable.email, googleData.email));
+
+        if (existingByEmail) {
+            // Link existing account to Google
+            const [updated] = await db.update(usersTable)
+                .set({ 
+                    google_id: googleData.google_id,
+                    avatar_url: googleData.avatar_url || existingByEmail.avatar_url,
+                    updated_at: new Date()
+                })
+                .where(eq(usersTable.id, existingByEmail.id))
+                .returning();
+            return updated;
+        }
+
+        // Create new user if not found
+        const [newUser] = await db.insert(usersTable).values({
+            email: googleData.email,
+            google_id: googleData.google_id,
+            first_name: googleData.first_name,
+            last_name: googleData.last_name,
+            avatar_url: googleData.avatar_url,
+            role: 'user',
+            is_verified: true,
+            password_hash: '', // No password for OAuth users initially
+        }).returning();
+
+        return newUser;
+    }
+
     public async createUser(userData: userRegisterData) {
         // Create user
         const hashed_password = await password.hash(userData.password, { algorithm: "bcrypt", cost: 10 });

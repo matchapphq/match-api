@@ -19,6 +19,9 @@ function isEnvsDefined(): boolean {
         "STRIPE_PRICE_ANNUAL",
         "FRONTEND_URL",
         "LOCATIONIQ_KEY",
+        "GOOGLE_CLIENT_ID",
+        "GOOGLE_CLIENT_SECRET",
+        "GOOGLE_CALLBACK_URL",
         "PORT",
     ];
 
