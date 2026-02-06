@@ -1,7 +1,7 @@
 import { createFactory } from "hono/factory";
 import { mailQueue, notificationQueue } from "../../queue/notification.queue";
 import { NotificationType } from "../../types/jobs.type";
-import { EmailType } from "../../../services/mail-service/types/mail.types";
+import { EmailType } from "../../types/mail.types";
 
 class HealthController {
     private readonly factory = createFactory();

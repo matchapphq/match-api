@@ -20,6 +20,13 @@ function isEnvsDefined(): boolean {
         "FRONTEND_URL",
         "LOCATIONIQ_KEY",
         "PORT",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_SECURE",
+        "SMTP_USER",
+        "SMTP_PASSWORD",
+        "SMTP_SEND_MAIL",
+        "SMTP_SEND_NAME",
     ];
 
     const missingEnvs = requiredEnvs.filter((env) => process.env[env] === undefined);
