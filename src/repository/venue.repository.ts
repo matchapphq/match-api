@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import type { CreateVenueInput, UpdateVenueInput, GetVenuesQuery } from "../types/venue.types";
 import { venuePhotosTable } from "../config/db/venue-photos.table";
 import { openingHoursExceptionsTable, amenitiesTable, venueAmenitiesTable } from "../config/db/venue-amenities.table";
+import { venueMatchesTable, matchesTable } from "../config/db/matches.table";
 
 export class VenueRepository {
 
@@ -410,5 +411,46 @@ export class VenueRepository {
         return await db.select()
             .from(amenitiesTable)
             .where(inArray(amenitiesTable.slug, slugs));
+    }
+
+    // ============================================
+    // VENUE MATCHES
+    // ============================================
+
+    async getVenueMatches(venueId: string, options?: { upcomingOnly?: boolean }) {
+        // Get all venue matches for this venue
+        const venueMatches = await db.query.venueMatchesTable.findMany({
+            where: and(
+                eq(venueMatchesTable.venue_id, venueId),
+                eq(venueMatchesTable.is_active, true),
+            ),
+            with: {
+                match: {
+                    with: {
+                        homeTeam: true,
+                        awayTeam: true,
+                        league: true,
+                    }
+                }
+            },
+        });
+
+        // Filter upcoming matches in memory if needed
+        let filteredMatches = venueMatches;
+        if (options?.upcomingOnly) {
+            const now = new Date();
+            filteredMatches = venueMatches.filter((vm: any) => 
+                vm.match?.scheduled_at && new Date(vm.match.scheduled_at) >= now
+            );
+        }
+
+        // Sort by match scheduled_at descending
+        filteredMatches.sort((a: any, b: any) => {
+            const dateA = a.match?.scheduled_at ? new Date(a.match.scheduled_at).getTime() : 0;
+            const dateB = b.match?.scheduled_at ? new Date(b.match.scheduled_at).getTime() : 0;
+            return dateA - dateB; // ascending order (closest matches first)
+        });
+
+        return filteredMatches;
     }
 }

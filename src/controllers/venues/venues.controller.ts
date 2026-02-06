@@ -412,8 +412,60 @@ class VenueController {
     });
 
     readonly getMatches = this.factory.createHandlers(async (ctx) => {
-        // TODO: Implement
-        return ctx.json({ msg: "Venue matches" });
+        const venueId = ctx.req.param("venueId");
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID is required" }, 400);
+        }
+
+        try {
+            const venue = await this.venueRepository.findById(venueId);
+            if (!venue) {
+                return ctx.json({ error: "Venue not found" }, 404);
+            }
+
+            const upcomingOnly = ctx.req.query("upcoming_only") !== "false";
+            const venueMatches = await this.venueRepository.getVenueMatches(venueId, { upcomingOnly });
+
+            // Transform to expected format
+            const matches = venueMatches.map((vm: any) => ({
+                id: vm.match?.id,
+                scheduled_at: vm.match?.scheduled_at,
+                status: vm.match?.status,
+                homeTeam: vm.match?.homeTeam ? {
+                    id: vm.match.homeTeam.id,
+                    name: vm.match.homeTeam.name,
+                    logo_url: vm.match.homeTeam.logo_url,
+                    short_name: vm.match.homeTeam.short_name,
+                } : null,
+                awayTeam: vm.match?.awayTeam ? {
+                    id: vm.match.awayTeam.id,
+                    name: vm.match.awayTeam.name,
+                    logo_url: vm.match.awayTeam.logo_url,
+                    short_name: vm.match.awayTeam.short_name,
+                } : null,
+                league: vm.match?.league ? {
+                    id: vm.match.league.id,
+                    name: vm.match.league.name,
+                    logo_url: vm.match.league.logo_url,
+                } : null,
+                home_team_score: vm.match?.home_team_score,
+                away_team_score: vm.match?.away_team_score,
+                venue_match: {
+                    id: vm.id,
+                    total_capacity: vm.total_capacity,
+                    available_capacity: vm.available_capacity,
+                    allows_reservations: vm.allows_reservations,
+                    is_featured: vm.is_featured,
+                    is_boosted: vm.is_boosted,
+                },
+            }));
+
+            return ctx.json(matches);
+        } catch (error: any) {
+            console.error("Get venue matches error:", error);
+            return ctx.json({ error: "Failed to fetch venue matches" }, 500);
+        }
     });
 
     readonly getAvailability = this.factory.createHandlers(async (ctx) => {
