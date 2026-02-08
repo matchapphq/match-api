@@ -11,6 +11,7 @@
 | **[🔌 API Routes](./api_routes.md)** | Complete API endpoint reference with request/response examples. |
 | **[📊 Status Report](./status_report.md)** | Current project status, module completion, and roadmap. |
 | **[💳 Stripe Integration](./stripe_integration.md)** | Setup guide for Subscriptions and Boosts. |
+| **[📧 Mail Service](./mail_service.md)** | Microservice details, queues, and email templates. |
 | **[📋 Implementation Plan](./implementation_plan.md)** | Active refactoring and feature implementation roadmap. |
 | **[🔍 Verification Report](./verification_report.md)** | Audit findings and required fixes. |
 

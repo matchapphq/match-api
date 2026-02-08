@@ -1,3 +1,7 @@
+[🏠 Home](./index.md) | [🏗️ Architecture](./architecture.md) | [🔌 API Routes](./api_routes.md) | [📊 Status](./status_report.md)
+
+---
+
 # Implementation Plan: API Logic & Architecture Refactor
 
 This plan outlines the steps to refactor the API architecture and implement missing features as requested.
@@ -40,10 +44,14 @@ This plan outlines the steps to refactor the API architecture and implement miss
 
 ## 4. Documentation
 - [ ] **Document Waitlists**
-    - Update `API_ROUTES.md` to include the user-side Waitlist routes found in `ReservationsController` (`joinWaitlist`, `leaveWaitlist`, `getWaitlist`).
+    - Update `api_routes.md` to include the user-side Waitlist routes found in `ReservationsController` (`joinWaitlist`, `leaveWaitlist`, `getWaitlist`).
 
 ## 5. Execution Order
 1.  **Cleanup**: Remove Seats, Fix Auth/Me.
 2.  **Refactor**: Onboarding & Reviews.
 3.  **Documentation**: Update Waitlist docs.
 4.  **Implementation**: Tackle the Controllers one by one (Billing, Sports, Discovery, Messaging, Notifications).
+
+
+---
+[« Back to Documentation Index](./index.md)

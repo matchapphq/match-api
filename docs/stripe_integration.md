@@ -1,3 +1,7 @@
+[🏠 Home](./index.md) | [🏗️ Architecture](./architecture.md) | [🔌 API Routes](./api_routes.md) | [📊 Status](./status_report.md)
+
+---
+
 # Stripe Integration Documentation
 
 ## Overview
@@ -289,3 +293,7 @@ curl -X POST http://localhost:3000/subscriptions/mock \
 |----------|--------------|--------------|
 | `mensuel` | `basic` | `STRIPE_PRICE_MONTHLY` |
 | `annuel` | `pro` | `STRIPE_PRICE_ANNUAL` |
+
+
+---
+[« Back to Documentation Index](./index.md)

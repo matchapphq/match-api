@@ -1,3 +1,7 @@
+[🏠 Home](./index.md) | [🏗️ Architecture](./architecture.md) | [🔌 API Routes](./api_routes.md) | [📊 Status](./status_report.md)
+
+---
+
 # Match Mail Service
 
 A standalone microservice responsible for handling email delivery for the Match platform. Built with [Bun](https://bun.sh) and [BullMQ](https://docs.bullmq.io/), this service consumes jobs from a Redis queue to process email tasks asynchronously.
@@ -72,7 +76,9 @@ await mailQueue.add("send-welcome", {
   template: "welcome-email",
   data: { name: "John Doe" }
 });
-```\n---\n
+```
+---
+
 # Mail Service Templates
 
 This document outlines the available email templates and the data payloads required for each. The Mail Service processes these jobs via the `mail-queue` queue.
@@ -218,3 +224,6 @@ const jobData = {
   "address": "123 Main St, Paris"
 }
 ```
+
+---
+[« Back to Documentation Index](./index.md)

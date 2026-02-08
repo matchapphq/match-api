@@ -1,6 +1,10 @@
+[🏠 Home](./index.md) | [🏗️ Architecture](./architecture.md) | [🔌 API Routes](./api_routes.md) | [📊 Status](./status_report.md)
+
+---
+
 # API Route Verification Report
 
-This report summarizes the verification of the `match-api` implementation against the documented `API_ROUTES.md`.
+This report summarizes the verification of the `match-api` implementation against the documented `api_routes.md`.
 
 ## Summary
 - **Total Controllers Reviewed**: 15+
@@ -29,7 +33,7 @@ The following controllers appear to be legally implemented and match the documen
 - **Sports**:
   - `GET /api/sports/fixture`: Method exists but body is empty (`try {} catch...`).
 - **Waitlist (User-side)**:
-  - `ReservationsController` contains `joinWaitlist`, `leaveWaitlist`, `getWaitlist` which are NOT documented in `API_ROUTES.md` under Reservations (only under Partner for viewing).
+  - `ReservationsController` contains `joinWaitlist`, `leaveWaitlist`, `getWaitlist` which are NOT documented in `api_routes.md` under Reservations (only under Partner for viewing).
 - **Billing**:
   - `BillingController` is all stubs. However, `SubscriptionsController` implements `getMyInvoices`, creating potential duplication or confusion.
 
@@ -49,4 +53,8 @@ The following controllers exist but their methods return placeholder responses (
 3.  **Implement Reviews**: Essential for social proof.
 4.  **Implement Messaging/Notifications**: Needed for user-venue communication.
 5.  **Clarify Billing**: Decide if `BillingController` is needed or if `SubscriptionsController` covers it.
-6.  **Update API_ROUTES.md**: Add the user-side Waitlist routes found in `ReservationsController`.
+6.  **Update api_routes.md**: Add the user-side Waitlist routes found in `ReservationsController`.
+
+
+---
+[« Back to Documentation Index](./index.md)

@@ -1,3 +1,7 @@
+[🏠 Home](./index.md) | [🏗️ Architecture](./architecture.md) | [🔌 API Routes](./api_routes.md) | [📊 Status](./status_report.md)
+
+---
+
 # Match Project — Complete API Routes Documentation
 
 **Production-ready API routes for Match platform**  
@@ -817,3 +821,6 @@ Response: 200
 
 ### GET /api/subscriptions/invoices
 **Get invoice history**
+
+---
+[« Back to Documentation Index](./index.md)

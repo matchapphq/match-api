@@ -1,3 +1,7 @@
+[🏠 Home](./index.md) | [🏗️ Architecture](./architecture.md) | [🔌 API Routes](./api_routes.md) | [📊 Status](./status_report.md)
+
+---
+
 # Match Project API Architecture
 
 *Last updated: February 2026*
@@ -145,3 +149,6 @@ bun drizzle-kit push
 # Start development server
 bun run dev
 ```
+
+---
+[« Back to Documentation Index](./index.md)
