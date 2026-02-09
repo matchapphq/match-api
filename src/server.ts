@@ -11,7 +11,6 @@ import VenueService from "./services/venues/venues.service";
 import MatchesService from "./services/matches/matches.service";
 import SportsService from "./services/sports/sports.service";
 import LeaguesService from "./services/leagues/leagues.service";
-import TeamsService from "./services/teams/teams.service";
 import ReservationsService from "./services/reservations/reservations.service";
 import PartnerService from "./services/partner/partner.service";
 
@@ -36,7 +35,6 @@ const venueRouter = new VenueService();
 const matchesRouter = new MatchesService();
 const sportsRouter = new SportsService();
 const leaguesRouter = new LeaguesService();
-const teamsRouter = new TeamsService();
 const reservationsRouter = new ReservationsService();
 const partnerRouter = new PartnerService();
 
@@ -114,7 +112,6 @@ app.get("/amenities", async (c) => {
 app.route("/matches", matchesRouter.getRouter);
 app.route("/sports", sportsRouter.getRouter);
 app.route("/leagues", leaguesRouter.getRouter);
-app.route("/teams", teamsRouter.getRouter);
 app.route("/reservations", reservationsRouter.getRouter);
 app.route("/partners", partnerRouter.getRouter);
 
