@@ -1,5 +1,7 @@
 import { Hono } from "hono";
-import NotificationsController from "../../controllers/notifications/notifications.controller";
+import NotificationsController from "./notifications.controller";
+import { NotificationsLogic } from "./notifications.logic";
+import { NotificationsRepository } from "../../repository/notifications.repository";
 import { authMiddleware } from "../../middleware/auth.middleware";
 
 /**
@@ -7,13 +9,16 @@ import { authMiddleware } from "../../middleware/auth.middleware";
  */
 class NotificationsService {
     private readonly router = new Hono();
-    private readonly controller = new NotificationsController();
+    private readonly controller: NotificationsController;
 
     public get getRouter() {
         return this.router;
     }
 
     constructor() {
+        const repository = new NotificationsRepository();
+        const notificationsLogic = new NotificationsLogic(repository);
+        this.controller = new NotificationsController(notificationsLogic);
         this.initRoutes();
     }
 

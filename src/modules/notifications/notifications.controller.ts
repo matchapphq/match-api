@@ -1,42 +1,34 @@
 import { createFactory } from "hono/factory";
 import type { HonoEnv } from "../../types/hono.types";
-import { NotificationsRepository } from "../../repository/notifications.repository";
+import { NotificationsLogic } from "./notifications.logic";
 
 /**
  * Controller for Notifications operations.
  */
 class NotificationsController {
     private readonly factory = createFactory<HonoEnv>();
-    private readonly repository = new NotificationsRepository();
+
+    constructor(private readonly notificationsLogic: NotificationsLogic) {}
 
     /**
      * GET /notifications
      * Get all notifications for the authenticated user
-     * Query params: limit, offset, unreadOnly
      */
     readonly getNotifications = this.factory.createHandlers(async (ctx) => {
         const user = ctx.get("user");
-        console.log('[NotificationsController] getNotifications called for user:', user?.id);
         if (!user?.id) return ctx.json({ error: "Unauthorized" }, 401);
 
         const limit = parseInt(ctx.req.query("limit") || "50");
         const offset = parseInt(ctx.req.query("offset") || "0");
         const unreadOnly = ctx.req.query("unreadOnly") === "true";
 
-        const notifications = await this.repository.findByUserId(user.id, {
-            limit,
-            offset,
-            unreadOnly
-        });
-
-        const unreadCount = await this.repository.getUnreadCount(user.id);
-        console.log('[NotificationsController] Found', notifications.length, 'notifications, unreadCount:', unreadCount);
-
-        return ctx.json({ 
-            notifications,
-            unreadCount,
-            pagination: { limit, offset }
-        });
+        try {
+            const result = await this.notificationsLogic.getNotifications(user.id, limit, offset, unreadOnly);
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error fetching notifications:", error);
+            return ctx.json({ error: "Failed to fetch notifications" }, 500);
+        }
     });
 
     /**
@@ -47,14 +39,18 @@ class NotificationsController {
         const user = ctx.get("user");
         if (!user?.id) return ctx.json({ error: "Unauthorized" }, 401);
 
-        const unreadCount = await this.repository.getUnreadCount(user.id);
-        return ctx.json({ unreadCount });
+        try {
+            const result = await this.notificationsLogic.getUnreadCount(user.id);
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error fetching unread count:", error);
+            return ctx.json({ error: "Failed to fetch unread count" }, 500);
+        }
     });
 
     /**
      * GET /notifications/new
      * Get notifications created after a timestamp (for polling new notifications)
-     * Query param: since (ISO timestamp)
      */
     readonly getNewNotifications = this.factory.createHandlers(async (ctx) => {
         const user = ctx.get("user");
@@ -70,14 +66,13 @@ class NotificationsController {
             return ctx.json({ error: "Invalid 'since' timestamp" }, 400);
         }
 
-        const notifications = await this.repository.getNewNotifications(user.id, since);
-        const unreadCount = await this.repository.getUnreadCount(user.id);
-
-        return ctx.json({ 
-            notifications,
-            unreadCount,
-            hasNew: notifications.length > 0
-        });
+        try {
+            const result = await this.notificationsLogic.getNewNotifications(user.id, since);
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error fetching new notifications:", error);
+            return ctx.json({ error: "Failed to fetch new notifications" }, 500);
+        }
     });
 
     /**
@@ -93,15 +88,14 @@ class NotificationsController {
             return ctx.json({ error: "Notification ID required" }, 400);
         }
 
-        const updated = await this.repository.markAsRead(notificationId, user.id);
-        if (!updated) {
-            return ctx.json({ error: "Notification not found" }, 404);
+        try {
+            const result = await this.notificationsLogic.markAsRead(user.id, notificationId);
+            return ctx.json(result);
+        } catch (error: any) {
+            if (error.message === "NOTIFICATION_NOT_FOUND") return ctx.json({ error: "Notification not found" }, 404);
+            console.error("Error marking notification as read:", error);
+            return ctx.json({ error: "Failed to mark notification as read" }, 500);
         }
-
-        return ctx.json({ 
-            message: "Notification marked as read",
-            notification: updated
-        });
     });
 
     /**
@@ -112,12 +106,13 @@ class NotificationsController {
         const user = ctx.get("user");
         if (!user?.id) return ctx.json({ error: "Unauthorized" }, 401);
 
-        const count = await this.repository.markAllAsRead(user.id);
-
-        return ctx.json({ 
-            message: "All notifications marked as read",
-            count
-        });
+        try {
+            const result = await this.notificationsLogic.markAllAsRead(user.id);
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error marking all notifications as read:", error);
+            return ctx.json({ error: "Failed to mark all notifications as read" }, 500);
+        }
     });
 
     /**
@@ -133,12 +128,14 @@ class NotificationsController {
             return ctx.json({ error: "Notification ID required" }, 400);
         }
 
-        const deleted = await this.repository.delete(notificationId, user.id);
-        if (!deleted) {
-            return ctx.json({ error: "Notification not found" }, 404);
+        try {
+            const result = await this.notificationsLogic.deleteNotification(user.id, notificationId);
+            return ctx.json(result);
+        } catch (error: any) {
+            if (error.message === "NOTIFICATION_NOT_FOUND") return ctx.json({ error: "Notification not found" }, 404);
+            console.error("Error deleting notification:", error);
+            return ctx.json({ error: "Failed to delete notification" }, 500);
         }
-
-        return ctx.json({ message: "Notification deleted" });
     });
 }
 
