@@ -20,7 +20,6 @@ import BoostService from "./modules/boost/boost.routes";
 import CouponsService from "./modules/coupons/coupons.routes";
 import FidelityService from "./modules/fidelity/fidelity.routes";
 import HealthService from "./modules/health/health.routes";
-import MessagingService from "./modules/messaging/messaging.routes";
 import NotificationsService from "./modules/notifications/notifications.routes";
 import ReferralService from "./modules/referral/referral.routes";
 import ReviewsService from "./modules/reviews/reviews.routes";
@@ -39,7 +38,6 @@ const partnerRouter = new PartnerService();
 // New Service Instances
 const reviewsRouter = new ReviewsService();
 const notificationsRouter = new NotificationsService();
-const messagingRouter = new MessagingService();
 const subscriptionsRouter = new SubscriptionsService();
 const billingRouter = new BillingService();
 const analyticsRouter = new AnalyticsService();
@@ -121,18 +119,6 @@ app.route("/reviews", reviewsRouter.getRouter); // Direct review actions
 app.route("/notifications", notificationsRouter.getRouter);
 app.route("/webhooks", webhooksRouter.getRouter);
 app.route("/coupons", couponsRouter.getRouter);
-
-// Messaging (Conversations & Messages)
-// Can be mounted at separate roots or typically messaging or conversations
-// API Docs: /api/conversations, /api/messages
-// We can mount messagingRouter at / and let it handle both if defined there, 
-// OR mount at / and prefix in service.
-// Service definitions:
-// this.router.post("/conversations", ...)
-// this.router.put("/messages/:messageId", ...)
-// So mounting at "/" works best to capture both /conversations and /messages from one service,
-// or we mount at /api (parent) context. Use "" for now.
-app.route("/", messagingRouter.getRouter);
 
 // Subscriptions (Venue Owners)
 app.route("/subscriptions", subscriptionsRouter.getRouter);
