@@ -1,17 +1,20 @@
 import { createFactory } from "hono/factory";
+import { MediaLogic } from "./media.logic";
 
 class MediaController {
     private readonly factory = createFactory();
     
+    constructor(private readonly mediaLogic: MediaLogic) {}
+
     public readonly uploadMedia = this.factory.createHandlers(async (ctx) => {
-        // Placeholder for media upload logic
-        return ctx.json({ msg: "Media uploaded successfully" });
+        const result = await this.mediaLogic.uploadMedia();
+        return ctx.json(result);
     })
     
     public readonly getMedia = this.factory.createHandlers(async (ctx) => {
-        // Placeholder for media retrieval logic
         const mediaId = ctx.req.param("mediaId");
-        return ctx.json({ msg: `Media retrieved successfully for ID: ${mediaId}` });
+        const result = await this.mediaLogic.getMedia(mediaId);
+        return ctx.json(result);
     })
     
 }

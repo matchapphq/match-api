@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import ReferralController from "../../controllers/referral/referral.controller";
+import ReferralController from "./referral.controller";
+import { ReferralLogic } from "./referral.logic";
 import { authMiddleware } from "../../middleware/auth.middleware";
 
 /**
@@ -8,13 +9,15 @@ import { authMiddleware } from "../../middleware/auth.middleware";
  */
 class ReferralService {
     private readonly router = new Hono();
-    private readonly controller = new ReferralController();
+    private readonly controller: ReferralController;
 
     public get getRouter() {
         return this.router;
     }
 
     constructor() {
+        const referralLogic = new ReferralLogic();
+        this.controller = new ReferralController(referralLogic);
         this.initRoutes();
     }
 

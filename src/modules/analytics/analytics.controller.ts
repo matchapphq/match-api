@@ -2,9 +2,9 @@ import type { Context } from "hono";
 import { createFactory } from "hono/factory";
 import { validator } from "hono/validator";
 import { z } from "zod";
-import { AnalyticsRepository } from "../../repository/analytics.repository";
 import type { GroupByPeriod } from "../../repository/analytics.repository";
 import type { HonoEnv } from "../../types/hono.types";
+import { AnalyticsLogic } from "./analytics.logic";
 
 // ============================================
 // VALIDATION SCHEMAS
@@ -25,7 +25,8 @@ const TrendQuerySchema = DateRangeSchema.extend({
  */
 class AnalyticsController {
     private readonly factory = createFactory<HonoEnv>();
-    private readonly analyticsRepo = new AnalyticsRepository();
+
+    constructor(private readonly analyticsLogic: AnalyticsLogic) {}
 
     /**
      * Helper to get user ID from context
@@ -43,7 +44,7 @@ class AnalyticsController {
      */
     private async verifyOwnership(ctx: Context<HonoEnv>, venueId: string): Promise<boolean> {
         const userId = this.getUserId(ctx);
-        return await this.analyticsRepo.isVenueOwner(venueId, userId);
+        return await this.analyticsLogic.isVenueOwner(venueId, userId);
     }
 
     /**
@@ -74,16 +75,13 @@ class AnalyticsController {
                 const { start_date, end_date } = ctx.req.valid('query');
 
                 // Get venue info
-                const venue = await this.analyticsRepo.getVenueBasicInfo(venueId);
+                const venue = await this.analyticsLogic.getVenueBasicInfo(venueId);
                 if (!venue) {
                     return ctx.json({ error: "Venue not found" }, 404);
                 }
 
                 // Get analytics
-                const overview = await this.analyticsRepo.getOverview(venueId, {
-                    startDate: start_date,
-                    endDate: end_date
-                });
+                const overview = await this.analyticsLogic.getVenueOverview(venueId, start_date, end_date);
 
                 return ctx.json({
                     venue: {
@@ -135,17 +133,13 @@ class AnalyticsController {
                 const { start_date, end_date, group_by } = ctx.req.valid('query');
 
                 // Get venue info
-                const venue = await this.analyticsRepo.getVenueBasicInfo(venueId);
+                const venue = await this.analyticsLogic.getVenueBasicInfo(venueId);
                 if (!venue) {
                     return ctx.json({ error: "Venue not found" }, 404);
                 }
 
                 // Get trends
-                const trends = await this.analyticsRepo.getReservationTrends(venueId, {
-                    startDate: start_date,
-                    endDate: end_date,
-                    groupBy: group_by as GroupByPeriod
-                });
+                const trends = await this.analyticsLogic.getReservationTrends(venueId, start_date, end_date, group_by as GroupByPeriod);
 
                 return ctx.json({
                     venue: {
@@ -197,17 +191,13 @@ class AnalyticsController {
                 const { start_date, end_date, group_by } = ctx.req.valid('query');
 
                 // Get venue info
-                const venue = await this.analyticsRepo.getVenueBasicInfo(venueId);
+                const venue = await this.analyticsLogic.getVenueBasicInfo(venueId);
                 if (!venue) {
                     return ctx.json({ error: "Venue not found" }, 404);
                 }
 
                 // Get trends
-                const trends = await this.analyticsRepo.getRevenueTrends(venueId, {
-                    startDate: start_date,
-                    endDate: end_date,
-                    groupBy: group_by as GroupByPeriod
-                });
+                const trends = await this.analyticsLogic.getRevenueTrends(venueId, start_date, end_date, group_by as GroupByPeriod);
 
                 return ctx.json({
                     venue: {
