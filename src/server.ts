@@ -6,11 +6,10 @@ import { authMiddleware } from "./middleware/auth.middleware";
 
 import AuthService from "./modules/auth/auth.routes";
 import DiscoveryService from "./services/discovery/discovery.service";
-import LeaguesService from "./services/leagues/leagues.service";
+import SportsService from "./modules/sports/sports.routes"; // Consolidated Sports/Leagues/Teams
 import MatchesService from "./modules/matches/matches.routes";
-import PartnerService from "./services/partner/partner.service";
+import PartnerService from "./modules/partner/partner.routes";
 import ReservationsService from "./modules/reservations/reservations.routes";
-import SportsService from "./services/sports/sports.service";
 import UserService from "./modules/user/user.routes";
 import VenueService from "./modules/venues/venues.routes";
 
@@ -19,14 +18,14 @@ import AnalyticsService from "./services/analytics/analytics.service";
 import BillingService from "./services/billing/billing.service";
 import BoostService from "./services/boost/boost.service";
 import CouponsService from "./services/coupons/coupons.service";
-import fidelityService from "./services/fidelity/fidelity.service";
+import FidelityService from "./modules/fidelity/fidelity.routes";
 import HealthService from "./services/health/health.service";
 import MessagingService from "./services/messaging/messaging.service";
-import NotificationsService from "./services/notifications/notifications.service";
+import NotificationsService from "./modules/notifications/notifications.routes";
 import ReferralService from "./services/referral/referral.service";
 import ReviewsService from "./services/reviews/reviews.service";
-import SubscriptionsService from "./services/subscriptions/subscriptions.service";
-import WebhooksService from "./services/webhooks/webhooks.service";
+import SubscriptionsService from "./modules/subscriptions/subscriptions.routes";
+import WebhooksService from "./modules/webhooks/webhooks.routes";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -34,7 +33,6 @@ const discoveryRouter = new DiscoveryService();
 const venueRouter = new VenueService();
 const matchesRouter = new MatchesService();
 const sportsRouter = new SportsService();
-const leaguesRouter = new LeaguesService();
 const reservationsRouter = new ReservationsService();
 const partnerRouter = new PartnerService();
 
@@ -50,6 +48,7 @@ const webhooksRouter = new WebhooksService();
 const referralRouter = new ReferralService();
 const boostRouter = new BoostService();
 const healthRouter = new HealthService();
+const fidelityRouter = new FidelityService();
 
 const app = new Hono().basePath("/api");
 
@@ -110,8 +109,10 @@ app.get("/amenities", async (c) => {
     }
 });
 app.route("/matches", matchesRouter.getRouter);
-app.route("/sports", sportsRouter.getRouter);
-app.route("/leagues", leaguesRouter.getRouter);
+// Sports router now handles /sports, /leagues, /teams (if mounted at root)
+// But to keep paths clean, we will mount it at / and let it handle its own prefixes
+app.route("/", sportsRouter.getRouter); 
+
 app.route("/reservations", reservationsRouter.getRouter);
 app.route("/partners", partnerRouter.getRouter);
 
@@ -154,6 +155,6 @@ app.route("/referral", referralRouter.getRouter);
 app.route("/boosts", boostRouter.getRouter);
 
 // Fidelity System (loyalty points, badges, challenges)
-app.route("/fidelity", fidelityService);
+app.route("/fidelity", fidelityRouter.getRouter);
 
 export default app;
