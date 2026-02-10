@@ -4,29 +4,27 @@ import { logger } from "hono/logger";
 import { authMiddleware } from "./middleware/auth.middleware";
 
 
-import AuthService from "./services/auth/auth.service";
-import DiscoveryService from "./services/discovery/discovery.service";
-import LeaguesService from "./services/leagues/leagues.service";
-import MatchesService from "./services/matches/matches.service";
-import PartnerService from "./services/partner/partner.service";
-import ReservationsService from "./services/reservations/reservations.service";
-import SportsService from "./services/sports/sports.service";
-import UserService from "./services/user/user.service";
-import VenueService from "./services/venues/venues.service";
+import AuthService from "./modules/auth/auth.routes";
+import DiscoveryService from "./modules/discovery/discovery.routes";
+import SportsService from "./modules/sports/sports.routes"; // Consolidated Sports/Leagues/Teams
+import MatchesService from "./modules/matches/matches.routes";
+import PartnerService from "./modules/partner/partner.routes";
+import ReservationsService from "./modules/reservations/reservations.routes";
+import UserService from "./modules/user/user.routes";
+import VenueService from "./modules/venues/venues.routes";
 
 // New Services
-import AnalyticsService from "./services/analytics/analytics.service";
-import BillingService from "./services/billing/billing.service";
-import BoostService from "./services/boost/boost.service";
-import CouponsService from "./services/coupons/coupons.service";
-import fidelityService from "./services/fidelity/fidelity.service";
-import HealthService from "./services/health/health.service";
-import MessagingService from "./services/messaging/messaging.service";
-import NotificationsService from "./services/notifications/notifications.service";
-import ReferralService from "./services/referral/referral.service";
-import ReviewsService from "./services/reviews/reviews.service";
-import SubscriptionsService from "./services/subscriptions/subscriptions.service";
-import WebhooksService from "./services/webhooks/webhooks.service";
+import AnalyticsService from "./modules/analytics/analytics.routes";
+import BillingService from "./modules/billing/billing.routes";
+import BoostService from "./modules/boost/boost.routes";
+import CouponsService from "./modules/coupons/coupons.routes";
+import FidelityService from "./modules/fidelity/fidelity.routes";
+import HealthService from "./modules/health/health.routes";
+import NotificationsService from "./modules/notifications/notifications.routes";
+import ReferralService from "./modules/referral/referral.routes";
+import ReviewsService from "./modules/reviews/reviews.routes";
+import SubscriptionsService from "./modules/subscriptions/subscriptions.routes";
+import WebhooksService from "./modules/webhooks/webhooks.routes";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -34,14 +32,12 @@ const discoveryRouter = new DiscoveryService();
 const venueRouter = new VenueService();
 const matchesRouter = new MatchesService();
 const sportsRouter = new SportsService();
-const leaguesRouter = new LeaguesService();
 const reservationsRouter = new ReservationsService();
 const partnerRouter = new PartnerService();
 
 // New Service Instances
 const reviewsRouter = new ReviewsService();
 const notificationsRouter = new NotificationsService();
-const messagingRouter = new MessagingService();
 const subscriptionsRouter = new SubscriptionsService();
 const billingRouter = new BillingService();
 const analyticsRouter = new AnalyticsService();
@@ -50,6 +46,7 @@ const webhooksRouter = new WebhooksService();
 const referralRouter = new ReferralService();
 const boostRouter = new BoostService();
 const healthRouter = new HealthService();
+const fidelityRouter = new FidelityService();
 
 const app = new Hono().basePath("/api");
 
@@ -110,8 +107,10 @@ app.get("/amenities", async (c) => {
     }
 });
 app.route("/matches", matchesRouter.getRouter);
-app.route("/sports", sportsRouter.getRouter);
-app.route("/leagues", leaguesRouter.getRouter);
+// Sports router now handles /sports, /leagues, /teams (if mounted at root)
+// But to keep paths clean, we will mount it at / and let it handle its own prefixes
+app.route("/", sportsRouter.getRouter); 
+
 app.route("/reservations", reservationsRouter.getRouter);
 app.route("/partners", partnerRouter.getRouter);
 
@@ -120,18 +119,6 @@ app.route("/reviews", reviewsRouter.getRouter); // Direct review actions
 app.route("/notifications", notificationsRouter.getRouter);
 app.route("/webhooks", webhooksRouter.getRouter);
 app.route("/coupons", couponsRouter.getRouter);
-
-// Messaging (Conversations & Messages)
-// Can be mounted at separate roots or typically messaging or conversations
-// API Docs: /api/conversations, /api/messages
-// We can mount messagingRouter at / and let it handle both if defined there, 
-// OR mount at / and prefix in service.
-// Service definitions:
-// this.router.post("/conversations", ...)
-// this.router.put("/messages/:messageId", ...)
-// So mounting at "/" works best to capture both /conversations and /messages from one service,
-// or we mount at /api (parent) context. Use "" for now.
-app.route("/", messagingRouter.getRouter);
 
 // Subscriptions (Venue Owners)
 app.route("/subscriptions", subscriptionsRouter.getRouter);
@@ -154,6 +141,6 @@ app.route("/referral", referralRouter.getRouter);
 app.route("/boosts", boostRouter.getRouter);
 
 // Fidelity System (loyalty points, badges, challenges)
-app.route("/fidelity", fidelityService);
+app.route("/fidelity", fidelityRouter.getRouter);
 
 export default app;

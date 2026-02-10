@@ -8,7 +8,12 @@
 
 ## 🏗️ Overview
 
-This project is a high-performance API built with [Hono](https://hono.dev/) for the Match Project. It follows a clean, modular architecture separating concerns into **Services** (Route Definitions), **Controllers** (Business Logic & Request Handling), and **Repositories** (Data Access).
+This project is a high-performance API built with [Hono](https://hono.dev/) for the Match Project. It follows a **Domain-Driven, Modular Architecture** inspired by NestJS but optimized for Hono's performance.
+
+It separates concerns into **Modules**, which contain:
+*   **Routes**: Route definitions and wiring.
+*   **Controllers**: HTTP Adapters (Validation, Response Mapping).
+*   **Logic**: Pure business logic (Service Layer).
 
 ## 💼 Business Model
 
@@ -40,9 +45,12 @@ match-api/
 ├── src/
 │   ├── config/            # Configuration files
 │   │   └── db/            # Drizzle table definitions
-│   ├── controllers/       # Business logic (Controller modules)
-│   ├── services/          # Route definitions (Service modules)
-│   ├── repository/        # Data access layer
+│   ├── modules/           # Domain Modules (Feature-based)
+│   │   ├── auth/          # Authentication
+│   │   ├── user/          # User management
+│   │   ├── venues/        # Venue management
+│   │   └── ...            # Other features
+│   ├── repository/        # Data access layer (Shared)
 │   ├── middleware/        # Auth & role middleware
 │   ├── types/             # TypeScript type definitions
 │   ├── utils/             # Helper utilities
@@ -53,16 +61,29 @@ match-api/
 
 ## 🧩 Architecture Components
 
-### 1. Services (`src/services/`)
-Services in this architecture primarily serve as **Route Definitions**. They are responsible for creating a `Hono` router instance and binding HTTP paths to Controller methods.
+### 1. Modules (`src/modules/`)
+Each feature is encapsulated in a module folder containing:
 
-### 2. Controllers (`src/controllers/`)
-Controllers contain the actual business logic and request handling code. They validate input, orchestrate logic (often calling Repositories), and return JSON responses.
+*   **`*.routes.ts`** (Router Layer):
+    *   Acts as the entry point and wiring container.
+    *   Instantiates Logic and Controller classes (Dependency Injection).
+    *   Mounts routes to the Hono instance.
 
-### 3. Repositories (`src/repository/`)
-Repositories abstract the database layer. They use Drizzle ORM to interact with the PostgreSQL database.
+*   **`*.controller.ts`** (Controller Layer):
+    *   Handles HTTP concerns: reading Request Body/Query/Params.
+    *   Validates input using Zod schemas.
+    *   Calls the Logic layer.
+    *   Returns JSON responses and HTTP status codes.
 
-### 4. Database Schema (`src/config/db/`)
+*   **`*.logic.ts`** (Logic Layer):
+    *   Contains pure business logic.
+    *   Interacts with Repositories.
+    *   **No HTTP dependencies** (Context, Response, etc.), making it easily testable.
+
+### 2. Repositories (`src/repository/`)
+Repositories abstract the database layer. They use Drizzle ORM to interact with the PostgreSQL database and are shared across modules if necessary.
+
+### 3. Database Schema (`src/config/db/`)
 The database schema is defined using Drizzle ORM's schema builder.
 
 | File | Description |
@@ -89,7 +110,7 @@ The database schema is defined using Drizzle ORM's schema builder.
 | `admin.table.ts` | Analytics & Audit logs |
 | `token.table.ts` | Refresh tokens |
 
-### 5. Middleware (`src/middleware/`)
+### 4. Middleware (`src/middleware/`)
 
 | File | Description |
 | :--- | :--- |
@@ -107,6 +128,7 @@ The application is structured into the following domains (mounted in `server.ts`
 | **Discovery** | `/discovery` | Venue/Map discovery, search, nearby | ❌ |
 | **Venues** | `/venues` | Venue CRUD, photos, amenities | Partial |
 | **Matches** | `/matches` | Match listing, details, venues | ❌ |
+| **Sports** | `/sports`, `/leagues`, `/teams` | Sports master data | ❌ |
 | **Reservations** | `/reservations` | Reservation flow, QR codes | ✅ |
 | **Partners** | `/partners` | Dashboard, analytics, client management | ✅ |
 | **Referral** | `/referral` | Referral codes, stats, rewards | ✅ |
@@ -114,16 +136,15 @@ The application is structured into the following domains (mounted in `server.ts`
 | **Fidelity** | `/fidelity` | Loyalty points, badges, challenges | ✅ |
 | **Subscriptions** | `/subscriptions` | Venue owner subscriptions (Stripe) | ✅ |
 | **Webhooks** | `/webhooks` | Stripe webhook handler | ❌ |
-| **Sports** | `/sports` | Sports master data | ❌ |
 
 ## 🔄 Request Flow
 
 1. **Request**: Incoming HTTP request hits `server.ts`.
-2. **Routing**: `server.ts` delegates to the appropriate **Service**.
-3. **Dispatch**: The **Service** matches the route and calls the **Controller**.
+2. **Routing**: `server.ts` delegates to the appropriate **Module Router** (`*.routes.ts`).
+3. **Dispatch**: The **Router** matches the route and calls the **Controller method**.
 4. **Validation**: **Controller** validates input using Zod.
-5. **Logic**: **Controller** calls **Repository** methods.
-6. **DB Access**: **Repository** executes queries via Drizzle ORM.
+5. **Logic**: **Controller** calls **Logic** service.
+6. **DB Access**: **Logic** calls **Repository** methods.
 7. **Response**: Data flows back up, and **Controller** returns JSON.
 
 ## 💳 Stripe Integration
@@ -132,9 +153,9 @@ The API integrates with Stripe for venue owner subscriptions and boost purchases
 
 | Component | Purpose |
 | :--- | :--- |
-| `subscriptions.service.ts` | Checkout sessions (Subscriptions) |
-| `boost.service.ts` | Checkout sessions (One-time purchases) |
-| `webhooks.service.ts` | Handle Stripe events (Async) |
+| `subscriptions.logic.ts` | Checkout sessions (Subscriptions) |
+| `boost.logic.ts` | Checkout sessions (One-time purchases) |
+| `webhooks.logic.ts` | Handle Stripe events (Async) |
 | `stripe.worker.ts` | Background worker for webhook processing |
 
 ## 🚀 Running the API
