@@ -1,7 +1,7 @@
 import { createFactory } from "hono/factory";
 import { validator } from "hono/validator";
 import { z } from "zod";
-import { SportsRepository } from "../../repository/sports.repository";
+import { SportsLogic } from "./sports.logic";
 
 // ============================================
 // VALIDATION SCHEMAS
@@ -39,7 +39,8 @@ const FixtureQuerySchema = PaginationSchema.extend({
  */
 class SportsController {
     private readonly factory = createFactory();
-    private readonly sportsRepo = new SportsRepository();
+
+    constructor(private readonly sportsLogic: SportsLogic) {}
 
     // ============================================
     // SPORTS ENDPOINTS
@@ -57,13 +58,7 @@ class SportsController {
     }), async (c) => {
         try {
             const { page, limit, is_active } = c.req.valid('query');
-
-            const result = await this.sportsRepo.findAllSports({
-                page,
-                limit,
-                isActive: is_active
-            });
-
+            const result = await this.sportsLogic.getSports(page, limit, is_active);
             return c.json(result);
         } catch (error: any) {
             console.error("Error fetching sports:", error);
@@ -81,9 +76,10 @@ class SportsController {
         }
         return parsed.data;
     }), async (c) => {
-        const { sport_id, status, date, league_id } = c.req.valid("query");
+        const query = c.req.valid("query");
         try {
-             
+             const result = await this.sportsLogic.getFixtures(query);
+             return c.json(result);
         } catch (error: any) {
             console.error("Error fetching team fixtures:", error);
             return c.json({ error: "Failed to fetch team fixtures" }, 500);
@@ -96,18 +92,12 @@ class SportsController {
     readonly getSportById = this.factory.createHandlers(async (c) => {
         try {
             const sportId = c.req.param("sportId");
-            if (!sportId) {
-                return c.json({ error: "Sport ID required" }, 400);
-            }
+            if (!sportId) return c.json({ error: "Sport ID required" }, 400);
 
-            const sport = await this.sportsRepo.findSportById(sportId);
-
-            if (!sport) {
-                return c.json({ error: "Sport not found" }, 404);
-            }
-
+            const sport = await this.sportsLogic.getSportById(sportId);
             return c.json(sport);
         } catch (error: any) {
+            if (error.message === "SPORT_NOT_FOUND") return c.json({ error: "Sport not found" }, 404);
             console.error("Error fetching sport:", error);
             return c.json({ error: "Failed to fetch sport" }, 500);
         }
@@ -125,27 +115,13 @@ class SportsController {
     }), async (c) => {
         try {
             const sportId = c.req.param("sportId");
-            if (!sportId) {
-                return c.json({ error: "Sport ID required" }, 400);
-            }
-
-            // Verify sport exists
-            const sport = await this.sportsRepo.findSportById(sportId);
-            if (!sport) {
-                return c.json({ error: "Sport not found" }, 404);
-            }
+            if (!sportId) return c.json({ error: "Sport ID required" }, 400);
 
             const { page, limit, is_active, country } = c.req.valid('query');
-
-            const result = await this.sportsRepo.findLeaguesBySportId(sportId, {
-                page,
-                limit,
-                isActive: is_active,
-                country
-            });
-
+            const result = await this.sportsLogic.getLeaguesBySport(sportId, page, limit, is_active, country);
             return c.json(result);
         } catch (error: any) {
+            if (error.message === "SPORT_NOT_FOUND") return c.json({ error: "Sport not found" }, 404);
             console.error("Error fetching leagues:", error);
             return c.json({ error: "Failed to fetch leagues" }, 500);
         }
@@ -161,18 +137,12 @@ class SportsController {
     readonly getLeagueById = this.factory.createHandlers(async (c) => {
         try {
             const leagueId = c.req.param("leagueId");
-            if (!leagueId) {
-                return c.json({ error: "League ID required" }, 400);
-            }
+            if (!leagueId) return c.json({ error: "League ID required" }, 400);
 
-            const league = await this.sportsRepo.findLeagueById(leagueId);
-
-            if (!league) {
-                return c.json({ error: "League not found" }, 404);
-            }
-
+            const league = await this.sportsLogic.getLeagueById(leagueId);
             return c.json(league);
         } catch (error: any) {
+            if (error.message === "LEAGUE_NOT_FOUND") return c.json({ error: "League not found" }, 404);
             console.error("Error fetching league:", error);
             return c.json({ error: "Failed to fetch league" }, 500);
         }
@@ -190,26 +160,13 @@ class SportsController {
     }), async (c) => {
         try {
             const leagueId = c.req.param("leagueId");
-            if (!leagueId) {
-                return c.json({ error: "League ID required" }, 400);
-            }
-
-            // Verify league exists
-            const league = await this.sportsRepo.findLeagueById(leagueId);
-            if (!league) {
-                return c.json({ error: "League not found" }, 404);
-            }
+            if (!leagueId) return c.json({ error: "League ID required" }, 400);
 
             const { page, limit, is_active } = c.req.valid('query');
-
-            const result = await this.sportsRepo.findTeamsByLeagueId(leagueId, {
-                page,
-                limit,
-                isActive: is_active
-            });
-
+            const result = await this.sportsLogic.getTeamsByLeague(leagueId, page, limit, is_active);
             return c.json(result);
         } catch (error: any) {
+            if (error.message === "LEAGUE_NOT_FOUND") return c.json({ error: "League not found" }, 404);
             console.error("Error fetching teams:", error);
             return c.json({ error: "Failed to fetch teams" }, 500);
         }
@@ -225,18 +182,12 @@ class SportsController {
     readonly getTeamById = this.factory.createHandlers(async (c) => {
         try {
             const teamId = c.req.param("teamId");
-            if (!teamId) {
-                return c.json({ error: "Team ID required" }, 400);
-            }
+            if (!teamId) return c.json({ error: "Team ID required" }, 400);
 
-            const team = await this.sportsRepo.findTeamById(teamId);
-
-            if (!team) {
-                return c.json({ error: "Team not found" }, 404);
-            }
-
+            const team = await this.sportsLogic.getTeamById(teamId);
             return c.json(team);
         } catch (error: any) {
+            if (error.message === "TEAM_NOT_FOUND") return c.json({ error: "Team not found" }, 404);
             console.error("Error fetching team:", error);
             return c.json({ error: "Failed to fetch team" }, 500);
         }
