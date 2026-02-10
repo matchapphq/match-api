@@ -2,20 +2,31 @@ import { Hono } from "hono";
 import UserController from "../../controllers/user/user.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import type { HonoEnv } from "../../types/hono.types";
+import { UserLogic } from "./user.logic";
+import UserRepository from "../../repository/user.repository";
+import { FavoritesRepository } from "../../repository/favorites.repository";
 
 /**
- * Service for defining User routes.
- * Mounts the UserController handlers to the router.
+ * Service for defining User routes (Router/Module layer).
+ * Handles Dependency Injection and mounts the UserController handlers.
  */
 class UserService {
     private readonly router = new Hono<HonoEnv>();
-    private readonly controller = new UserController();
+    private readonly controller: UserController;
 
     public get getRouter() {
         return this.router;
     }
 
     constructor() {
+        // 1. Manual Dependency Injection (NestJS Module style)
+        const userRepository = new UserRepository();
+        const favoritesRepository = new FavoritesRepository();
+        const userLogic = new UserLogic(userRepository, favoritesRepository);
+        
+        this.controller = new UserController(userLogic);
+
+        // 2. Initialize Routes
         this.initRoutes();
     }
 

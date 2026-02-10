@@ -5,29 +5,28 @@ import { authMiddleware } from "./middleware/auth.middleware";
 
 
 import AuthService from "./services/auth/auth.service";
-import UserService from "./services/user/user.service";
 import DiscoveryService from "./services/discovery/discovery.service";
-import VenueService from "./services/venues/venues.service";
-import MatchesService from "./services/matches/matches.service";
-import SportsService from "./services/sports/sports.service";
 import LeaguesService from "./services/leagues/leagues.service";
-import TeamsService from "./services/teams/teams.service";
-import ReservationsService from "./services/reservations/reservations.service";
+import MatchesService from "./services/matches/matches.service";
 import PartnerService from "./services/partner/partner.service";
+import ReservationsService from "./services/reservations/reservations.service";
+import SportsService from "./services/sports/sports.service";
+import UserService from "./services/user/user.service";
+import VenueService from "./services/venues/venues.service";
 
 // New Services
-import ReviewsService from "./services/reviews/reviews.service";
-import NotificationsService from "./services/notifications/notifications.service";
-import MessagingService from "./services/messaging/messaging.service";
-import SubscriptionsService from "./services/subscriptions/subscriptions.service";
-import BillingService from "./services/billing/billing.service";
 import AnalyticsService from "./services/analytics/analytics.service";
-import CouponsService from "./services/coupons/coupons.service";
-import WebhooksService from "./services/webhooks/webhooks.service";
-import ReferralService from "./services/referral/referral.service";
+import BillingService from "./services/billing/billing.service";
 import BoostService from "./services/boost/boost.service";
+import CouponsService from "./services/coupons/coupons.service";
 import fidelityService from "./services/fidelity/fidelity.service";
 import HealthService from "./services/health/health.service";
+import MessagingService from "./services/messaging/messaging.service";
+import NotificationsService from "./services/notifications/notifications.service";
+import ReferralService from "./services/referral/referral.service";
+import ReviewsService from "./services/reviews/reviews.service";
+import SubscriptionsService from "./services/subscriptions/subscriptions.service";
+import WebhooksService from "./services/webhooks/webhooks.service";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -36,7 +35,6 @@ const venueRouter = new VenueService();
 const matchesRouter = new MatchesService();
 const sportsRouter = new SportsService();
 const leaguesRouter = new LeaguesService();
-const teamsRouter = new TeamsService();
 const reservationsRouter = new ReservationsService();
 const partnerRouter = new PartnerService();
 
@@ -114,7 +112,6 @@ app.get("/amenities", async (c) => {
 app.route("/matches", matchesRouter.getRouter);
 app.route("/sports", sportsRouter.getRouter);
 app.route("/leagues", leaguesRouter.getRouter);
-app.route("/teams", teamsRouter.getRouter);
 app.route("/reservations", reservationsRouter.getRouter);
 app.route("/partners", partnerRouter.getRouter);
 

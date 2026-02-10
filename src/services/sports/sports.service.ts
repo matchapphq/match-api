@@ -23,6 +23,7 @@ class SportsService {
         this.router.get("/fixture", ...this.controller.getFixtures);
         this.router.get("/:sportId", ...this.controller.getSportById);
         this.router.get("/:sportId/leagues", ...this.controller.getLeaguesBySport);
+        this.router.get("/teams/:teamId", ...this.controller.getTeamById);
     }
 }
 

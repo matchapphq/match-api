@@ -8,6 +8,7 @@
 | Document | Description |
 | :--- | :--- |
 | **[🏗️ Architecture](./architecture.md)** | System design, database schema, and project structure. |
+| **[📐 Architecture Standards](./architecture_standards.md)** | Layered architecture (Logic, Controller, Router) and DI rules. |
 | **[🔌 API Routes](./api_routes.md)** | Complete API endpoint reference. |
 | **[🔐 Authentication](./authentication.md)** | Deep dive into JWT flow and Token Rotation. |
 | **[📊 Status Report](./status_report.md)** | Current project status and module completion. |
