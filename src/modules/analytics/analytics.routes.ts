@@ -1,5 +1,7 @@
 import { Hono } from "hono";
-import AnalyticsController from "../../controllers/analytics/analytics.controller";
+import AnalyticsController from "./analytics.controller";
+import { AnalyticsLogic } from "./analytics.logic";
+import { AnalyticsRepository } from "../../repository/analytics.repository";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import type { HonoEnv } from "../../types/hono.types";
 
@@ -10,13 +12,16 @@ import type { HonoEnv } from "../../types/hono.types";
  */
 class AnalyticsService {
     private readonly router = new Hono<HonoEnv>();
-    private readonly controller = new AnalyticsController();
+    private readonly controller: AnalyticsController;
 
     public get getRouter() {
         return this.router;
     }
 
     constructor() {
+        const analyticsRepo = new AnalyticsRepository();
+        const analyticsLogic = new AnalyticsLogic(analyticsRepo);
+        this.controller = new AnalyticsController(analyticsLogic);
         this.initRoutes();
     }
 

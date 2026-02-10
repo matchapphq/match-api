@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import DiscoveryController from "../../controllers/discovery/discovery.controller";
+import DiscoveryController from "./discovery.controller";
+import { DiscoveryLogic } from "./discovery.logic";
 
 /**
  * Service for defining Discovery routes.
@@ -7,13 +8,15 @@ import DiscoveryController from "../../controllers/discovery/discovery.controlle
  */
 class DiscoveryService {
     private readonly router = new Hono();
-    private readonly controller = new DiscoveryController();
+    private readonly controller: DiscoveryController;
 
     public get getRouter() {
         return this.router;
     }
 
     constructor() {
+        const discoveryLogic = new DiscoveryLogic();
+        this.controller = new DiscoveryController(discoveryLogic);
         this.initRoutes();
     }
 
