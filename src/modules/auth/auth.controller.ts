@@ -10,7 +10,7 @@ import {
     VerifyResetCodeSchema,
     ResetPasswordSchema,
 } from "../../utils/auth.valid";
-import { AuthLogic } from "../../services/auth/auth.logic";
+import { AuthLogic } from "./auth.logic";
 import z from "zod";
 import type { Context } from "hono";
 
@@ -124,51 +124,48 @@ class AuthController {
             const { email } = ctx.req.valid("json");
             await this.authLogic.forgotPassword(email);
             return ctx.json({ message: "If the email exists, a code has been sent." });
-                }
-            );
-        
-            public readonly verifyResetCode = this.factory.createHandlers(
-                zValidator("json", VerifyResetCodeSchema),
-                async (ctx) => {
-                    const { email, code } = ctx.req.valid("json");
-                    try {
-                        await this.authLogic.verifyResetCode(email, code);
-                        return ctx.json({ valid: true });
-                    } catch (error: any) {
-                        return ctx.json({ error: "Invalid or expired code" }, 400);
-                    }
-                }
-            );
-        
-            public readonly resetPassword = this.factory.createHandlers(
-                zValidator("json", ResetPasswordSchema),
-                async (ctx) => {
-                    const { email, code, new_password } = ctx.req.valid("json");
-                    try {
-                        await this.authLogic.resetPassword(email, code, new_password);
-                        return ctx.json({ message: "Password reset successfully" });
-                    } catch (error: any) {
-                        const status = error.message === "USER_NOT_FOUND" ? 404 : 400;
-                        return ctx.json({ error: error.message }, status);
-                    }
-                }
-            );
-        
-            public readonly validateEmail = this.factory.createHandlers(
-                zValidator("json", z.object({ email: z.string().email() })),
-                async (ctx) => {
-                    const { email } = ctx.req.valid("json");
-                    try {
-                        await this.authLogic.validateEmail(email);
-                        return ctx.json({ message: "Email is valid" }, 200);
-                    } catch (error: any) {
-                        return ctx.json({ error: "User not found" }, 404);
-                    }
-                }
-            );
-        
-            // ... Other handlers
         }
-        
-        export default AuthController;
-        
+    );
+
+    public readonly verifyResetCode = this.factory.createHandlers(
+        zValidator("json", VerifyResetCodeSchema),
+        async (ctx) => {
+            const { email, code } = ctx.req.valid("json");
+            try {
+                await this.authLogic.verifyResetCode(email, code);
+                return ctx.json({ valid: true });
+            } catch (error: any) {
+                return ctx.json({ error: "Invalid or expired code" }, 400);
+            }
+        }
+    );
+
+    public readonly resetPassword = this.factory.createHandlers(
+        zValidator("json", ResetPasswordSchema),
+        async (ctx) => {
+            const { email, code, new_password } = ctx.req.valid("json");
+            try {
+                await this.authLogic.resetPassword(email, code, new_password);
+                return ctx.json({ message: "Password reset successfully" });
+            } catch (error: any) {
+                const status = error.message === "USER_NOT_FOUND" ? 404 : 400;
+                return ctx.json({ error: error.message }, status);
+            }
+        }
+    );
+
+    public readonly validateEmail = this.factory.createHandlers(
+        zValidator("json", z.object({ email: z.string().email() })),
+        async (ctx) => {
+            const { email } = ctx.req.valid("json");
+            try {
+                await this.authLogic.validateEmail(email);
+                return ctx.json({ message: "Email is valid" }, 200);
+            } catch (error: any) {
+                return ctx.json({ error: "User not found" }, 404);
+            }
+        }
+    );
+}
+
+export default AuthController;

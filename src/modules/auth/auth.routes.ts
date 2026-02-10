@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import AuthController from "../../controllers/auth/auth.controller";
+import AuthController from "./auth.controller";
 import { AuthLogic } from "./auth.logic";
 import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";

@@ -4,7 +4,7 @@ import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
 import AuthRepository from "../../repository/auth/auth.repository";
 import referralRepository, { ReferralRepository } from "../../repository/referral.repository";
-import { userOnaboarding } from "../../controllers/auth/auth.helper";
+import { userOnaboarding } from "./auth.helper";
 import { Redis } from "ioredis";
 import { mailQueue } from "../../queue/notification.queue";
 import type { userRegisterData } from "../../utils/userData";
