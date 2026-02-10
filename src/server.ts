@@ -4,15 +4,15 @@ import { logger } from "hono/logger";
 import { authMiddleware } from "./middleware/auth.middleware";
 
 
-import AuthService from "./services/auth/auth.service";
+import AuthService from "./modules/auth/auth.routes";
 import DiscoveryService from "./services/discovery/discovery.service";
 import LeaguesService from "./services/leagues/leagues.service";
-import MatchesService from "./services/matches/matches.service";
+import MatchesService from "./modules/matches/matches.routes";
 import PartnerService from "./services/partner/partner.service";
-import ReservationsService from "./services/reservations/reservations.service";
+import ReservationsService from "./modules/reservations/reservations.routes";
 import SportsService from "./services/sports/sports.service";
-import UserService from "./services/user/user.service";
-import VenueService from "./services/venues/venues.service";
+import UserService from "./modules/user/user.routes";
+import VenueService from "./modules/venues/venues.routes";
 
 // New Services
 import AnalyticsService from "./services/analytics/analytics.service";

@@ -1,5 +1,8 @@
 import { Hono } from "hono";
-import PartnerController from "../../controllers/partner/partner.controller";
+import PartnerController from "./partner.controller";
+import { PartnerLogic } from "./partner.logic";
+import { PartnerRepository } from "../../repository/partner.repository";
+import { WaitlistRepository } from "../../repository/waitlist.repository";
 
 /**
  * Service for defining Partner (Restaurant Owner) routes.
@@ -7,13 +10,17 @@ import PartnerController from "../../controllers/partner/partner.controller";
  */
 class PartnerService {
     private readonly router = new Hono();
-    private readonly controller = new PartnerController();
+    private readonly controller: PartnerController;
 
     public get getRouter() {
         return this.router;
     }
 
     constructor() {
+        const partnerRepo = new PartnerRepository();
+        const waitlistRepo = new WaitlistRepository();
+        const partnerLogic = new PartnerLogic(partnerRepo, waitlistRepo);
+        this.controller = new PartnerController(partnerLogic);
         this.initRoutes();
     }
 
