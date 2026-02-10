@@ -2,10 +2,8 @@ import { createFactory } from "hono/factory";
 import { z } from "zod";
 import { validator } from "hono/validator";
 import type { Context } from "hono";
-
-import { FavoritesRepository } from "../../repository/favorites.repository";
 import type { HonoEnv } from "../../types/hono.types";
-import UserRepository from "../../repository/user.repository";
+import { UserLogic } from "../../services/user/user.logic";
 
 // Validation schema for pagination
 const PaginationSchema = z.object({
@@ -15,11 +13,12 @@ const PaginationSchema = z.object({
 
 /**
  * Controller for User operations.
+ * Handles HTTP mapping and uses UserLogic for business rules.
  */
 class UserController {
     private readonly factory = createFactory<HonoEnv>();
-    private readonly favoritesRepository = new FavoritesRepository();
-    private readonly userRepository = new UserRepository();
+
+    constructor(private readonly userLogic: UserLogic) {}
 
     // Helper to get user ID from context
     private getUserId(ctx: Context<HonoEnv>): string {
@@ -30,32 +29,18 @@ class UserController {
         return user.id;
     }
 
+    /**
+     * GET /users/me
+     */
     public readonly getMe = this.factory.createHandlers(async (ctx) => {
-        const user = ctx.get('user');
-        if (!user) {
-            return ctx.json({ error: "Unauthorized" }, 401);
-        }
-        
         try {
-          const users = await this.userRepository.getMe({ id: user.id });
-          
-          if (!users || users.length === 0) {
-            return ctx.json({ error: "User not found" }, 404);
-          }
-          
-          const userData = users[0]!;
-          return ctx.json({ 
-            user: {
-              id: userData.id,
-              email: userData.email,
-              first_name: userData.first_name,
-              last_name: userData.last_name,
-              phone: userData.phone,
-              role: userData.role,
-              has_completed_onboarding: true
-            }
-          });
-        } catch (error) {
+            const userId = this.getUserId(ctx);
+            const user = await this.userLogic.getUserProfile(userId);
+            return ctx.json({ user });
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            if (error.message === "USER_NOT_FOUND") return ctx.json({ error: "User not found" }, 404);
+            
             console.error("Error fetching user:", error);
             return ctx.json({ error: "Failed to fetch user data" }, 500);
         }
@@ -107,7 +92,7 @@ class UserController {
             const userId = this.getUserId(ctx);
             const { page, limit } = ctx.req.valid('query');
 
-            const result = await this.favoritesRepository.getFavorites(userId, { page, limit });
+            const result = await this.userLogic.getFavorites(userId, { page, limit });
 
             return ctx.json(result);
 
