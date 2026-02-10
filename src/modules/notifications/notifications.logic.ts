@@ -1,4 +1,6 @@
 import { NotificationsRepository } from "../../repository/notifications.repository";
+import { notificationQueue } from "../../queue/notification.queue";
+import { NotificationType, type NotificationPayload } from "../../types/jobs/notifications";
 
 export class NotificationsLogic {
     constructor(private readonly repository: NotificationsRepository) {}
@@ -63,5 +65,21 @@ export class NotificationsLogic {
         }
 
         return { message: "Notification deleted" };
+    }
+
+    /**
+     * Send a notification (internal use)
+     * Adds a job to the notification queue.
+     */
+    async sendNotification(payload: NotificationPayload) {
+        await notificationQueue.add(payload.type, payload, {
+            removeOnComplete: true,
+            attempts: 3,
+            backoff: {
+                type: 'exponential',
+                delay: 1000,
+            }
+        });
+        return { success: true, message: "Notification queued" };
     }
 }
