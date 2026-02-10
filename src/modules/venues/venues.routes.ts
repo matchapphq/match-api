@@ -1,8 +1,12 @@
 import { Hono } from "hono";
-import VenueController from "../../controllers/venues/venues.controller";
+import VenueController from "./venues.controller";
+import { VenuesLogic } from "./venues.logic";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import { venueOwnerMiddleware } from "../../middleware/role.middleware";
 import type { HonoEnv } from "../../types/hono.types";
+import { VenueRepository } from "../../repository/venue.repository";
+import { FavoritesRepository } from "../../repository/favorites.repository";
+import { AnalyticsRepository } from "../../repository/analytics.repository";
 
 /**
  * Service for defining Venue routes.
@@ -10,13 +14,20 @@ import type { HonoEnv } from "../../types/hono.types";
  */
 class VenueService {
     private readonly router = new Hono<HonoEnv>();
-    private readonly controller = new VenueController();
+    private readonly controller: VenueController;
 
     public get getRouter() {
         return this.router;
     }
 
     constructor() {
+        const venueRepository = new VenueRepository();
+        const favoritesRepository = new FavoritesRepository();
+        const analyticsRepository = new AnalyticsRepository();
+        
+        const venuesLogic = new VenuesLogic(venueRepository, favoritesRepository, analyticsRepository);
+        this.controller = new VenueController(venuesLogic);
+
         this.initRoutes();
     }
 
