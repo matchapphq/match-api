@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import UserController from "../../controllers/user/user.controller";
+import UserController from "./user.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
 import type { HonoEnv } from "../../types/hono.types";
 import { UserLogic } from "./user.logic";

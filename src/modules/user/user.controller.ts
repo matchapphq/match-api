@@ -3,7 +3,7 @@ import { z } from "zod";
 import { validator } from "hono/validator";
 import type { Context } from "hono";
 import type { HonoEnv } from "../../types/hono.types";
-import { UserLogic } from "../../services/user/user.logic";
+import { UserLogic } from "./user.logic";
 
 // Validation schema for pagination
 const PaginationSchema = z.object({

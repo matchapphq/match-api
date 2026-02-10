@@ -29,7 +29,7 @@ export class UserLogic {
             last_name: userData.last_name,
             phone: userData.phone,
             role: userData.role,
-            has_completed_onboarding: true // Logic can be more complex here
+            has_completed_onboarding: true, // Logic can be more complex here
         };
     }
 
