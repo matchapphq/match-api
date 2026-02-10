@@ -5,7 +5,7 @@ import { authMiddleware } from "./middleware/auth.middleware";
 
 
 import AuthService from "./modules/auth/auth.routes";
-import DiscoveryService from "./services/discovery/discovery.service";
+import DiscoveryService from "./modules/discovery/discovery.routes";
 import SportsService from "./modules/sports/sports.routes"; // Consolidated Sports/Leagues/Teams
 import MatchesService from "./modules/matches/matches.routes";
 import PartnerService from "./modules/partner/partner.routes";
@@ -14,16 +14,16 @@ import UserService from "./modules/user/user.routes";
 import VenueService from "./modules/venues/venues.routes";
 
 // New Services
-import AnalyticsService from "./services/analytics/analytics.service";
-import BillingService from "./services/billing/billing.service";
-import BoostService from "./services/boost/boost.service";
-import CouponsService from "./services/coupons/coupons.service";
+import AnalyticsService from "./modules/analytics/analytics.routes";
+import BillingService from "./modules/billing/billing.routes";
+import BoostService from "./modules/boost/boost.routes";
+import CouponsService from "./modules/coupons/coupons.routes";
 import FidelityService from "./modules/fidelity/fidelity.routes";
-import HealthService from "./services/health/health.service";
-import MessagingService from "./services/messaging/messaging.service";
+import HealthService from "./modules/health/health.routes";
+import MessagingService from "./modules/messaging/messaging.routes";
 import NotificationsService from "./modules/notifications/notifications.routes";
-import ReferralService from "./services/referral/referral.service";
-import ReviewsService from "./services/reviews/reviews.service";
+import ReferralService from "./modules/referral/referral.routes";
+import ReviewsService from "./modules/reviews/reviews.routes";
 import SubscriptionsService from "./modules/subscriptions/subscriptions.routes";
 import WebhooksService from "./modules/webhooks/webhooks.routes";
 
