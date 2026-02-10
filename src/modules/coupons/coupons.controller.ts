@@ -1,4 +1,5 @@
 import { createFactory } from "hono/factory";
+import { CouponsLogic } from "./coupons.logic";
 
 /**
  * Controller for Coupons operations.
@@ -6,8 +7,11 @@ import { createFactory } from "hono/factory";
 class CouponsController {
     private readonly factory = createFactory();
 
+    constructor(private readonly couponsLogic: CouponsLogic) {}
+
     readonly validateCoupon = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Validate coupon" });
+        const result = await this.couponsLogic.validateCoupon();
+        return ctx.json(result);
     });
 }
 
