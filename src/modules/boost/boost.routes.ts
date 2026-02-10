@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import BoostController from "../../controllers/boost/boost.controller";
+import BoostController from "./boost.controller";
+import { BoostLogic } from "./boost.logic";
 import { authMiddleware } from "../../middleware/auth.middleware";
 
 /**
@@ -8,13 +9,15 @@ import { authMiddleware } from "../../middleware/auth.middleware";
  */
 class BoostService {
     private readonly router = new Hono();
-    private readonly controller = new BoostController();
+    private readonly controller: BoostController;
 
     public get getRouter() {
         return this.router;
     }
 
     constructor() {
+        const boostLogic = new BoostLogic();
+        this.controller = new BoostController(boostLogic);
         this.initRoutes();
     }
 

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
-import BillingController from "../../controllers/billing/billing.controller";
+import BillingController from "./billing.controller";
+import { BillingLogic } from "./billing.logic";
 import { authMiddleware } from "../../middleware/auth.middleware";
 
 /**
@@ -7,13 +8,15 @@ import { authMiddleware } from "../../middleware/auth.middleware";
  */
 class BillingService {
     private readonly router = new Hono();
-    private readonly controller = new BillingController();
+    private readonly controller: BillingController;
 
     public get getRouter() {
         return this.router;
     }
 
     constructor() {
+        const billingLogic = new BillingLogic();
+        this.controller = new BillingController(billingLogic);
         this.initRoutes();
     }
 
