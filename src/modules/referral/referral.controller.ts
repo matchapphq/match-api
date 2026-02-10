@@ -1,9 +1,11 @@
 import { createFactory } from "hono/factory";
 import type { HonoEnv } from "../../types/hono.types";
-import referralRepository from "../../repository/referral.repository";
+import { ReferralLogic } from "./referral.logic";
 
 class ReferralController {
     private readonly factory = createFactory<HonoEnv>();
+
+    constructor(private readonly referralLogic: ReferralLogic) {}
 
     /**
      * GET /referral/code
@@ -13,21 +15,8 @@ class ReferralController {
         const userId = ctx.get('user').id;
 
         try {
-            let referralCode = await referralRepository.getReferralCode(userId);
-            
-            if (!referralCode) {
-                referralCode = await referralRepository.createReferralCode(userId);
-            }
-
-            if (!referralCode) {
-                return ctx.json({ error: "Failed to create referral code" }, 500);
-            }
-
-            return ctx.json({
-                referral_code: referralCode.referral_code,
-                referral_link: referralCode.referral_link,
-                created_at: referralCode.created_at?.toISOString(),
-            });
+            const result = await this.referralLogic.getCode(userId);
+            return ctx.json(result);
         } catch (error: any) {
             console.error("Error getting referral code:", error);
             return ctx.json({ error: "Failed to get referral code", details: error.message }, 500);
@@ -42,7 +31,7 @@ class ReferralController {
         const userId = ctx.get('user').id;
 
         try {
-            const stats = await referralRepository.getReferralStats(userId);
+            const stats = await this.referralLogic.getStats(userId);
             return ctx.json(stats);
         } catch (error: any) {
             console.error("Error getting referral stats:", error);
@@ -62,12 +51,7 @@ class ReferralController {
             const limit = parseInt(ctx.req.query('limit') || '20', 10);
             const status = ctx.req.query('status') || 'all';
 
-            const history = await referralRepository.getReferralHistory(userId, {
-                page,
-                limit,
-                status,
-            });
-
+            const history = await this.referralLogic.getHistory(userId, page, limit, status);
             return ctx.json(history);
         } catch (error: any) {
             console.error("Error getting referral history:", error);
@@ -88,27 +72,8 @@ class ReferralController {
                 return ctx.json({ error: "referral_code is required" }, 400);
             }
 
-            if (!/^MATCH-RESTO-[A-Z0-9]{6}$/.test(referral_code)) {
-                return ctx.json({ 
-                    valid: false, 
-                    message: "Format de code invalide" 
-                });
-            }
-
-            const validation = await referralRepository.validateReferralCode(referral_code);
-
-            if (!validation.valid) {
-                return ctx.json({ 
-                    valid: false, 
-                    message: "Code de parrainage invalide" 
-                });
-            }
-
-            return ctx.json({
-                valid: true,
-                referrer_name: validation.referrer_name,
-                message: "Code de parrainage valide",
-            });
+            const result = await this.referralLogic.validateCode(referral_code);
+            return ctx.json(result);
         } catch (error: any) {
             console.error("Error validating referral code:", error);
             return ctx.json({ error: "Failed to validate referral code", details: error.message }, 500);
@@ -128,21 +93,10 @@ class ReferralController {
                 return ctx.json({ error: "referral_code and referred_user_id are required" }, 400);
             }
 
-            const result = await referralRepository.registerReferral(referral_code, referred_user_id);
-
-            if (!result.success) {
-                return ctx.json({ 
-                    success: false, 
-                    error: result.error 
-                }, 400);
-            }
-
-            return ctx.json({
-                success: true,
-                referral_id: result.referral_id,
-                message: "Parrainage enregistré avec succès",
-            });
+            const result = await this.referralLogic.registerReferral(referral_code, referred_user_id);
+            return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "REGISTRATION_FAILED") return ctx.json({ success: false, error: "Registration failed" }, 400);
             console.error("Error registering referral:", error);
             return ctx.json({ error: "Failed to register referral", details: error.message }, 500);
         }
@@ -161,23 +115,10 @@ class ReferralController {
                 return ctx.json({ error: "referred_user_id is required" }, 400);
             }
 
-            const result = await referralRepository.convertReferral(referred_user_id);
-
-            if (!result.success) {
-                return ctx.json({ 
-                    success: false, 
-                    error: result.error 
-                }, 400);
-            }
-
-            return ctx.json({
-                success: true,
-                referral_id: result.referral_id,
-                boost_id: result.boost_id,
-                referrer_id: result.referrer_id,
-                message: "Parrainage converti, 1 boost ajouté",
-            });
+            const result = await this.referralLogic.convertReferral(referred_user_id);
+            return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "CONVERSION_FAILED") return ctx.json({ success: false, error: "Conversion failed" }, 400);
             console.error("Error converting referral:", error);
             return ctx.json({ error: "Failed to convert referral", details: error.message }, 500);
         }
@@ -191,11 +132,8 @@ class ReferralController {
         const userId = ctx.get('user').id;
 
         try {
-            const boosts = await referralRepository.getAvailableBoosts(userId);
-            return ctx.json({ 
-                boosts,
-                total: boosts.length,
-            });
+            const result = await this.referralLogic.getBoosts(userId);
+            return ctx.json(result);
         } catch (error: any) {
             console.error("Error getting boosts:", error);
             return ctx.json({ error: "Failed to get boosts", details: error.message }, 500);
@@ -222,20 +160,10 @@ class ReferralController {
                 return ctx.json({ error: "venue_match_id is required" }, 400);
             }
 
-            const result = await referralRepository.useBoost(boostId, userId, venue_match_id);
-
-            if (!result.success) {
-                return ctx.json({ 
-                    success: false, 
-                    error: result.error 
-                }, 400);
-            }
-
-            return ctx.json({
-                success: true,
-                message: "Boost utilisé avec succès",
-            });
+            const result = await this.referralLogic.useBoost(userId, boostId, venue_match_id);
+            return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "BOOST_USAGE_FAILED") return ctx.json({ success: false, error: "Boost usage failed" }, 400);
             console.error("Error using boost:", error);
             return ctx.json({ error: "Failed to use boost", details: error.message }, 500);
         }
