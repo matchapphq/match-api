@@ -226,7 +226,9 @@ API-Sports Fixture
 
 ## Seeding a Fresh Database
 
-For a new database, only **sports** need to be manually seeded. Everything else (leagues, teams, matches) comes from API-Sports.
+The seed script fetches **all data from API-Sports** — no fake/hardcoded data. The only manually created entry is the "Football" sport (since API-Sports is football-specific and doesn't have a "sports" endpoint).
+
+**Requires `API_SPORTS_KEY` to be set.**
 
 ```bash
 # 1. Setup DB schema
@@ -235,14 +237,17 @@ bun run db:setup:dev
 # 2. Generate and run migrations
 bun run db:gen:dev
 
-# 3. Seed sports (the only manual data)
-bun --env-file=.env.dev run src/config/seeds/seed-sports-only.ts
-
-# 4. Sync real fixtures from API-Sports
-curl -X POST http://localhost:8008/api/matches/sync
+# 3. Seed everything from API-Sports
+bun run db:seed:sports-only:dev
 ```
 
-Or simply start the server and hit `/api/matches/upcoming` — the auto-sync will populate everything.
+The seed script runs 4 steps:
+1. **Creates "Football" sport** — the only non-API entry
+2. **Fetches 10 real leagues** from API-Sports (Premier League, La Liga, Serie A, etc.)
+3. **Fetches all teams** per league from API-Sports (with logos, codes, countries)
+4. **Fetches fixtures** for the next 30 days from API-Sports (with scores, venues, statuses)
+
+After seeding, all endpoints return real data immediately.
 
 ---
 
@@ -250,10 +255,10 @@ Or simply start the server and hit `/api/matches/upcoming` — the auto-sync wil
 
 | Entity | Source | Notes |
 |---|---|---|
-| **Sports** | Manual seed | "Football", "Basketball", etc. — only Football has API data for now |
-| **Leagues** | API-Sports | Created automatically when fixtures are synced |
-| **Teams** | API-Sports | Created automatically when fixtures are synced |
-| **Matches** | API-Sports | Synced via auto-sync or manual `POST /sync` |
+| **Sports** | Created by seed | "Football" — only entry not from API (API-Sports is football-specific) |
+| **Leagues** | API-Sports | Fetched by seed + auto-sync |
+| **Teams** | API-Sports | Fetched by seed + auto-sync |
+| **Matches** | API-Sports | Fetched by seed + auto-sync + `POST /sync` |
 | **Venue Matches** | Manual / Partner | Venue owners link their venues to matches |
 
 ---
