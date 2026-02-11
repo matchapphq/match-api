@@ -135,6 +135,46 @@ class MatchesController {
         const result = await this.matchesLogic.getLiveUpdates(matchId);
         return c.json(result);
     });
+
+    /**
+     * POST /matches/sync - Bulk-sync upcoming fixtures from API-Sports
+     * Body (optional): { leagues?: number[], season?: string, from?: string, to?: string, days?: number }
+     */
+    public readonly syncFixtures = this.factory.createHandlers(async (c) => {
+        try {
+            const body = await c.req.json().catch(() => ({}));
+            const { leagues, season, from, to, days } = body as any;
+
+            const result = await this.matchesLogic.syncFixturesForLeagues(
+                leagues,
+                { season, from, to, days }
+            );
+
+            return c.json({
+                message: "Sync completed",
+                ...result,
+            });
+        } catch (error: any) {
+            console.error("Error syncing fixtures:", error);
+            return c.json({ error: "Failed to sync fixtures" }, 500);
+        }
+    });
+
+    /**
+     * POST /matches/sync-today - Sync today's fixtures (for live score updates)
+     */
+    public readonly syncToday = this.factory.createHandlers(async (c) => {
+        try {
+            const result = await this.matchesLogic.syncTodayFixtures();
+            return c.json({
+                message: "Today sync completed",
+                ...result,
+            });
+        } catch (error: any) {
+            console.error("Error syncing today's fixtures:", error);
+            return c.json({ error: "Failed to sync today's fixtures" }, 500);
+        }
+    });
 }
 
 export default MatchesController;

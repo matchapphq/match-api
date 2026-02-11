@@ -23,6 +23,11 @@ class MatchesService {
         this.router.get("/", ...this.controller.getMatches);
         this.router.get("/upcoming", ...this.controller.getUpcoming);
         this.router.get("/upcoming-nearby", ...this.controller.getUpcomingNearby);
+
+        // Sync routes (call to populate DB with real API-Sports fixtures)
+        this.router.post("/sync", ...this.controller.syncFixtures);
+        this.router.post("/sync-today", ...this.controller.syncToday);
+
         this.router.get("/:matchId", ...this.controller.getMatchDetails);
         this.router.get("/:matchId/venues", ...this.controller.getMatchVenues);
         this.router.get("/:matchId/live-updates", ...this.controller.getLiveUpdates);
