@@ -9,6 +9,7 @@ export const sportsTable = pgTable(
     {
         id: uuid('id').primaryKey().defaultRandom(),
 
+        api_id: integer('api_id').unique(),             // API-Sports external ID (e.g. football = null for now)
         name: varchar('name', { length: 100 }).notNull().unique(),
         slug: varchar('slug', { length: 100 }).notNull().unique(),
         description: text('description'),
@@ -39,8 +40,10 @@ export const leaguesTable = pgTable(
         id: uuid('id').primaryKey().defaultRandom(),
         sport_id: uuid('sport_id').notNull(),
 
+        api_id: integer('api_id').unique(),             // API-Sports league ID (e.g. 39 = Premier League)
         name: varchar('name', { length: 150 }).notNull(),
         slug: varchar('slug', { length: 150 }).notNull().unique(),
+        type: varchar('type', { length: 20 }),              // "League", "Cup", etc.
         country: varchar('country', { length: 100 }),
         description: text('description'),
         logo_url: text('logo_url'),
@@ -76,8 +79,10 @@ export const teamsTable = pgTable(
         id: uuid('id').primaryKey().defaultRandom(),
         league_id: uuid('league_id').notNull(),
 
+        api_id: integer('api_id').unique(),             // API-Sports team ID (e.g. 33 = Man Utd)
         name: varchar('name', { length: 150 }).notNull(),
         slug: varchar('slug', { length: 150 }).notNull().unique(),
+        short_code: varchar('short_code', { length: 10 }),  // e.g. "MUN"
         country: varchar('country', { length: 100 }),
         city: varchar('city', { length: 100 }),
         description: text('description'),

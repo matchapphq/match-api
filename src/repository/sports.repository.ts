@@ -1,6 +1,9 @@
 import { db } from "../config/config.db";
 import { sportsTable, leaguesTable, teamsTable } from "../config/db/sports.table";
+import { matchesTable } from "../config/db/matches.table";
 import { eq, and, sql, asc, desc, ilike } from "drizzle-orm";
+import type { ApiLeagueResponse, ApiTeamResponse, ApiFixtureResponse } from "../lib/api-sports";
+import { mapFixtureStatus } from "../lib/api-sports";
 
 // ============================================
 // TYPES
@@ -339,5 +342,179 @@ export class SportsRepository {
             leagues: leaguesCount?.count ?? 0,
             teams: teamsCount?.count ?? 0
         };
+    }
+
+    // ============================================
+    // API-SPORTS SYNC — Upsert from external data
+    // ============================================
+
+    /**
+     * Get or create the "Football" sport entry (single sport for now).
+     * Returns the internal UUID for FK relationships.
+     */
+    async getOrCreateFootballSport(): Promise<string> {
+        const existing = await db.query.sportsTable.findFirst({
+            where: eq(sportsTable.slug, "football"),
+        });
+        if (existing) return existing.id;
+
+        const [sport] = await db.insert(sportsTable).values({
+            name: "Football",
+            slug: "football",
+            description: "Association football (soccer)",
+            icon_url: "https://cdn.example.com/icons/football.svg",
+            display_order: 1,
+            is_active: true,
+        }).returning();
+
+        return sport!.id;
+    }
+
+    /**
+     * Find a league by its API-Sports api_id
+     */
+    async findLeagueByApiId(apiId: number) {
+        return await db.query.leaguesTable.findFirst({
+            where: eq(leaguesTable.api_id, apiId),
+        });
+    }
+
+    /**
+     * Find a team by its API-Sports api_id
+     */
+    async findTeamByApiId(apiId: number) {
+        return await db.query.teamsTable.findFirst({
+            where: eq(teamsTable.api_id, apiId),
+        });
+    }
+
+    /**
+     * Find a match by its external_id (API-Sports fixture id)
+     */
+    async findMatchByExternalId(externalId: string) {
+        return await db.query.matchesTable.findFirst({
+            where: eq(matchesTable.external_id, externalId),
+        });
+    }
+
+    /**
+     * Upsert a league from API-Sports data.
+     * Creates or updates based on api_id.
+     */
+    async upsertLeagueFromApi(sportId: string, data: ApiLeagueResponse): Promise<string> {
+        const slug = data.league.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+
+        const existing = await this.findLeagueByApiId(data.league.id);
+
+        if (existing) {
+            await db.update(leaguesTable)
+                .set({
+                    name: data.league.name,
+                    type: data.league.type,
+                    logo_url: data.league.logo,
+                    country: data.country.name,
+                    updated_at: new Date(),
+                })
+                .where(eq(leaguesTable.id, existing.id));
+            return existing.id;
+        }
+
+        const [league] = await db.insert(leaguesTable).values({
+            sport_id: sportId,
+            api_id: data.league.id,
+            name: data.league.name,
+            slug: `${slug}-${data.league.id}`,
+            type: data.league.type,
+            country: data.country.name,
+            logo_url: data.league.logo,
+            is_active: true,
+        }).returning();
+
+        return league!.id;
+    }
+
+    /**
+     * Upsert a team from API-Sports data.
+     * Creates or updates based on api_id.
+     */
+    async upsertTeamFromApi(leagueId: string, data: ApiTeamResponse): Promise<string> {
+        const slug = data.team.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-|-$/g, "");
+
+        const existing = await this.findTeamByApiId(data.team.id);
+
+        if (existing) {
+            await db.update(teamsTable)
+                .set({
+                    name: data.team.name,
+                    logo_url: data.team.logo,
+                    short_code: data.team.code,
+                    updated_at: new Date(),
+                })
+                .where(eq(teamsTable.id, existing.id));
+            return existing.id;
+        }
+
+        const [team] = await db.insert(teamsTable).values({
+            league_id: leagueId,
+            api_id: data.team.id,
+            name: data.team.name,
+            slug: `${slug}-${data.team.id}`,
+            short_code: data.team.code,
+            country: data.team.country,
+            city: data.venue?.city ?? null,
+            founded_year: data.team.founded,
+            logo_url: data.team.logo,
+            is_active: true,
+        }).returning();
+
+        return team!.id;
+    }
+
+    /**
+     * Upsert a match/fixture from API-Sports data.
+     * Creates or updates based on external_id (fixture api_id).
+     */
+    async upsertMatchFromApi(fixture: ApiFixtureResponse, leagueInternalId: string, homeTeamInternalId: string, awayTeamInternalId: string): Promise<string> {
+        const externalId = String(fixture.fixture.id);
+        const status = mapFixtureStatus(fixture.fixture.status.short);
+        const scheduledAt = new Date(fixture.fixture.date);
+
+        const existing = await this.findMatchByExternalId(externalId);
+
+        if (existing) {
+            await db.update(matchesTable)
+                .set({
+                    status,
+                    home_team_score: fixture.goals.home,
+                    away_team_score: fixture.goals.away,
+                    venue_name: fixture.fixture.venue?.name ?? null,
+                    updated_at: new Date(),
+                    ...(status === "live" && !existing.started_at ? { started_at: new Date() } : {}),
+                    ...(status === "finished" && !existing.finished_at ? { finished_at: new Date() } : {}),
+                })
+                .where(eq(matchesTable.id, existing.id));
+            return existing.id;
+        }
+
+        const [match] = await db.insert(matchesTable).values({
+            league_id: leagueInternalId,
+            home_team_id: homeTeamInternalId,
+            away_team_id: awayTeamInternalId,
+            status,
+            scheduled_at: scheduledAt,
+            home_team_score: fixture.goals.home,
+            away_team_score: fixture.goals.away,
+            venue_name: fixture.fixture.venue?.name ?? null,
+            round_number: fixture.league.round ? parseInt(fixture.league.round.replace(/\D/g, "")) || null : null,
+            external_id: externalId,
+        }).returning();
+
+        return match!.id;
     }
 }
