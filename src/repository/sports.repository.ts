@@ -1,5 +1,5 @@
 import { db } from "../config/config.db";
-import { sportsTable, leaguesTable, teamsTable } from "../config/db/sports.table";
+import { countriesTable, sportsTable, leaguesTable, teamsTable } from "../config/db/sports.table";
 import { matchesTable } from "../config/db/matches.table";
 import { eq, and, sql, asc, desc, ilike } from "drizzle-orm";
 import type { ApiLeagueResponse, ApiTeamResponse, ApiFixtureResponse } from "../lib/api-sports";
@@ -349,6 +349,46 @@ export class SportsRepository {
     // ============================================
 
     /**
+     * Upsert a country by name. Returns the internal UUID.
+     */
+    async upsertCountry(name: string, code?: string | null, flag?: string | null): Promise<string> {
+        const existing = await db.query.countriesTable.findFirst({
+            where: eq(countriesTable.name, name),
+        });
+
+        if (existing) {
+            // Update code/flag if provided
+            if (code !== undefined || flag !== undefined) {
+                await db.update(countriesTable)
+                    .set({
+                        ...(code !== undefined ? { code } : {}),
+                        ...(flag !== undefined ? { flag } : {}),
+                        updated_at: new Date(),
+                    })
+                    .where(eq(countriesTable.id, existing.id));
+            }
+            return existing.id;
+        }
+
+        const [country] = await db.insert(countriesTable).values({
+            name,
+            code: code ?? null,
+            flag: flag ?? null,
+        }).returning();
+
+        return country!.id;
+    }
+
+    /**
+     * Find a country by name.
+     */
+    async findCountryByName(name: string) {
+        return await db.query.countriesTable.findFirst({
+            where: eq(countriesTable.name, name),
+        });
+    }
+
+    /**
      * Get or create the "Football" sport entry (single sport for now).
      * Returns the internal UUID for FK relationships.
      */
@@ -400,12 +440,20 @@ export class SportsRepository {
     /**
      * Upsert a league from API-Sports data.
      * Creates or updates based on api_id.
+     * Automatically upserts the country and links via country_id.
      */
     async upsertLeagueFromApi(sportId: string, data: ApiLeagueResponse): Promise<string> {
         const slug = data.league.name
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-|-$/g, "");
+
+        // Upsert country and get its ID
+        const countryId = await this.upsertCountry(
+            data.country.name,
+            data.country.code,
+            data.country.flag,
+        );
 
         const existing = await this.findLeagueByApiId(data.league.id);
 
@@ -416,6 +464,7 @@ export class SportsRepository {
                     type: data.league.type,
                     logo_url: data.league.logo,
                     country: data.country.name,
+                    country_id: countryId,
                     updated_at: new Date(),
                 })
                 .where(eq(leaguesTable.id, existing.id));
@@ -424,6 +473,7 @@ export class SportsRepository {
 
         const [league] = await db.insert(leaguesTable).values({
             sport_id: sportId,
+            country_id: countryId,
             api_id: data.league.id,
             name: data.league.name,
             slug: `${slug}-${data.league.id}`,
@@ -439,12 +489,16 @@ export class SportsRepository {
     /**
      * Upsert a team from API-Sports data.
      * Creates or updates based on api_id.
+     * Automatically upserts the country and links via country_id.
      */
     async upsertTeamFromApi(leagueId: string, data: ApiTeamResponse): Promise<string> {
         const slug = data.team.name
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/^-|-$/g, "");
+
+        // Upsert country and get its ID
+        const countryId = await this.upsertCountry(data.team.country);
 
         const existing = await this.findTeamByApiId(data.team.id);
 
@@ -454,6 +508,7 @@ export class SportsRepository {
                     name: data.team.name,
                     logo_url: data.team.logo,
                     short_code: data.team.code,
+                    country_id: countryId,
                     updated_at: new Date(),
                 })
                 .where(eq(teamsTable.id, existing.id));
@@ -462,6 +517,7 @@ export class SportsRepository {
 
         const [team] = await db.insert(teamsTable).values({
             league_id: leagueId,
+            country_id: countryId,
             api_id: data.team.id,
             name: data.team.name,
             slug: `${slug}-${data.team.id}`,

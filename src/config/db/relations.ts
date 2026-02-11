@@ -5,7 +5,7 @@ import { userFavoriteVenuesTable } from './user-favorites.table';
 import { subscriptionsTable } from './subscriptions.table';
 import { venuesTable } from './venues.table';
 import { venuePhotosTable } from './venue-photos.table';
-import { sportsTable, leaguesTable, teamsTable } from './sports.table';
+import { countriesTable, sportsTable, leaguesTable, teamsTable } from './sports.table';
 import { matchesTable, venueMatchesTable } from './matches.table';
 import { seatsTable, seatHoldsTable } from './seats.table';
 import { reservationsTable } from './reservations.table';
@@ -87,6 +87,11 @@ export const venuePhotosRelations = relations(venuePhotosTable, ({ one }) => ({
     }),
 }));
 
+export const countriesRelations = relations(countriesTable, ({ many }) => ({
+    leagues: many(leaguesTable),
+    teams: many(teamsTable),
+}));
+
 export const sportsRelations = relations(sportsTable, ({ many }) => ({
     leagues: many(leaguesTable),
 }));
@@ -96,6 +101,10 @@ export const leaguesRelations = relations(leaguesTable, ({ one, many }) => ({
         fields: [leaguesTable.sport_id],
         references: [sportsTable.id],
     }),
+    country: one(countriesTable, {
+        fields: [leaguesTable.country_id],
+        references: [countriesTable.id],
+    }),
     teams: many(teamsTable),
 }));
 
@@ -103,6 +112,10 @@ export const teamsRelations = relations(teamsTable, ({ one }) => ({
     league: one(leaguesTable, {
         fields: [teamsTable.league_id],
         references: [leaguesTable.id],
+    }),
+    country: one(countriesTable, {
+        fields: [teamsTable.country_id],
+        references: [countriesTable.id],
     }),
 }));
 
