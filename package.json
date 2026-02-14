@@ -4,13 +4,13 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --env-file=.env.dev --watch index.ts",
+    "start": "bun run index.ts",
     "db:setup": "bun run src/config/setup.db.ts",
     "db:migrate": "bun run db:setup && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:push": "bun run db:setup && drizzle-kit push",
     "db:seed:sports-only": "bun run src/config/seeds/seed-sports-only.ts",
-    "start": "bun run index.ts"
+    "dev": "bun --env-file=.env.dev --watch index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
