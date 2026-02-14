@@ -1,4 +1,7 @@
 import { Client } from "pg";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 async function setupDatabase() {
   if (!process.env.DATABASE_URL) {

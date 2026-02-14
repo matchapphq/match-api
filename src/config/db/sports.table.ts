@@ -1,6 +1,30 @@
 import { pgTable, varchar, boolean, timestamp, uuid, index, foreignKey, integer, text } from 'drizzle-orm/pg-core';
 
 // ============================================
+// 7. COUNTRIES TABLE
+// ============================================
+
+export const countriesTable = pgTable(
+    'countries',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+
+        name: varchar('name', { length: 100 }).notNull().unique(),
+        code: varchar('code', { length: 10 }),          // ISO code e.g. "GB", "ES"
+        flag: text('flag'),                               // Flag URL from API-Sports
+
+        created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+        updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    },
+    (table) => [
+        index('idx_countries_name').on(table.name),
+    ]
+);
+
+export type Country = typeof countriesTable.$inferSelect;
+export type NewCountry = typeof countriesTable.$inferInsert;
+
+// ============================================
 // 8. SPORTS TABLE
 // ============================================
 
@@ -9,6 +33,7 @@ export const sportsTable = pgTable(
     {
         id: uuid('id').primaryKey().defaultRandom(),
 
+        api_id: integer('api_id').unique(),             // API-Sports external ID (e.g. football = null for now)
         name: varchar('name', { length: 100 }).notNull().unique(),
         slug: varchar('slug', { length: 100 }).notNull().unique(),
         description: text('description'),
@@ -39,9 +64,13 @@ export const leaguesTable = pgTable(
         id: uuid('id').primaryKey().defaultRandom(),
         sport_id: uuid('sport_id').notNull(),
 
+        country_id: uuid('country_id'),
+
+        api_id: integer('api_id').unique(),             // API-Sports league ID (e.g. 39 = Premier League)
         name: varchar('name', { length: 150 }).notNull(),
         slug: varchar('slug', { length: 150 }).notNull().unique(),
-        country: varchar('country', { length: 100 }),
+        type: varchar('type', { length: 20 }),              // "League", "Cup", etc.
+        country: varchar('country', { length: 100 }),       // kept for backward compat
         description: text('description'),
         logo_url: text('logo_url'),
 
@@ -60,6 +89,11 @@ export const leaguesTable = pgTable(
             foreignColumns: [sportsTable.id],
             name: 'fk_leagues_sport_id',
         }).onDelete('cascade'),
+        foreignKey({
+            columns: [table.country_id],
+            foreignColumns: [countriesTable.id],
+            name: 'fk_leagues_country_id',
+        }).onDelete('set null'),
     ]
 );
 
@@ -76,9 +110,13 @@ export const teamsTable = pgTable(
         id: uuid('id').primaryKey().defaultRandom(),
         league_id: uuid('league_id').notNull(),
 
+        country_id: uuid('country_id'),
+
+        api_id: integer('api_id').unique(),             // API-Sports team ID (e.g. 33 = Man Utd)
         name: varchar('name', { length: 150 }).notNull(),
         slug: varchar('slug', { length: 150 }).notNull().unique(),
-        country: varchar('country', { length: 100 }),
+        short_code: varchar('short_code', { length: 10 }),  // e.g. "MUN"
+        country: varchar('country', { length: 100 }),       // kept for backward compat
         city: varchar('city', { length: 100 }),
         description: text('description'),
         logo_url: text('logo_url'),
@@ -98,6 +136,11 @@ export const teamsTable = pgTable(
             foreignColumns: [leaguesTable.id],
             name: 'fk_teams_league_id',
         }).onDelete('cascade'),
+        foreignKey({
+            columns: [table.country_id],
+            foreignColumns: [countriesTable.id],
+            name: 'fk_teams_country_id',
+        }).onDelete('set null'),
     ]
 );
 

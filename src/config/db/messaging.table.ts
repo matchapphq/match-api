@@ -60,17 +60,17 @@ export const messagesTable = pgTable(
         deleted_at: timestamp('deleted_at', { withTimezone: true }),
     },
     (table) => [
-        index('idx_messages_conversation_id').on(table.conversation_id),
-        index('idx_messages_sender_id').on(table.sender_id),
+        index('idx_messaging_conversation_id').on(table.conversation_id),
+        index('idx_messaging_sender_id').on(table.sender_id),
         foreignKey({
             columns: [table.conversation_id],
             foreignColumns: [conversationsTable.id],
-            name: 'fk_messages_conversation_id',
+            name: 'fk_messaging_conversation_id',
         }).onDelete('cascade'),
         foreignKey({
             columns: [table.sender_id],
             foreignColumns: [usersTable.id],
-            name: 'fk_messages_sender_id',
+            name: 'fk_messaging_sender_id',
         }).onDelete('cascade'),
     ]
 );

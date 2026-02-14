@@ -1,5 +1,11 @@
+import { isMailEnvVarsInit } from "./types/mail.types";
 import { mailWorker } from "./worker/mail.worker";
 import { Hono } from 'hono';
+
+if (!isMailEnvVarsInit()) {
+    console.error("[MAIL SERVICE]: Missing required environment variables. Please check your configuration.");
+    process.exit(1);
+}
 
 const app = new Hono().get('/health', (c) => c.text('[MAIL WORKER]: Running !'));
 

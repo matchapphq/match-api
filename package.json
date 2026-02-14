@@ -4,20 +4,13 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "bun --env-file=.env.dev --watch index.ts",
-    "db:dev": "bun run db:setup:dev && bun run db:seed:dev",
+    "start": "bun run index.ts",
     "db:setup": "bun run src/config/setup.db.ts",
     "db:migrate": "bun run db:setup && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
     "db:push": "bun run db:setup && drizzle-kit push",
-    "db:seed": "bun run scripts/seed-sports.ts && bun run scripts/seed-data.ts && bun run src/config/seeds/fidelity.seed.ts",
-    "db:setup:dev": "bun --env-file=.env.dev run src/config/setup.db.ts",
-    "db:migrate:dev": "drizzle-kit migrate --config=drizzle.config.dev.ts",
-    "db:generate:dev": "drizzle-kit generate --config=drizzle.config.dev.ts",
-    "db:push:dev": "drizzle-kit push --config=drizzle.config.dev.ts",
-    "db:gen:dev": "bun run db:setup:dev && bun run db:generate:dev && bun run db:migrate:dev  && bun run db:seed:dev",
-    "db:seed:dev": "bun --env-file=.env.dev run src/config/seeds/seed-sports.ts && bun --env-file=.env.dev run src/config/seeds/seed-data.ts && bun --env-file=.env.dev run src/config/seeds/fidelity.seed.ts",
-    "start": "bun run index.ts"
+    "db:seed:sports-only": "bun run src/config/seeds/seed-sports-only.ts",
+    "dev": "bun --env-file=.env.dev --watch index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
