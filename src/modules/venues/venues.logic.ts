@@ -81,7 +81,7 @@ export class VenuesLogic {
         return deg * (Math.PI / 180);
     }
 
-    async create(userId: string, body: CreateVenueInput) {
+    public async create(userId: string, body: CreateVenueInput) {
         const subscription = await this.getActiveSubscription(userId);
         if (!subscription) {
             throw new Error("SUBSCRIPTION_REQUIRED");

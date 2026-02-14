@@ -33,7 +33,7 @@ class VenueController {
         return user.id;
     }
 
-    readonly getAll = this.factory.createHandlers(
+    public readonly getAll = this.factory.createHandlers(
         validator("query", (value, ctx) => {
             const parsed = GetVenuesSchema.safeParse(value);
             if (!parsed.success) {
@@ -56,7 +56,7 @@ class VenueController {
         },
     );
 
-    readonly getNearby = this.factory.createHandlers(async (ctx) => {
+    public readonly getNearby = this.factory.createHandlers(async (ctx) => {
         try {
             const { lat, lng, radius = "5000" } = ctx.req.query();
 
@@ -75,7 +75,7 @@ class VenueController {
         }
     });
 
-    readonly create = this.factory.createHandlers(
+    public readonly create = this.factory.createHandlers(
         validator("json", (value, ctx) => {
             const parsed = CreateVenueSchema.safeParse(value);
             if (!parsed.success) {
@@ -103,7 +103,7 @@ class VenueController {
         },
     );
 
-    readonly update = this.factory.createHandlers(
+    public readonly update = this.factory.createHandlers(
         validator("json", (value, ctx) => {
             const parsed = UpdateVenueSchema.safeParse(value);
             if (!parsed.success) {
