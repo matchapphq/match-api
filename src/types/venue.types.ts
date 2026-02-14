@@ -26,8 +26,8 @@ export type BookingMode = "INSTANT" | "REQUEST";
 
 export type CreateVenueInput = {
     name: string
-    lat: number
-    lng: number
+    lat?: number
+    lng?: number
     address: string
     city?: string
     stateProvince?: string
