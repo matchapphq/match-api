@@ -8,7 +8,7 @@
 
 ## 🏛️ The "Match Enterprise" Pattern
 
-To ensure the Match API remains scalable, testable, and maintainable, we follow a **Layered Architecture** inspired by NestJS but optimized for Hono's performance. Every module must be split into three distinct layers.
+To ensure the Match API remains scalable, testable, and maintainable, we follow a **Layered Architecture** inspired by NestJS but optimized for Hono's performance. Every feature is encapsulated in a **Module**.
 
 ### 1. The Logic Layer (`*.logic.ts`)
 **Responsibility**: Pure business logic and data orchestration.
@@ -53,7 +53,7 @@ export class UserController {
 }
 ```
 
-### 3. The Router Layer (`*.service.ts`)
+### 3. The Router Layer (`*.routes.ts`)
 **Responsibility**: Module wiring and route definitions.
 - **Rules**:
     - Acts as the "Dependency Injection" container.
@@ -92,10 +92,10 @@ class UserService {
 
 ## 🛠️ Implementation Checklist for New Modules
 
-1. [ ] Create directory: `src/services/my-module/`
-2. [ ] Define `MyModuleLogic` class in `my-module.logic.ts`.
-3. [ ] Define `MyModuleController` class in `../../controllers/my-module/my-module.controller.ts`.
-4. [ ] Wire them together in `MyModuleService` in `my-module.service.ts`.
+1. [ ] Create directory: `src/modules/[module-name]/`
+2. [ ] Define `[ModuleName]Logic` class in `[module-name].logic.ts`.
+3. [ ] Define `[ModuleName]Controller` class in `[module-name].controller.ts`.
+4. [ ] Wire them together in `[ModuleName]Service` in `[module-name].routes.ts`.
 5. [ ] Mount the service in `src/server.ts`.
 
 ---
