@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import PartnerController from "./partner.controller";
 import { PartnerLogic } from "./partner.logic";
-import { PartnerRepository } from "../../repository/partner.repository";
+import { PartnerRepository } from "../../repository/partner/partner.repository";
 import { WaitlistRepository } from "../../repository/waitlist.repository";
 
 /**

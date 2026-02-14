@@ -73,7 +73,8 @@ export const venuesTable = pgTable('venues', {
         type: venueTypeEnum('type').notNull(),
 
         // Address & Geolocation
-        street_address: varchar('street_address', { length: 255 }).notNull(),
+    street_address: varchar('street_address', { length: 255 }).notNull(),
+        formatted_address: text('formatted_address'),
         city: varchar('city', { length: 100 }).notNull(),
         state_province: varchar('state_province', { length: 100 }),
         postal_code: varchar('postal_code', { length: 20 }).notNull(),

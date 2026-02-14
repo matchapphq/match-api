@@ -34,6 +34,9 @@ export function getDb(): NodePgDatabase<Schema> | NeonHttpDatabase<Schema> {
     if (process.env.NODE_ENV === 'development') {
         const pool = new Pool({ connectionString });
         return pgDrizzle(pool, { schema }) as NodePgDatabase<Schema>;
+    } if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+        const sql = neon(connectionString);
+        return neonDrizzle(sql, { schema }) as NeonHttpDatabase<Schema>;
     } else {
         const sql = neon(connectionString);
         return neonDrizzle(sql, { schema }) as NeonHttpDatabase<Schema>;

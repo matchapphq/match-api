@@ -4,7 +4,7 @@ import type { StripeJobPayload } from "../types/jobs.type";
 import Stripe from "stripe";
 import stripe from "../config/stripe";
 import subscriptionsRepository from "../repository/subscriptions.repository";
-import { PartnerRepository } from "../repository/partner.repository";
+import { PartnerRepository } from "../repository/partner/partner.repository";
 import boostRepository from "../repository/boost.repository";
 import { geocodeAddress } from "../utils/geocoding";
 
