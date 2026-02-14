@@ -30,6 +30,7 @@ export type CreateVenueInput = {
     lng: number
     address: string
     city?: string
+    stateProvince?: string
     country?: string
     postalCode?: string
     capacity: number

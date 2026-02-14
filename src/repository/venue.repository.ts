@@ -6,11 +6,28 @@ import type { CreateVenueInput, UpdateVenueInput, GetVenuesQuery } from "../type
 import { venuePhotosTable } from "../config/db/venue-photos.table";
 import { openingHoursExceptionsTable, amenitiesTable, venueAmenitiesTable } from "../config/db/venue-amenities.table";
 import { venueMatchesTable, matchesTable } from "../config/db/matches.table";
+import { geocodeAddress } from "../utils/geocoding";
 
 export class VenueRepository {
 
-    async create(userId: string, subscriptionId: string, input: CreateVenueInput) {
+    public async create(userId: string, subscriptionId: string, input: CreateVenueInput) {
         return await db.transaction(async (tx) => {
+            
+            if (input.address && input.city && input.country && input.postalCode) {
+                try {
+                    const { lat, lng, formatted_address } = await geocodeAddress({
+                        city: input.city,
+                        postal_code: input.postalCode,
+                        country: input.country,
+                        street: input.address
+                    });
+                    input.lat = lat;
+                    input.lng = lng;
+                    input.address = formatted_address;
+                } catch (err) {
+                    console.error("Geocoding failed, proceeding without lat/lng:", err);
+                }
+            }
             // PostGIS point: SRID 4326 (WGS 84) is standard for GPS
             const locationSql = sql`ST_SetSRID(ST_MakePoint(${input.lng}, ${input.lat}), 4326)`;
 
@@ -18,7 +35,7 @@ export class VenueRepository {
                 owner_id: userId,
                 subscription_id: subscriptionId,
                 name: input.name,
-                street_address: input.address, // mapping address to street_address for now, might need split
+                street_address: input.address,
                 city: input.city ?? "Unknown",
                 postal_code: input.postalCode ?? "00000",
                 country: input.country ?? "Unknown",
@@ -26,7 +43,6 @@ export class VenueRepository {
                 latitude: input.lat,
                 longitude: input.lng,
                 capacity: input.capacity,
-                // maxSimultaneousBroadcasts: input.maxSimultaneousBroadcasts ?? 2, // Not in DB Schema yet
                 type: input.type ?? "bar",
                 description: input.description,
                 phone: input.phone,
@@ -55,7 +71,7 @@ export class VenueRepository {
         });
     }
 
-    async findById(venueId: string) {
+    public async findById(venueId: string) {
         // Exclude soft-deleted venues
         const venue = await db.query.venuesTable.findFirst({
             where: and(eq(venuesTable.id, venueId), isNull(venuesTable.deleted_at)),

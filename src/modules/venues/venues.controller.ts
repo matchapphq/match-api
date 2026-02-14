@@ -75,7 +75,7 @@ class VenueController {
         }
     });
 
-    readonly create = this.factory.createHandlers(
+    public readonly create = this.factory.createHandlers(
         validator("json", (value, ctx) => {
             const parsed = CreateVenueSchema.safeParse(value);
             if (!parsed.success) {
@@ -103,7 +103,7 @@ class VenueController {
         },
     );
 
-    readonly update = this.factory.createHandlers(
+    public readonly update = this.factory.createHandlers(
         validator("json", (value, ctx) => {
             const parsed = UpdateVenueSchema.safeParse(value);
             if (!parsed.success) {
