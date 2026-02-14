@@ -3,7 +3,7 @@ import axios from "axios";
 export type AddressOptions = {
     street: string;
     city: string;
-    state: string;
+    state?: string;
     country: string;
     postal_code: string;
 };
@@ -20,8 +20,15 @@ export type GeocodeResult = {
 
 export async function geocodeAddress(fullAddress: AddressOptions): Promise<GeocodeResult> {
     try {
+        const addressParts = [
+            fullAddress.street,
+            fullAddress.city,
+            fullAddress.postal_code,
+            fullAddress.country
+        ].filter(Boolean);
+        console.log("Geocoding address:", addressParts.join(","));
         const response = await axios.get(
-            `https://api.locationiq.com/v1/search.php?key=${process.env.LOCATIONIQ_KEY}&q=${fullAddress.street},${fullAddress.city},${fullAddress.state},${fullAddress.country}&format=json`,
+            `https://api.locationiq.com/v1/search.php?key=${process.env.LOCATIONIQ_KEY}&q=${addressParts.join(",")}&format=json`,
             {
                 headers: {
                     Accept: "application/json",
@@ -44,9 +51,17 @@ export async function geocodeAddress(fullAddress: AddressOptions): Promise<Geoco
             country: data.address?.country || "",
         };
     } catch (error) {
+        const addressString = [
+            fullAddress.street,
+            fullAddress.city,
+            fullAddress.state,
+            fullAddress.postal_code,
+            fullAddress.country
+        ].filter(Boolean).join(",");
+        
         console.error("Geocoding failed:", error);
         throw new Error(
-            `Geocoding failed for "${fullAddress.street},${fullAddress.city},${fullAddress.state},${fullAddress.country}": ${error}`,
+            `Geocoding failed for "${addressString}": ${error}`,
         );
     }
 }
