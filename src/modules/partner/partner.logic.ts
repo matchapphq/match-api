@@ -1,4 +1,4 @@
-import { PartnerRepository } from "../../repository/partner.repository";
+import { PartnerRepository } from "../../repository/partner/partner.repository";
 import { WaitlistRepository } from "../../repository/waitlist.repository";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import stripe, { CHECKOUT_URLS, isStripeConfigured } from "../../config/stripe";

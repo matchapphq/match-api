@@ -1,10 +1,11 @@
-import { db } from "../config/config.db";
-import { venuesTable } from "../config/db/venues.table";
-import { venueMatchesTable, matchesTable } from "../config/db/matches.table";
-import { reservationsTable } from "../config/db/reservations.table";
-import { reviewsTable } from "../config/db/reviews.table";
-import { analyticsTable } from "../config/db/admin.table";
+import { db } from "../../config/config.db";
+import { venuesTable } from "../../config/db/venues.table";
+import { venueMatchesTable, matchesTable } from "../../config/db/matches.table";
+import { reservationsTable } from "../../config/db/reservations.table";
+import { reviewsTable } from "../../config/db/reviews.table";
+import { analyticsTable } from "../../config/db/admin.table";
 import { eq, and, sql, inArray, count, countDistinct, gte, lte, sum } from "drizzle-orm";
+import { geocodeAddress } from "../../utils/geocoding";
 
 export class PartnerRepository {
 
@@ -144,10 +145,7 @@ export class PartnerRepository {
         return updated;
     }
 
-    /**
-     * Create a new venue
-     */
-    async createVenue(data: {
+    public async createVenue(data: {
         name: string;
         owner_id: string;
         subscription_id: string;
@@ -162,6 +160,34 @@ export class PartnerRepository {
         type?: string;
         coords?: { lat: number, lng: number };
     }) {
+        let lat = 0;
+        let lng = 0;
+        let formatted_address = `${data.street_address}, ${data.city}, ${data.state_province || ''} ${data.postal_code}, ${data.country}`;
+
+        try {
+            const geoResult = await geocodeAddress({
+                street: data.street_address,
+                postal_code: data.postal_code,
+                country: data.country,
+                city: data.city,
+            });
+            
+            lat = geoResult.lat;
+            lng = geoResult.lng;
+            formatted_address = geoResult.formatted_address;
+
+            if (data.coords?.lat === 0 && data.coords?.lng === 0) {
+                data.coords = { lat, lng };
+            }
+        } catch (error) {
+            console.error("Geocoding failed, using default coordinates (0,0)", error);
+        }
+
+        // Determine final coordinates: use provided ones if available and not 0,0
+        // otherwise use geocoded ones (which might be 0,0 if geocoding failed)
+        const finalLat = data.coords && (data.coords.lat !== 0 || data.coords.lng !== 0) ? data.coords.lat : lat;
+        const finalLng = data.coords && (data.coords.lat !== 0 || data.coords.lng !== 0) ? data.coords.lng : lng;
+        
         const [newVenue] = await db.insert(venuesTable).values({
             name: data.name,
             owner_id: data.owner_id,
@@ -171,9 +197,10 @@ export class PartnerRepository {
             state_province: data.state_province || "",
             postal_code: data.postal_code,
             country: data.country,
-            location: sql`ST_SetSRID(ST_MakePoint(${data.coords?.lat || 0}, ${data.coords?.lng || 0}), 4326)`,
-            latitude: data.coords?.lat || 0,
-            longitude: data.coords?.lng || 0,
+            location: sql`ST_SetSRID(ST_MakePoint(${finalLng}, ${finalLat}), 4326)`,
+            formatted_address: formatted_address,
+            latitude: finalLat,
+            longitude: finalLng,
             type: 'sports_bar',
             status: 'pending',
             is_active: true

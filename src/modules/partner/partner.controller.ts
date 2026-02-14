@@ -46,7 +46,7 @@ class PartnerController {
     });
 
     // POST /partners/venues/verify-checkout
-    readonly verifyCheckoutAndCreateVenue = this.factory.createHandlers(async (ctx) => {
+    public readonly verifyCheckoutAndCreateVenue = this.factory.createHandlers(async (ctx) => {
         const userId = ctx.get('user').id;
 
         try {

@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import stripe, { STRIPE_WEBHOOK_SECRET } from "../../config/stripe";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
-import { PartnerRepository } from "../../repository/partner.repository";
+import { PartnerRepository } from "../../repository/partner/partner.repository";
 import boostRepository from "../../repository/boost.repository";
 import UserRepository from "../../repository/user.repository";
 import { geocodeAddress } from "../../utils/geocoding";
