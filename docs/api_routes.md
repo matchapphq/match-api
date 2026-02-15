@@ -21,16 +21,17 @@
 Base URL: /api
 Authentication: Bearer token (JWT)
 Response format: JSON
-Pagination: limit, offset query params
+Pagination: limit, offset (or page, limit) query params
 ```
 
 ### Protected Routes (Require Authentication)
-- `/api/partners/*` — All partner routes
+- `/api/partners/*` — All partner routes (Venue Owner only)
 - `/api/users/*` — All user routes  
 - `/api/reservations/*` — All reservation routes
 - `/api/referral/*` — Referral system
 - `/api/boosts/*` — Boost system
 - `/api/fidelity/*` — Loyalty program
+- `/api/notifications/*` — Notifications
 
 ---
 
@@ -341,229 +342,15 @@ Response: 200
 
 ---
 
-## 🤝 Referral Routes (`/api/referral`)
-
-*All routes require authentication*
-
-### GET /api/referral/code
-**Get current user's referral code**
-
-```typescript
-Response: 200
-{
-  referral_code: string;
-  referral_link: string;
-  created_at: string;
-}
-```
-
-### GET /api/referral/stats
-**Get referral statistics**
-
-```typescript
-Response: 200
-{
-  total_invited: number;
-  total_signed_up: number;
-  total_converted: number;
-  total_rewards_earned: number;
-  rewards_value: string;
-  conversion_rate: number;
-}
-```
-
-### GET /api/referral/history
-**Get referral history**
-
-```typescript
-Response: 200
-{
-  referred_users: Array<{
-    id: string;
-    name: string;
-    status: 'invited' | 'signed_up' | 'converted';
-    reward_earned: string | null;
-    signed_up_at: string;
-  }>;
-  total: number;
-}
-```
-
-### POST /api/referral/validate
-**Validate a referral code (Public)**
-
-```typescript
-Request body:
-{
-  referral_code: string;
-}
-
-Response: 200
-{
-  valid: boolean;
-  referrer_name: string;
-}
-```
-
----
-
-## 🚀 Boost Routes (`/api/boosts`)
-
-*Venue Owner routes for managing visibility boosts*
-
-### GET /api/boosts/available
-**Get available boosts**
-
-```typescript
-Response: 200
-{
-  count: number;
-  boosts: Array<{
-    id: string;
-    type: string;
-    source: string;
-    created_at: string;
-  }>;
-}
-```
-
-### GET /api/boosts/prices
-**Get boost pack pricing**
-
-```typescript
-Response: 200
-{
-  prices: Array<{
-    pack_type: string;
-    quantity: number;
-    price: number;
-    unit_price: number;
-    discount_percentage: number;
-    badge?: string;
-  }>;
-}
-```
-
-### POST /api/boosts/purchase/create-checkout
-**Purchase boosts via Stripe**
-
-```typescript
-Request body:
-{
-  pack_type: 'single' | 'pack_3' | 'pack_10';
-  success_url?: string;
-  cancel_url?: string;
-}
-
-Response: 200
-{
-  checkout_url: string;
-  session_id: string;
-}
-```
-
-### POST /api/boosts/activate
-**Activate a boost on a match**
-
-```typescript
-Request body:
-{
-  boost_id: string;
-  venue_match_id: string;
-}
-
-Response: 200
-{
-  success: true;
-  expires_at: string;
-}
-```
-
-### GET /api/boosts/stats
-**Get boost performance stats**
-
-```typescript
-Response: 200
-{
-  boosts: { available: number; active: number; used: number; total: number };
-  performance: { total_views: number; total_bookings: number };
-}
-```
-
----
-
-## 🏅 Fidelity Routes (`/api/fidelity`)
-
-*Loyalty program routes*
-
-### GET /api/fidelity/summary
-**Get user fidelity summary (points, level, badges)**
-
-```typescript
-Response: 200
-{
-  data: {
-    level: { id: string; name: string; rank: number; };
-    points: { total: number; thisMonth: number; };
-    progress: { pointsToNextLevel: number; progressPercentage: number; };
-    stats: { totalReservations: number; totalCheckIns: number; };
-    badges: { total: number; recent: Array<Badge> };
-  }
-}
-```
-
-### GET /api/fidelity/points-history
-**Get points transaction history**
-
-```typescript
-Response: 200
-{
-  data: Array<{
-    actionKey: string;
-    points: number;
-    description: string;
-    date: string;
-  }>
-}
-```
-
-### GET /api/fidelity/badges
-**Get all badges (locked and unlocked)**
-
-```typescript
-Response: 200
-{
-  data: {
-    unlocked: Badge[];
-    locked: Badge[];
-  }
-}
-```
-
-### GET /api/fidelity/challenges
-**Get active challenges**
-
-```typescript
-Response: 200
-{
-  data: {
-    active: Challenge[];
-    completed: Challenge[];
-  }
-}
-```
-
----
-
-## 🏟️ Venue Routes (`/api/venues`)
+## 🔍 Discovery & Venues (`/api/discovery`, `/api/venues`)
 
 ### GET /api/venues
 **Get all venues (with filters)**
 
 ```typescript
 Query params:
+  page?: number
   limit?: number
-  offset?: number
   city?: string
   type?: venue_type
   search?: string
@@ -575,36 +362,92 @@ Query params:
 Response: 200
 {
   data: Venue[];
-  pagination: { total: number; page: number; totalPages: number };
+  pagination: { total: number; page: number; limit: number; totalPages: number };
 }
 ```
 
 ### GET /api/venues/nearby
-**Get nearby venues**
+**Get nearby venues (Mobile focused)**
 
 ```typescript
 Query params:
   lat: number
   lng: number
-  radius: number (meters)
+  radius: number (meters, default 5000)
 
 Response: 200
 [
-  { ...Venue, distance: number }
+  { ...Venue, distance: string }
 ]
+```
+
+### GET /api/discovery/nearby
+**Get nearby venues (Discovery focused)**
+
+```typescript
+Query params:
+  lat: number
+  lng: number
+  radius_km?: number (default 10)
+
+Response: 200
+[
+  { ...Venue, distance: number, photos: Photo[] }
+]
+```
+
+### GET /api/discovery/matches-nearby
+**Get upcoming matches at nearby venues**
+
+```typescript
+Query params:
+  lat: number
+  lng: number
+  radius_km?: number (default 10)
+
+Response: 200
+[
+  { 
+    ...Match, 
+    venue: { id, name, distance, ... },
+    venueMatchId: string,
+    availableCapacity: number 
+  }
+]
+```
+
+### POST /api/discovery/search
+**Paginated search for venues and matches**
+
+```typescript
+Request Body:
+{
+  q?: string;
+  type?: 'all' | 'venues' | 'matches';
+  page?: number;
+  limit?: number;
+  lat?: number;
+  lng?: number;
+  radius_km?: number;
+  date?: string; // YYYY-MM-DD
+}
+
+Response: 200
+{
+  venues: Venue[];
+  matches: Match[];
+  pagination: { ... }
+}
 ```
 
 ### GET /api/venues/:venueId
 **Get venue details**
 
-```typescript
-Response: 200
-{
-  id: string;
-  name: string;
-  ...
-}
-```
+### GET /api/venues/:venueId/photos
+**Get venue photos**
+
+### GET /api/venues/:venueId/reviews
+**Get venue reviews**
 
 ### GET /api/venues/:venueId/matches
 **Get matches available at venue**
@@ -614,108 +457,100 @@ Query params:
   upcoming_only?: boolean
 
 Response: 200
-[
-  {
-    id: string;
-    match: Match;
-    venue_match: { available_capacity: number; ... }
+Array<{
+  id: string; // match id
+  scheduled_at: string;
+  status: string;
+  homeTeam: Team;
+  awayTeam: Team;
+  league: League;
+  venue_match: { 
+    id: string; // venue_match_id
+    available_capacity: number; 
+    ... 
   }
-]
+}>
 ```
 
-### POST /api/venues
-**Create new venue (venue_owner only)**
+### GET /api/venues/:venueId/availability
+**Get current seat availability**
 
-```typescript
-Headers: Authorization: Bearer <token>
+### GET /api/venues/:venueId/opening-hours
+**Get venue opening hours**
 
-Request body:
-{
-  name: string;
-  address: string; // street_address
-  city: string;
-  postalCode: string;
-  country: string;
-  lat: number;
-  lng: number;
-  capacity: number;
-  type: string;
-}
+### GET /api/venues/:venueId/opening-hours/exceptions
+**Get special closure dates or modified hours**
 
-Response: 201
-{
-  venue: Venue;
-}
-```
+### GET /api/venues/:venueId/menu
+**Get venue menu**
+
+### GET /api/venues/:venueId/amenities
+**Get venue amenities (Wi-Fi, Terrace, etc.)**
 
 ---
 
-## ⚽ Matches Routes (`/api/matches`)
+## ⚽ Sports & Matches (`/api/sports`, `/api/leagues`, `/api/teams`, `/api/matches`)
+
+### GET /api/sports
+**List all supported sports**
+
+### GET /api/sports/:sportId/leagues
+**Get leagues for a sport**
+
+### GET /api/leagues/:leagueId
+**Get league details**
+
+### GET /api/leagues/:leagueId/teams
+**Get teams in a league**
+
+### GET /api/teams/:teamId
+**Get team details**
 
 ### GET /api/matches
-**Get all upcoming matches**
+**Get matches (upcoming by default)**
 
 ```typescript
 Query params:
+  status?: 'scheduled' | 'live' | 'finished'
   limit?: number
   offset?: number
-  status?: string
-
-Response: 200
-{
-  data: Match[];
-  count: number;
-}
+  date?: string (YYYY-MM-DD)
+  sport_id?: string
 ```
+
+### GET /api/matches/upcoming
+**Get upcoming matches**
+
+### GET /api/matches/upcoming-nearby
+**Get upcoming matches at nearby venues**
 
 ### GET /api/matches/:matchId
 **Get match details**
 
-```typescript
-Response: 200
-{
-  data: Match;
-}
-```
-
 ### GET /api/matches/:matchId/venues
 **Get venues broadcasting this match**
 
-```typescript
-Query params:
-  lat?: number
-  lng?: number
-  distance_km?: number
+### GET /api/matches/:matchId/live-updates
+**Get real-time score updates (API-Sports proxy)**
 
-Response: 200
-{
-  data: Array<{
-    venue: Venue;
-    availableCapacity: number;
-    distance?: number;
-  }>;
-  count: number;
-}
-```
+### Live Data Proxy (`/api/football/*`)
+*Direct access to real-time data from API-Sports (autoy-syncs to DB)*
+- `GET /api/football/countries`
+- `GET /api/football/leagues`
+- `GET /api/football/teams`
+- `GET /api/football/fixtures`
 
 ---
 
-## 🎟️ Reservations Routes (`/api/reservations`)
+## 🎟️ Reservations & Waitlist (`/api/reservations`)
 
 *All routes require authentication*
 
 ### GET /api/reservations
-**Get user's reservations**
-
-```typescript
-Response: 200
-{
-  data: Reservation[];
-}
-```
+**Get user's reservation history**
 
 ### POST /api/reservations
-**Create reservation**
+**Create free table reservation**
 
 ```typescript
 Request body:
@@ -723,104 +558,138 @@ Request body:
   venueMatchId: string;
   partySize: number;
   specialRequests?: string;
-  requiresAccessibility?: boolean;
-}
-
-Response: 201
-{
-  message: string;
-  reservation: Reservation;
-  qr_code?: string;
 }
 ```
+
+### GET /api/reservations/:reservationId
+**Get reservation details (includes QR code)**
 
 ### POST /api/reservations/:reservationId/cancel
-**Cancel reservation**
+**Cancel a reservation**
+
+### POST /api/reservations/waitlist/join
+**Join waitlist for a full match**
 
 ```typescript
 Request body:
 {
-  reason?: string;
-}
-
-Response: 200
-{
-  message: string;
-  reservation: Reservation;
+  venueMatchId: string;
+  partySize: number;
 }
 ```
 
-### POST /api/reservations/verify-qr
-**Verify QR code (Venue Owner)**
+### POST /api/reservations/waitlist/:waitlistId/leave
+**Leave waitlist**
 
-```typescript
-Request body:
-{
-  qrContent: string;
-}
-
-Response: 200
-{
-  valid: boolean;
-  reservation: Reservation;
-}
-```
-
-### POST /api/reservations/:reservationId/check-in
-**Check-in guest (Venue Owner)**
-
-```typescript
-Response: 200
-{
-  message: string;
-  reservation: Reservation;
-}
-```
+### GET /api/reservations/waitlist
+**Get user's current waitlist entries**
 
 ---
 
-## 🏢 Partner Dashboard Routes (`/api/partners`)
+## 🏢 Partner Dashboard (`/api/partners`)
 
-*Requires `venue_owner` role*
+*Requires `venue_owner` role. Base URL: `/api/partners`*
 
-### GET /api/partners/venues
-**Get my venues**
+### Venues & Matches
+- `GET /venues` — Get my venues
+- `POST /venues` — Create venue (triggers Stripe checkout)
+- `POST /venues/verify-checkout` — Finalize venue creation after payment
+- `GET /venues/matches` — Get all matches scheduled across my venues
+- `POST /venues/:venueId/matches` — Schedule a match at my venue
+- `PUT /venues/:venueId/matches/:matchId` — Update capacity/settings for a match
+- `DELETE /venues/:venueId/matches/:matchId` — Cancel match broadcast
 
-### POST /api/partners/venues
-**Create venue with subscription checkout**
+### Management & Analytics
+- `GET /venues/:venueId/reservations` — Get all reservations for a venue
+- `GET /venues/:venueId/reservations/stats` — Detailed reservation analytics
+- `GET /venues/:venueId/matches/calendar` — Calendar view of broadcasts
+- `GET /venues/:venueId/clients` — CRM view of regular customers
+- `GET /venues/:venueId/subscription` — Manage Stripe subscription
+- `POST /venues/:venueId/payment-portal` — Open Stripe Billing Portal
+- `GET /stats/customers` — Consolidated customer statistics
+- `GET /analytics/summary` — Overview of performance
+- `GET /analytics/dashboard` — Full dashboard data
+- `GET /activity` — Recent activity feed
 
-### GET /api/partners/analytics/dashboard
-**Get main analytics dashboard**
+### Scans & Check-ins
+- `POST /reservations/:reservationId/status` — Accept/Decline 'Request' mode bookings
+- `POST /reservations/verify-qr` — Verify user's QR code (from scanning)
+- `POST /reservations/:reservationId/check-in` — Confirm guest arrival
+- `POST /reservations/:reservationId/mark-no-show` — Mark user as absent
 
-### GET /api/partners/analytics/summary
-**Get consolidated stats**
-
-### GET /api/partners/venues/:venueId/reservations
-**Get venue reservations**
-
-### GET /api/partners/venues/:venueId/matches/calendar
-**Get matches calendar view**
+### Waitlist
+- `GET /venues/:venueId/matches/:matchId/waitlist` — View waitlist
+- `POST /waitlist/:entryId/notify` — Notify customer that a table is free
 
 ---
 
-## 💳 Subscription Routes (`/api/subscriptions`)
-
-*Requires `venue_owner` role*
+## 💳 Subscriptions & Billing (`/api/subscriptions`, `/api/invoices`, `/api/transactions`)
 
 ### GET /api/subscriptions/plans
-**Get available plans**
+**List available subscription levels**
 
 ### POST /api/subscriptions/create-checkout
-**Create subscription checkout session**
+**Start subscription checkout**
 
 ### GET /api/subscriptions/me
-**Get current subscription**
+**Get current user subscription status**
 
 ### POST /api/subscriptions/me/update-payment-method
-**Get Stripe Customer Portal URL**
+**Get payment portal URL**
 
-### GET /api/subscriptions/invoices
-**Get invoice history**
+### Billing History
+- `GET /api/invoices` — List all invoices
+- `GET /api/invoices/:invoiceId` — Get invoice details
+- `GET /api/invoices/:invoiceId/pdf` — Download invoice
+- `GET /api/transactions` — List all transactions
+
+---
+
+## 🤝 Referral & Boosts (`/api/referral`, `/api/boosts`)
+
+### Referral System
+- `GET /api/referral/code` — Get my referral code
+- `GET /api/referral/stats` — Get referral performance
+- `GET /api/referral/history` — List invited users
+- `POST /api/referral/validate` — Validate code before signup
+
+### Boost visibility
+- `GET /api/boosts/available` — Check boost inventory
+- `GET /api/boosts/prices` — List boost pack prices
+- `POST /api/boosts/purchase/create-checkout` — Buy boosts
+- `POST /api/boosts/activate` — Apply boost to a match
+- `GET /api/boosts/stats` — Boost performance analytics
+
+---
+
+## 🏅 Fidelity Program (`/api/fidelity`)
+
+- `GET /api/fidelity/summary` — Points, level, and recent badges
+- `GET /api/fidelity/points-history` — Log of points earned/spent
+- `GET /api/fidelity/badges` — List all achievement badges
+- `GET /api/fidelity/challenges` — List active/completed challenges
+- `GET /api/fidelity/levels` — List all loyalty tiers
+
+---
+
+## 🔔 Notifications (`/api/notifications`)
+
+- `GET /api/notifications` — List notifications
+- `GET /api/notifications/unread-count` — Count unread
+- `GET /api/notifications/new` — Get new since last check
+- `PUT /api/notifications/read-all` — Mark all read
+- `PUT /api/notifications/:notificationId/read` — Mark single read
+- `DELETE /api/notifications/:notificationId` — Remove notification
+
+---
+
+## 🛠️ Infrastructure & Misc
+
+- `GET /api/health` — System health check
+- `GET /api/health/test` — Test endpoint
+- `POST /api/webhooks/stripe` — Stripe event handler
+- `GET /api/coupons/validate` — Check coupon code validity
+- `GET /api/amenities` — Global list of available amenities (grouped by category)
 
 ---
 [« Back to Documentation Index](./index.md)
