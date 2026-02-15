@@ -4,6 +4,7 @@ import { eq, and, gte, desc, asc, sql, isNotNull } from "drizzle-orm";
 import { SportsRepository } from "../../repository/sports.repository";
 import { apiSports, mapFixtureStatus } from "../../lib/api-sports";
 import type { ApiFixtureResponse } from "../../lib/api-sports";
+import { teamsTable } from "../../config/db/sports.table";
 
 // ============================================
 // Popular leagues to auto-sync (API-Sports IDs)
@@ -241,18 +242,60 @@ export class MatchesLogic {
     // MATCH ENDPOINTS
     // ============================================
 
-    async getMatches(status?: string, limit: number = 20, offset: number = 0) {
+    async getMatches(status?: string, limit: number = 20, offset: number = 0, date?: string, sportId?: string) {
         // Blocking sync: ensure we have upcoming real fixtures in DB
         await this.ensureUpcomingFixtures();
 
+        const conditions = [];
+
+        if (status) {
+            conditions.push(eq(matchesTable.status, status as any));
+        } else {
+            // Default to upcoming if no status or date provided
+            if (!date) {
+                conditions.push(gte(matchesTable.scheduled_at, new Date()));
+            }
+        }
+
+        if (date) {
+            const startOfDay = new Date(date);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+            conditions.push(and(
+                gte(matchesTable.scheduled_at, startOfDay),
+                sql`${matchesTable.scheduled_at} <= ${endOfDay}`
+            ));
+        }
+
+        if (sportId) {
+            // Join with leagues to filter by sport_id
+            const matches = await db.select({
+                match: matchesTable,
+                homeTeam: teamsTable, // This won't work directly with db.query style but we are in logic
+            }).from(matchesTable)
+            // ... actually db.query is easier for 'with' relations
+        }
+
         return await db.query.matchesTable.findMany({
-            where: status
-                ? eq(matchesTable.status, status as any)
-                : gte(matchesTable.scheduled_at, new Date()),
-            with: { homeTeam: true, awayTeam: true, league: true },
+            where: and(...conditions),
+            with: { 
+                homeTeam: true, 
+                awayTeam: true, 
+                league: {
+                    with: {
+                        sport: true
+                    }
+                }
+            },
             orderBy: [asc(matchesTable.scheduled_at)],
             limit,
             offset,
+        }).then(matches => {
+            if (sportId) {
+                return matches.filter(m => m.league?.sport_id === sportId);
+            }
+            return matches;
         });
     }
 
@@ -345,16 +388,67 @@ export class MatchesLogic {
         return venues;
     }
 
-    async getUpcoming(limit: number = 20, offset: number = 0) {
+    async getUpcoming(limit: number = 20, offset: number = 0, sportId?: string, date?: string, search?: string) {
         // Blocking sync: ensure we have upcoming real fixtures in DB
         await this.ensureUpcomingFixtures();
 
+        const conditions = [gte(matchesTable.scheduled_at, new Date())];
+
+        if (date) {
+            const startOfDay = new Date(date);
+            startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(date);
+            endOfDay.setHours(23, 59, 59, 999);
+            conditions.push(and(
+                gte(matchesTable.scheduled_at, startOfDay),
+                sql`${matchesTable.scheduled_at} <= ${endOfDay}`
+            ));
+        }
+
+        if (search) {
+            // We'll filter in memory after fetching because complex join filtering is harder with db.query
+            // but we can try to filter by team names if we join them.
+        }
+
         return await db.query.matchesTable.findMany({
-            where: gte(matchesTable.scheduled_at, new Date()),
-            with: { homeTeam: true, awayTeam: true, league: true },
+            where: and(...conditions),
+            with: { 
+                homeTeam: true, 
+                awayTeam: true, 
+                league: {
+                    with: {
+                        sport: true
+                    }
+                } 
+            },
             orderBy: [asc(matchesTable.scheduled_at)],
             limit,
             offset,
+        }).then(matches => {
+            let filtered = matches;
+            
+            if (sportId) {
+                filtered = filtered.filter(m => m.league?.sport_id === sportId);
+            }
+
+            if (search) {
+                const s = search.toLowerCase();
+                filtered = filtered.filter(m => 
+                    m.homeTeam?.name?.toLowerCase().includes(s) || 
+                    m.awayTeam?.name?.toLowerCase().includes(s) ||
+                    m.league?.name?.toLowerCase().includes(s)
+                );
+            }
+
+            // Map scheduled_at to start_time for frontend compatibility
+            return filtered.map(m => ({
+                ...m,
+                start_time: m.scheduled_at,
+                home_team: m.homeTeam,
+                away_team: m.awayTeam,
+                competition: m.league,
+                sport: m.league?.sport,
+            }));
         });
     }
 

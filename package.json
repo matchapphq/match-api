@@ -10,6 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:push": "bun run db:setup && drizzle-kit push",
     "db:seed:sports-only": "bun run src/config/seeds/seed-sports-only.ts",
+    "db:seed:matches": "bun run src/config/seeds/seed-matches-only.ts",
     "dev": "bun --env-file=.env.dev --watch index.ts"
   },
   "devDependencies": {
