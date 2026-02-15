@@ -139,24 +139,160 @@ export class DiscoveryLogic {
         };
     }
 
-    async getNearby() {
-        return { msg: "Nearby venues" };
+    async getNearby(lat: number, lng: number, radiusKm: number = 10) {
+        const distanceMeters = radiusKm * 1000;
+        
+        const venueConditions = [
+            isNull(venuesTable.deleted_at),
+            eq(venuesTable.is_active, true),
+            sql`ST_DWithin(
+                ${venuesTable.location}::geography, 
+                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography, 
+                ${distanceMeters}
+            )`
+        ];
+
+        const venues = await db.query.venuesTable.findMany({
+            where: and(...venueConditions),
+            orderBy: sql`ST_Distance(
+                ${venuesTable.location}::geography, 
+                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
+            )`,
+            with: {
+                photos: {
+                    where: eq(sql`is_primary`, true),
+                    limit: 1
+                }
+            }
+        });
+
+        return venues.map(v => ({
+            ...v,
+            distance: v.latitude && v.longitude
+                ? this.calculateDistance(lat, lng, v.latitude, v.longitude)
+                : null
+        }));
     }
 
     async getVenueDetails(venueId: string) {
-        return { msg: "Venue details" };
+        const venue = await db.query.venuesTable.findFirst({
+            where: and(
+                eq(venuesTable.id, venueId),
+                isNull(venuesTable.deleted_at)
+            ),
+            with: {
+                photos: true,
+            }
+        });
+
+        if (!venue) {
+            throw new Error("VENUE_NOT_FOUND");
+        }
+
+        // Fetch matches for this venue
+        const venueMatches = await db.query.venueMatchesTable.findMany({
+            where: and(
+                eq(venueMatchesTable.venue_id, venueId),
+                eq(venueMatchesTable.is_active, true)
+            ),
+            with: {
+                match: {
+                    with: {
+                        homeTeam: true,
+                        awayTeam: true,
+                        league: true
+                    }
+                }
+            },
+            orderBy: (vm, { asc }) => [asc(sql`created_at`)] // Using sql because match.scheduled_at is nested
+        });
+
+        return {
+            ...venue,
+            matches: venueMatches.map(vm => ({
+                ...vm.match,
+                venueMatchId: vm.id,
+                availableCapacity: vm.available_capacity,
+                totalCapacity: vm.total_capacity
+            }))
+        };
     }
 
     async getVenueMenu(venueId: string) {
-        return { msg: "Venue menu" };
+        const venue = await db.query.venuesTable.findFirst({
+            where: eq(venuesTable.id, venueId),
+            columns: {
+                menu: true
+            }
+        });
+
+        return venue?.menu || [];
     }
 
     async getVenueHours(venueId: string) {
-        return { msg: "Venue hours" };
+        const venue = await db.query.venuesTable.findFirst({
+            where: eq(venuesTable.id, venueId),
+            columns: {
+                opening_hours: true
+            }
+        });
+
+        const exceptions = await db.query.openingHoursExceptionsTable.findMany({
+            where: eq(openingHoursExceptionsTable.venue_id, venueId),
+            orderBy: [asc(openingHoursExceptionsTable.date)]
+        });
+
+        return {
+            regular_hours: venue?.opening_hours || [],
+            exceptions
+        };
     }
 
-    async getMatchesNearby() {
-        return { msg: "Matches nearby" };
+    async getMatchesNearby(lat: number, lng: number, radiusKm: number = 10) {
+        const distanceMeters = radiusKm * 1000;
+        const now = new Date();
+
+        // Get venue matches at nearby venues
+        // We join with venuesTable to use the location for distance filtering
+        const nearbyMatches = await db.select({
+            venueMatch: venueMatchesTable,
+            venue: venuesTable,
+            match: matchesTable,
+        })
+        .from(venueMatchesTable)
+        .innerJoin(venuesTable, eq(venueMatchesTable.venue_id, venuesTable.id))
+        .innerJoin(matchesTable, eq(venueMatchesTable.match_id, matchesTable.id))
+        .where(and(
+            eq(venueMatchesTable.is_active, true),
+            eq(venuesTable.is_active, true),
+            isNull(venuesTable.deleted_at),
+            gte(matchesTable.scheduled_at, now),
+            sql`ST_DWithin(
+                ${venuesTable.location}::geography, 
+                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography, 
+                ${distanceMeters}
+            )`
+        ))
+        .orderBy(asc(matchesTable.scheduled_at));
+
+        // Group by match or return as flat list depending on UX needs
+        // For discovery, a flat list of "Match at Venue" is often best
+        
+        return nearbyMatches.map(item => ({
+            ...item.match,
+            venue: {
+                id: item.venue.id,
+                name: item.venue.name,
+                address: item.venue.street_address,
+                latitude: item.venue.latitude,
+                longitude: item.venue.longitude,
+                distance: item.venue.latitude && item.venue.longitude
+                    ? this.calculateDistance(lat, lng, item.venue.latitude, item.venue.longitude)
+                    : null
+            },
+            venueMatchId: item.venueMatch.id,
+            availableCapacity: item.venueMatch.available_capacity
+        }));
     }
 
     private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

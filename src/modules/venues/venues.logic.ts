@@ -35,32 +35,26 @@ export class VenuesLogic {
     async getNearby(lat: string, lng: string, radius: string = "5000") {
         const latitude = parseFloat(lat);
         const longitude = parseFloat(lng);
-        const radiusKm = parseInt(radius) / 1000;
+        const radiusMeters = parseFloat(radius);
+        const radiusKm = radiusMeters / 1000;
 
-        const result = await this.venueRepository.findAll({});
+        const result = await this.venueRepository.findAll({
+            lat: latitude,
+            lng: longitude,
+            distance_km: radiusKm,
+            sort: 'distance',
+            limit: 50 // Get more for nearby
+        });
         
-        return result.data.filter((venue: any) => {
-                if (!venue.latitude || !venue.longitude) return false;
-                const distance = this.calculateDistance(
-                    latitude,
-                    longitude,
-                    venue.latitude,
-                    venue.longitude,
-                );
-                return distance <= radiusKm;
-            }).map((venue: any) => ({
-                ...venue,
-                distance: this.calculateDistance(
-                    latitude,
-                    longitude,
-                    venue.latitude,
-                    venue.longitude,
-                ).toFixed(2),
-            }))
-            .sort(
-                (a: any, b: any) =>
-                    parseFloat(a.distance) - parseFloat(b.distance),
-            );
+        return result.data.map((venue: any) => ({
+            ...venue,
+            distance: this.calculateDistance(
+                latitude,
+                longitude,
+                venue.latitude,
+                venue.longitude,
+            ).toFixed(2),
+        }));
     }
 
     private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
