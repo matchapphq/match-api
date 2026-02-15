@@ -186,9 +186,21 @@ export class PartnerLogic {
         };
     }
 
-    async scheduleMatch(venueId: string, data: any) {
-        const { match_id, total_capacity } = data;
-        return await this.partnerRepo.scheduleMatch(venueId, match_id, total_capacity);
+    async scheduleMatch(userId: string, venueId: string, data: any) {
+        // Verify ownership
+        const isOwner = await this.partnerRepo.verifyVenueOwnership(venueId, userId);
+        if (!isOwner) {
+            throw new Error("FORBIDDEN");
+        }
+
+        const { match_id, total_capacity, capacity } = data;
+        const finalCapacity = total_capacity ?? capacity;
+        
+        if (!finalCapacity) {
+            throw new Error("Capacity is required");
+        }
+
+        return await this.partnerRepo.scheduleMatch(venueId, match_id, finalCapacity);
     }
 
     async cancelMatch(venueId: string, matchId: string) {

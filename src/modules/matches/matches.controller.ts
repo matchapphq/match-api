@@ -15,12 +15,14 @@ class MatchesController {
      */
     public readonly getMatches = this.factory.createHandlers(async (c) => {
         try {
-            const { status, limit = "20", offset = "0" } = c.req.query();
+            const { status, limit = "20", offset = "0", date, sport_id } = c.req.query();
 
             const matches = await this.matchesLogic.getMatches(
                 status, 
                 parseInt(limit), 
-                parseInt(offset)
+                parseInt(offset),
+                date,
+                sport_id
             );
 
             return c.json({ 
@@ -80,11 +82,14 @@ class MatchesController {
      */
     public readonly getUpcoming = this.factory.createHandlers(async (c) => {
         try {
-            const { limit = "20", offset = "0" } = c.req.query();
+            const { limit = "20", offset = "0", sport_id, date, search } = c.req.query();
 
             const matches = await this.matchesLogic.getUpcoming(
                 parseInt(limit), 
-                parseInt(offset)
+                parseInt(offset),
+                sport_id,
+                date,
+                search
             );
             
             return c.json({ 

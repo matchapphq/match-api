@@ -72,19 +72,22 @@ class PartnerController {
 
     // POST /partners/venues/:venueId/matches
     readonly scheduleMatch = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
         const venueId = ctx.req.param("venueId");
 
         try {
             const body = await ctx.req.json();
-            const { match_id, total_capacity } = body;
+            const { match_id, total_capacity, capacity } = body;
+            const finalCapacity = total_capacity ?? capacity;
 
-            if (!venueId || !match_id || !total_capacity) {
-                return ctx.json({ error: "venueId, match_id and total_capacity are required" }, 400);
+            if (!venueId || !match_id || !finalCapacity) {
+                return ctx.json({ error: "venueId, match_id and capacity are required" }, 400);
             }
 
-            const venueMatch = await this.partnerLogic.scheduleMatch(venueId, body);
+            const venueMatch = await this.partnerLogic.scheduleMatch(userId, venueId, body);
             return ctx.json({ venueMatch }, 201);
         } catch (error: any) {
+            if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 403);
             console.error("Error scheduling match:", error);
             if (error.code === '23505') {
                 return ctx.json({ error: "Match already scheduled at this venue" }, 409);
