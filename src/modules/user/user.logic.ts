@@ -1,6 +1,7 @@
 import UserRepository from "../../repository/user.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
 import { password as BunPassword } from "bun";
+import { mailQueue } from "../../queue/notification.queue";
 
 /**
  * Service handling Pure Business Logic for Users.
@@ -72,6 +73,15 @@ export class UserLogic {
             throw new Error("INVALID_PASSWORD");
         }
         
+        // Send confirmation email before deleting the user record
+        await mailQueue.add("account-deletion", {
+            to: user.email,
+            subject: "Confirmation de suppression de compte - Match",
+            data: {
+                userName: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email,
+            }
+        });
+
         await this.userRepository.deleteUser(userId, reason, details);
         return true;
     }

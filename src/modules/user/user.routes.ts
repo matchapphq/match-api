@@ -38,12 +38,6 @@ class UserService {
 
         // Notification Preferences (Protected)
         this.router.put("/me/notification-preferences", authMiddleware, ...this.controller.updateNotificationPreferences);
-        
-        // Addresses (Protected)
-        this.router.get("/me/addresses", authMiddleware, ...this.controller.getAddresses);
-        this.router.post("/me/addresses", authMiddleware, ...this.controller.addAddress);
-        this.router.put("/me/addresses/:addressId", authMiddleware, ...this.controller.updateAddress);
-        this.router.delete("/me/addresses/:addressId", authMiddleware, ...this.controller.deleteAddress);
 
         // Favorites (Protected)
         this.router.get("/me/favorite-venues", authMiddleware, ...this.controller.getFavorites);
