@@ -12,7 +12,6 @@ export class VenueRepository {
 
     public async create(userId: string, subscriptionId: string, input: CreateVenueInput) {
         return await db.transaction(async (tx) => {
-            console.log("Creating venue with input:", input);
             if (input.address && input.city && input.country && input.postalCode) {
                 try {
                     const { lat, lng, formatted_address } = await geocodeAddress({
