@@ -1,5 +1,6 @@
 import UserRepository from "../../repository/user.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
+import { password as BunPassword } from "bun";
 
 /**
  * Service handling Pure Business Logic for Users.
@@ -56,7 +57,26 @@ export class UserLogic {
             created_at: updatedUser.created_at,
         };
     }
-
+    
+    /**
+     * Delete user account after verifying password.
+     */
+    public async deleteUser(userId: string, reason: string, details: string | undefined, password: string) {
+        const user = await this.userRepository.getUserById(userId);
+        if (!user) {
+            throw new Error("USER_NOT_FOUND");
+        }
+        
+        const isPasswordValid = await BunPassword.verify(password, user.password_hash);
+        if (!isPasswordValid) {
+            throw new Error("INVALID_PASSWORD");
+        }
+        
+        await this.userRepository.deleteUser(userId, reason, details);
+        return true;
+    }
+    
+    
     /**
      * Get user favorites with business-level pagination.
      */

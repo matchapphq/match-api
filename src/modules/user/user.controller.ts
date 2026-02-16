@@ -4,6 +4,8 @@ import { validator } from "hono/validator";
 import type { Context } from "hono";
 import type { HonoEnv } from "../../types/hono.types";
 import { UserLogic } from "./user.logic";
+import { zValidator } from "@hono/zod-validator";
+import { DeleteRequestSchema, type DeleteRequestSchemaType } from "../../utils/users.valid";
 
 // Validation schema for pagination
 const PaginationSchema = z.object({
@@ -75,7 +77,21 @@ class UserController {
         }
     });
 
-    readonly deleteMe = this.factory.createHandlers(async (ctx) => {
+    readonly deleteMe = this.factory.createHandlers(zValidator("json", DeleteRequestSchema), async (ctx) => {
+        const body: DeleteRequestSchemaType = ctx.req.valid("json");
+        
+        try {
+            const userId = this.getUserId(ctx);
+            const result = await this.userLogic.deleteUser(userId, body.reason, body.details, body.password);
+            
+            if (!result) {
+                return ctx.json({ error: "Failed to delete user account" }, 400);
+            }
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Error deleting user:", error);
+            return ctx.json({ error: "Failed to delete user account" }, 500);
+        }
         return ctx.json({ msg: "Delete user account" });
     });
 

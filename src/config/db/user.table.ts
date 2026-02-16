@@ -1,4 +1,4 @@
-import { pgTable, varchar, boolean, timestamp, uuid, index, text, jsonb, doublePrecision } from 'drizzle-orm/pg-core';
+import { boolean, doublePrecision, index, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 import { userRoleEnum } from './enums';
 
 // ============================================
@@ -92,3 +92,18 @@ export const userPreferencesTable = pgTable(
 
 export type UserPreferences = typeof userPreferencesTable.$inferSelect;
 export type NewUserPreferences = typeof userPreferencesTable.$inferInsert;
+
+export const userDeleteReasonsTable = pgTable('user_delete_reasons', {
+        id: uuid('id').primaryKey().defaultRandom().notNull(),
+        reason: text('reason').notNull(),
+        details: text('details'),
+        created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+        updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
+    },
+    (table) => [
+        index('idx_delete_reasons_id').on(table.id),
+    ]
+);
+
+export type UserDeleteReason = typeof userDeleteReasonsTable.$inferSelect;
+export type NewUserDeleteReason = typeof userDeleteReasonsTable.$inferInsert;

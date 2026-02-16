@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../config/config.db";
-import { userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
+import { userDeleteReasonsTable, userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
 import type { userRegisterData } from "../utils/userData";
 import { password } from "bun";
 
@@ -116,7 +116,17 @@ class UserRepository {
         const user = await this.getUserByEmail(email);
         return !!user;
     }
-
+    
+    public async deleteUser(userId: string, reason: string, details?: string): Promise<void> {
+        await Promise.all([
+            await db.delete(usersTable).where(eq(usersTable.id, userId)),
+            await db.insert(userDeleteReasonsTable).values({
+                reason: reason,
+                details: details || null,
+            })
+        ])
+        
+    }
 }
 
 export default UserRepository;
