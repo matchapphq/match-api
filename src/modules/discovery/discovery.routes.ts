@@ -26,7 +26,7 @@ class DiscoveryService {
         this.router.get("/venues/:venueId/menu", ...this.controller.getVenueMenu);
         this.router.get("/venues/:venueId/hours", ...this.controller.getVenueHours);
         this.router.get("/matches-nearby", ...this.controller.getMatchesNearby);
-        this.router.post("/search", ...this.controller.search);
+        this.router.get("/search", ...this.controller.search);
     }
 }
 
