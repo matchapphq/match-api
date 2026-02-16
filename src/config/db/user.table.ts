@@ -18,6 +18,7 @@ export const usersTable = pgTable(
         username: varchar('username', { length: 100 }),
         first_name: varchar('first_name', { length: 100 }),
         last_name: varchar('last_name', { length: 100 }),
+        bio: text('bio'),
         phone: varchar('phone', { length: 20 }),
         avatar_url: text('avatar_url'),
 

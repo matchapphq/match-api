@@ -14,7 +14,7 @@ export const countriesTable = pgTable(
         flag: text('flag'),                               // Flag URL from API-Sports
 
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-        updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+        updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull().$onUpdate(() => new Date()),
     },
     (table) => [
         index('idx_countries_name').on(table.name),

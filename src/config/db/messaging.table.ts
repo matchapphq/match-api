@@ -52,6 +52,7 @@ export const messagesTable = pgTable(
         
         type: messageTypeEnum('type').default('text').notNull(),
         content: text('content').notNull(),
+        media_url: text('media_url'),
         
         is_read: boolean('is_read').default(false).notNull(),
         

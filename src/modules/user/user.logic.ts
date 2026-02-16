@@ -21,15 +21,39 @@ export class UserLogic {
             throw new Error("USER_NOT_FOUND");
         }
         
-        const userData = users[0]!;
+        const userData = (await this.userRepository.getUserById(userId))!;
         return {
             id: userData.id,
             email: userData.email,
             first_name: userData.first_name,
             last_name: userData.last_name,
             phone: userData.phone,
+            bio: userData.bio,
+            avatar: userData.avatar_url,
             role: userData.role,
-            has_completed_onboarding: true, // Logic can be more complex here
+            created_at: userData.created_at,
+            has_completed_onboarding: true,
+        };
+    }
+
+    /**
+     * Update the current user's profile.
+     */
+    async updateUser(userId: string, data: { first_name?: string; last_name?: string; email?: string; phone?: string; avatar?: string; bio?: string }) {
+        const updatedUser = await this.userRepository.updateUser(userId, data);
+        if (!updatedUser) {
+            throw new Error("USER_NOT_FOUND");
+        }
+        return {
+            id: updatedUser.id,
+            email: updatedUser.email,
+            first_name: updatedUser.first_name,
+            last_name: updatedUser.last_name,
+            phone: updatedUser.phone,
+            bio: updatedUser.bio,
+            avatar: updatedUser.avatar_url,
+            role: updatedUser.role,
+            created_at: updatedUser.created_at,
         };
     }
 

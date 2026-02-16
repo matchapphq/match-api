@@ -23,7 +23,10 @@ class UserRepository {
             role: usersTable.role,
             first_name: usersTable.first_name,
             last_name: usersTable.last_name,
-            phone: usersTable.phone
+            bio: usersTable.bio,
+            phone: usersTable.phone,
+            avatar_url: usersTable.avatar_url,
+            created_at: usersTable.created_at
         }).from(usersTable).where(eq(usersTable.id, user.id));
     }
     
@@ -60,6 +63,18 @@ class UserRepository {
         }
 
         return newUser;
+    }
+
+    public async updateUser(userId: string, data: { first_name?: string; last_name?: string; email?: string; phone?: string; avatar?: string; bio?: string }) {
+        const { avatar, ...rest } = data;
+        return (await db.update(usersTable)
+            .set({ 
+                ...rest,
+                ...(avatar ? { avatar_url: avatar } : {}),
+                updated_at: new Date() 
+            })
+            .where(eq(usersTable.id, userId))
+            .returning())[0];
     }
 
     public async updateUserPassword(userId: string, passwordHash: string) {
