@@ -47,7 +47,32 @@ class UserController {
     });
 
     readonly updateMe = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Update current user profile" });
+        try {
+            const userId = this.getUserId(ctx);
+            const body = await ctx.req.json();
+            
+            // Basic validation
+            const updateData = {
+                first_name: body.first_name,
+                last_name: body.last_name,
+                email: body.email,
+                phone: body.phone,
+                bio: body.bio,
+                avatar: body.avatar,
+            };
+
+            // Remove undefined fields
+            Object.keys(updateData).forEach(key => (updateData as any)[key] === undefined && delete (updateData as any)[key]);
+
+            const user = await this.userLogic.updateUser(userId, updateData);
+            return ctx.json({ user });
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            if (error.message === "USER_NOT_FOUND") return ctx.json({ error: "User not found" }, 404);
+            
+            console.error("Error updating user:", error);
+            return ctx.json({ error: "Failed to update user data" }, 500);
+        }
     });
 
     readonly deleteMe = this.factory.createHandlers(async (ctx) => {
