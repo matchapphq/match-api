@@ -103,22 +103,6 @@ class UserController {
         return ctx.json({ msg: "Update notification settings" });
     });
 
-    readonly getAddresses = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Get user addresses" });
-    });
-
-    readonly addAddress = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Add new address" });
-    });
-
-    readonly updateAddress = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Update address" });
-    });
-
-    readonly deleteAddress = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Delete address" });
-    });
-
     /**
      * GET /users/me/favorite-venues - List user's favorite venues with pagination
      */
