@@ -48,12 +48,12 @@ export class VenuesLogic {
         
         return result.data.map((venue: any) => ({
             ...venue,
-            distance: this.calculateDistance(
+            distance: parseFloat(this.calculateDistance(
                 latitude,
                 longitude,
                 venue.latitude,
                 venue.longitude,
-            ).toFixed(2),
+            ).toFixed(2)),
         }));
     }
 

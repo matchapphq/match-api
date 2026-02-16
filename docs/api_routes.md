@@ -416,12 +416,11 @@ Response: 200
 ]
 ```
 
-### POST /api/discovery/search
+### GET /api/discovery/search
 **Paginated search for venues and matches**
 
 ```typescript
-Request Body:
-{
+Query params:
   q?: string;
   type?: 'all' | 'venues' | 'matches';
   page?: number;
@@ -430,7 +429,6 @@ Request Body:
   lng?: number;
   radius_km?: number;
   date?: string; // YYYY-MM-DD
-}
 
 Response: 200
 {
