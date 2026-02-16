@@ -75,7 +75,13 @@ export class AuthLogic {
         const tokens = await this.generateAndStoreTokens(user, deviceId);
 
         return {
-            user: { id: user.id, email: user.email, role: user.role, firstName: user.first_name },
+            user: { 
+                id: user.id, 
+                email: user.email, 
+                role: user.role, 
+                first_name: user.first_name,
+                last_name: user.last_name 
+            },
             ...tokens
         };
     }
@@ -177,7 +183,8 @@ export class AuthLogic {
             id: user.id,
             email: user.email,
             role: user.role,
-            firstName: user.first_name || user.firstName,
+            first_name: user.first_name || user.firstName,
+            last_name: user.last_name || user.lastName,
         };
 
         const [accessToken, refreshToken] = await Promise.all([
