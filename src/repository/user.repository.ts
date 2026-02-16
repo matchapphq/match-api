@@ -23,7 +23,9 @@ class UserRepository {
             role: usersTable.role,
             first_name: usersTable.first_name,
             last_name: usersTable.last_name,
+            bio: usersTable.bio,
             phone: usersTable.phone,
+            avatar_url: usersTable.avatar_url,
             created_at: usersTable.created_at
         }).from(usersTable).where(eq(usersTable.id, user.id));
     }
