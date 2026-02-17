@@ -58,6 +58,27 @@ export class UserLogic {
             created_at: updatedUser.created_at,
         };
     }
+
+    /**
+     * Update the current user's profile.
+     */
+    async updateUser(userId: string, data: { first_name?: string; last_name?: string; email?: string; phone?: string; avatar?: string; bio?: string }) {
+        const updatedUser = await this.userRepository.updateUser(userId, data);
+        if (!updatedUser) {
+            throw new Error("USER_NOT_FOUND");
+        }
+        return {
+            id: updatedUser.id,
+            email: updatedUser.email,
+            first_name: updatedUser.first_name,
+            last_name: updatedUser.last_name,
+            phone: updatedUser.phone,
+            bio: updatedUser.bio,
+            avatar: updatedUser.avatar_url,
+            role: updatedUser.role,
+            created_at: updatedUser.created_at,
+        };
+    }
     
     /**
      * Delete user account after verifying password.
