@@ -34,19 +34,14 @@ class UserService {
         // Me routes (Protected)
         this.router.get("/me", authMiddleware, ...this.controller.getMe);
         this.router.put("/me", authMiddleware, ...this.controller.updateMe);
+        this.router.put("/me/password", authMiddleware, ...this.controller.updatePassword);
         this.router.delete("/me", authMiddleware, ...this.controller.deleteMe);
 
         // Notification Preferences (Protected)
         this.router.put("/me/notification-preferences", authMiddleware, ...this.controller.updateNotificationPreferences);
-        
-        // Addresses (Protected)
-        this.router.get("/me/addresses", authMiddleware, ...this.controller.getAddresses);
-        this.router.post("/me/addresses", authMiddleware, ...this.controller.addAddress);
-        this.router.put("/me/addresses/:addressId", authMiddleware, ...this.controller.updateAddress);
-        this.router.delete("/me/addresses/:addressId", authMiddleware, ...this.controller.deleteAddress);
 
         // Favorites (Protected)
-        this.router.get("/me/favorite-venues", authMiddleware, ...this.controller.getFavorites);
+        this.router.get("/me/favorites", authMiddleware, ...this.controller.getFavorites);
 
         // Public Profile
         this.router.get("/:userId", ...this.controller.getUserProfile);

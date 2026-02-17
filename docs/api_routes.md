@@ -213,6 +213,25 @@ Response: 200
 }
 ```
 
+### PUT /api/users/me/password
+**Update current user password**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  current_password: string;
+  new_password: string;
+  confirm_password: string;
+}
+
+Response: 200
+{
+  message: "Password updated successfully";
+}
+```
+
 ### DELETE /api/users/me
 **Delete user account (soft delete)**
 
@@ -312,7 +331,7 @@ Response: 200
 }
 ```
 
-### GET /api/users/me/favorite-venues
+### GET /api/users/me/favorites
 **Get user's favorite venues**
 
 ```typescript

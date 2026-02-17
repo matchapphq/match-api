@@ -587,7 +587,6 @@ class VenueController {
             return ctx.json({ message: "Venue removed from favorites" });
         } catch (error: any) {
             if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
-            if (error.message === "FAVORITE_NOT_FOUND") return ctx.json({ error: "Favorite not found" }, 404);
 
             console.error("Remove favorite error:", error);
             return ctx.json({ error: "Failed to remove favorite" }, 500);

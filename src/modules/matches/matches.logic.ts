@@ -137,7 +137,10 @@ export class MatchesLogic {
         if (upcomingCount >= MIN_UPCOMING_THRESHOLD) return;
 
         console.log(`[SYNC] Only ${upcomingCount} upcoming real fixtures in DB (threshold: ${MIN_UPCOMING_THRESHOLD}). Syncing...`);
-        await this.syncFixturesForLeagues(DEFAULT_SYNC_LEAGUES);
+        // We trigger the sync in the background without awaiting it to avoid timeouts in the mobile app
+        this.syncFixturesForLeagues(DEFAULT_SYNC_LEAGUES).catch(err => {
+            console.error("[SYNC] Background sync failed:", err);
+        });
     }
 
     /**

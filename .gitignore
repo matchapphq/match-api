@@ -25,6 +25,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.production.local
 .env.local
 .env.example
+.env.staging
 
 # caches
 .eslintcache
@@ -48,4 +49,4 @@ scripts/
 INTE_PLAN.md
 API_VERIFICATION_REPORT.md
 seeds/
-
+*.test.ts

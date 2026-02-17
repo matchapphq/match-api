@@ -61,8 +61,8 @@ export class FavoritesRepository {
                     .returning();
                 return { success: true, favorite: restored, restored: true };
             }
-            // Already exists and not deleted
-            return { success: false, error: 'already_favorited' };
+            // Already exists and not deleted - return success (idempotent)
+            return { success: true, favorite: existing, restored: false };
         }
 
         // Create new favorite

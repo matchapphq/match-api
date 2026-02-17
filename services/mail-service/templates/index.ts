@@ -4,6 +4,7 @@ import { getWelcomeTemplate } from './welcome';
 import { getWelcomePartnerTemplate } from './welcome-partner';
 import { getVenuePaymentSuccessTemplate } from './venue-payment-success';
 import { getReservationConfirmationTemplate } from './reservation-confirmation';
+import { getAccountDeletionTemplate } from './account-deletion';
 import { getBaseLayout } from './layout';
 
 export const getEmailTemplate = (type: EmailType, data: any): string => {
@@ -19,6 +20,8 @@ export const getEmailTemplate = (type: EmailType, data: any): string => {
       return getVenuePaymentSuccessTemplate(data);
     case EmailType.RESERVATION_CONFIRMATION:
       return getReservationConfirmationTemplate(data);
+    case EmailType.ACCOUNT_DELETION:
+      return getAccountDeletionTemplate(data);
     default:
       // Fallback for other types or throw error if strict
       // For now, return a basic HTML
