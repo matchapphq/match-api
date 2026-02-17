@@ -24,7 +24,7 @@ export class AuthLogic {
     /**
      * Register a new user and return user data + tokens.
      */
-    async register(body: any, deviceId: string) {
+    public async register(body: any, deviceId: string) {
         // Check if user already exists
         const existingUser = await this.userRepository.getUserByEmail(body.email);
         if (existingUser) {

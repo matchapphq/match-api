@@ -34,6 +34,7 @@ class UserService {
         // Me routes (Protected)
         this.router.get("/me", authMiddleware, ...this.controller.getMe);
         this.router.put("/me", authMiddleware, ...this.controller.updateMe);
+        this.router.put("/me/password", authMiddleware, ...this.controller.updatePassword);
         this.router.delete("/me", authMiddleware, ...this.controller.deleteMe);
 
         // Notification Preferences (Protected)

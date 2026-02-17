@@ -87,6 +87,23 @@ export class UserLogic {
     }
     
     
+    async updatePassword(userId: string, data: { current_password: string; new_password: string }) {
+        const user = await this.userRepository.getUserById(userId);
+        if (!user) {
+            throw new Error("USER_NOT_FOUND");
+        }
+
+        const isPasswordValid = await BunPassword.verify(data.current_password, user.password_hash);
+        if (!isPasswordValid) {
+            throw new Error("INVALID_CURRENT_PASSWORD");
+        }
+
+        const newPasswordHash = await BunPassword.hash(data.new_password, { algorithm: "bcrypt", cost: 10 });
+        await this.userRepository.updateUserPassword(userId, newPasswordHash);
+        
+        return true;
+    }
+
     /**
      * Get user favorites with business-level pagination.
      */
