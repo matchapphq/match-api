@@ -41,7 +41,7 @@ class UserService {
         this.router.put("/me/notification-preferences", authMiddleware, ...this.controller.updateNotificationPreferences);
 
         // Favorites (Protected)
-        this.router.get("/me/favorite-venues", authMiddleware, ...this.controller.getFavorites);
+        this.router.get("/me/favorites", authMiddleware, ...this.controller.getFavorites);
 
         // Public Profile
         this.router.get("/:userId", ...this.controller.getUserProfile);

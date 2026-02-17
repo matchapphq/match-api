@@ -127,7 +127,7 @@ class UserController {
     });
 
     /**
-     * GET /users/me/favorite-venues - List user's favorite venues with pagination
+     * GET /users/me/favorites - List user's favorite venues with pagination
      */
     readonly getFavorites = this.factory.createHandlers(validator('query', (value, ctx) => {
         const parsed = PaginationSchema.safeParse(value);

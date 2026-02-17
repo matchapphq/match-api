@@ -331,7 +331,7 @@ Response: 200
 }
 ```
 
-### GET /api/users/me/favorite-venues
+### GET /api/users/me/favorites
 **Get user's favorite venues**
 
 ```typescript
