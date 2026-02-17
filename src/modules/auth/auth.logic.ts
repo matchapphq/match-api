@@ -1,5 +1,5 @@
 import { password, randomUUIDv7 } from "bun";
-import { JwtUtils } from "../../utils/jwt";
+import { JwtUtils, type TokenPayload } from "../../utils/jwt";
 import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
 import AuthRepository from "../../repository/auth/auth.repository";
@@ -179,12 +179,11 @@ export class AuthLogic {
     // --- Helpers ---
 
     private async generateAndStoreTokens(user: any, deviceId: string, tokenIdToUpdate?: string) {
-        const tokenPayload = {
+        const tokenPayload: TokenPayload = {
             id: user.id,
             email: user.email,
             role: user.role,
-            first_name: user.first_name || user.firstName,
-            last_name: user.last_name || user.lastName,
+            firstName: user.first_name || user.firstName || null,
         };
 
         const [accessToken, refreshToken] = await Promise.all([

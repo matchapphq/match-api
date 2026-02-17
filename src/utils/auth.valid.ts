@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const RegisterRequestSchema = z.object({
-    email: z.email().min(1, { message: "Email is required" }),
+    email: z.string().email().min(1, { message: "Email is required" }),
     username: z.string().min(1, { message: "Username is required" }).optional(),
     firstName: z.string().min(1, { message: "First name is required" }),
     lastName: z.string().min(1, { message: "Last name is required" }),
@@ -22,21 +22,21 @@ export const RegisterRequestSchema = z.object({
 })
 
 export const LoginRequestSchema = z.object({
-    email: z.email().min(1, { message: "Email is required" }),
+    email: z.string().email().min(1, { message: "Email is required" }),
     password: z.string().min(1, { message: "Password is required" }),
 })
 
 export const ForgotPasswordRequestSchema = z.object({
-    email: z.email().min(1, { message: "Email is required" }),
+    email: z.string().email().min(1, { message: "Email is required" }),
 })
 
 export const VerifyResetCodeSchema = z.object({
-    email: z.email().min(1, { message: "Email is required" }),
+    email: z.string().email().min(1, { message: "Email is required" }),
     code: z.string().length(6, { message: "Code must be 6 digits" }),
 })
 
 export const ResetPasswordSchema = z.object({
-    email: z.email().min(1, { message: "Email is required" }),
+    email: z.string().email().min(1, { message: "Email is required" }),
     code: z.string().length(6, { message: "Code must be 6 digits" }),
     new_password: z.string().min(6, { message: "Password must be at least 6 characters" }),
 })

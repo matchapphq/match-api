@@ -51,6 +51,7 @@ class UserRepository {
         const [newUser] = await db.insert(usersTable).values({
             email: userData.email,
             password_hash: hashed_password,
+            username: userData.username,
             first_name: userData.firstName,
             last_name: userData.lastName,
             role: userData.role || 'user',
