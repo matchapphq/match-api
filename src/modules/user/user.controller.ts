@@ -147,7 +147,6 @@ class UserController {
             return ctx.json({ error: "Failed to update push token" }, 500);
         }
     });
-
     /**
      * GET /users/me/favorites - List user's favorite venues with pagination
      */

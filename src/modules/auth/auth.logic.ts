@@ -184,6 +184,7 @@ export class AuthLogic {
             email: user.email,
             role: user.role,
             firstName: user.first_name || user.firstName || null,
+            last_name: user.last_name || user.lastName,
         };
 
         const [accessToken, refreshToken] = await Promise.all([
