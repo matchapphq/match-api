@@ -39,6 +39,7 @@ class UserService {
 
         // Notification Preferences (Protected)
         this.router.put("/me/notification-preferences", authMiddleware, ...this.controller.updateNotificationPreferences);
+        this.router.put("/me/push-token", authMiddleware, ...this.controller.updatePushToken);
 
         // Favorites (Protected)
         this.router.get("/me/favorites", authMiddleware, ...this.controller.getFavorites);

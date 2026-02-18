@@ -1,10 +1,13 @@
 import { NotificationsRepository } from "../../repository/notifications.repository";
+import UserRepository from "../../repository/user.repository";
+import { pushNotificationService } from "../push-notification.service";
 import { db } from "../../config/config.db";
 import { venuesTable } from "../../config/db/venues.table";
 import { venueMatchesTable } from "../../config/db/matches.table";
 import { eq } from "drizzle-orm";
 
 const notificationsRepository = new NotificationsRepository();
+const userRepository = new UserRepository();
 
 interface ReservationNotificationPayload {
     venueMatchId: string;
@@ -47,17 +50,28 @@ export async function notifyNewReservation(payload: ReservationNotificationPaylo
 
     // Notify the customer
     const isConfirmed = payload.status === 'confirmed';
+    const message = isConfirmed
+        ? `Votre réservation pour ${payload.partySize} personne(s) à ${venueInfo?.venueName ?? 'un bar'} a été confirmée.`
+        : `Votre demande de réservation pour ${payload.partySize} personne(s) à ${venueInfo?.venueName ?? 'un bar'} est en attente de confirmation.`;
+    const title = isConfirmed ? 'Réservation confirmée' : 'Réservation en attente';
+
     await notificationsRepository.create({
         user_id: payload.userId,
         type: 'reservation_confirmed',
-        title: isConfirmed ? 'Réservation confirmée' : 'Réservation en attente',
-        message: isConfirmed
-            ? `Votre réservation pour ${payload.partySize} personne(s) à ${venueInfo?.venueName ?? 'un bar'} a été confirmée.`
-            : `Votre demande de réservation pour ${payload.partySize} personne(s) à ${venueInfo?.venueName ?? 'un bar'} est en attente de confirmation.`,
+        title,
+        message,
         related_entity_type: 'reservation',
         related_entity_id: payload.reservationId,
         send_push: true,
     });
+
+    const user = await userRepository.getUserById(payload.userId);
+    if (user?.push_token) {
+        await pushNotificationService.sendToUser(user.push_token, title, message, {
+            type: 'reservation_confirmed',
+            reservationId: payload.reservationId
+        });
+    }
 
     // Notify the venue owner (if found)
     if (venueInfo?.ownerId) {
@@ -70,6 +84,14 @@ export async function notifyNewReservation(payload: ReservationNotificationPaylo
             related_entity_id: payload.reservationId,
             send_push: true,
         });
+        
+        const owner = await userRepository.getUserById(venueInfo.ownerId);
+        if (owner?.push_token) {
+            await pushNotificationService.sendToUser(owner.push_token, 'Nouvelle réservation', `Nouvelle réservation de ${payload.partySize} personne(s) pour ${venueInfo.venueName}.`, {
+                type: 'reservation_new',
+                reservationId: payload.reservationId
+            });
+        }
     }
 }
 
@@ -78,17 +100,27 @@ export async function notifyNewReservation(payload: ReservationNotificationPaylo
  */
 export async function notifyReservationCancelled(payload: CancellationNotificationPayload) {
     const venueInfo = await getVenueOwnerFromMatch(payload.venueMatchId);
+    const message = `Votre réservation pour ${payload.partySize} personne(s) à ${venueInfo?.venueName ?? 'un bar'} a été annulée.${payload.reason ? ` Raison : ${payload.reason}` : ''}`;
+    const title = 'Réservation annulée';
 
     // Notify the customer
     await notificationsRepository.create({
         user_id: payload.userId,
         type: 'reservation_canceled',
-        title: 'Réservation annulée',
-        message: `Votre réservation pour ${payload.partySize} personne(s) à ${venueInfo?.venueName ?? 'un bar'} a été annulée.${payload.reason ? ` Raison : ${payload.reason}` : ''}`,
+        title,
+        message,
         related_entity_type: 'reservation',
         related_entity_id: payload.reservationId,
         send_push: true,
     });
+
+    const user = await userRepository.getUserById(payload.userId);
+    if (user?.push_token) {
+        await pushNotificationService.sendToUser(user.push_token, title, message, {
+            type: 'reservation_canceled',
+            reservationId: payload.reservationId
+        });
+    }
 
     // Notify the venue owner (if found)
     if (venueInfo?.ownerId) {
@@ -101,5 +133,13 @@ export async function notifyReservationCancelled(payload: CancellationNotificati
             related_entity_id: payload.reservationId,
             send_push: true,
         });
+
+        const owner = await userRepository.getUserById(venueInfo.ownerId);
+        if (owner?.push_token) {
+            await pushNotificationService.sendToUser(owner.push_token, 'Réservation annulée', `Une réservation de ${payload.partySize} personne(s) pour ${venueInfo.venueName} a été annulée.`, {
+                type: 'reservation_canceled',
+                reservationId: payload.reservationId
+            });
+        }
     }
 }

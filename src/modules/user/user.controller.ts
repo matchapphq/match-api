@@ -127,6 +127,27 @@ class UserController {
     });
 
     /**
+     * PUT /users/me/push-token - Update user's push token
+     */
+    readonly updatePushToken = this.factory.createHandlers(async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const { push_token } = await ctx.req.json();
+
+            if (!push_token) {
+                return ctx.json({ error: "push_token is required" }, 400);
+            }
+
+            await this.userLogic.updatePushToken(userId, push_token);
+            return ctx.json({ success: true });
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            if (error.message === "USER_NOT_FOUND") return ctx.json({ error: "User not found" }, 404);
+            console.error("Error updating push token:", error);
+            return ctx.json({ error: "Failed to update push token" }, 500);
+        }
+    });
+    /**
      * GET /users/me/favorites - List user's favorite venues with pagination
      */
     readonly getFavorites = this.factory.createHandlers(validator('query', (value, ctx) => {

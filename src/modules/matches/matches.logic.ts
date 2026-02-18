@@ -23,8 +23,8 @@ const DEFAULT_SYNC_LEAGUES = [
     253,  // MLS (USA)
 ];
 
-// How many upcoming real fixtures we need before skipping auto-sync
-const MIN_UPCOMING_THRESHOLD = 5;
+// How many upcoming real fixtures we need before skipping auto-sync (removed in favor of ratio)
+// const MIN_UPCOMING_THRESHOLD = 5;
 
 export class MatchesLogic {
     private sportsRepo = new SportsRepository();
@@ -126,21 +126,51 @@ export class MatchesLogic {
 
     /**
      * Ensure we have enough upcoming real fixtures in the DB.
-     * If not, do a BLOCKING sync from API-Sports for popular leagues.
-     * Uses a lock to prevent concurrent syncs.
+     * Implements a 9:1 cache-to-api ratio.
+     * Only syncs if:
+     * 1. Data is critically low (always sync)
+     * 2. 10% chance sync (random ratio)
+     * 3. Cache is "old" (no sync in 24h)
      */
     private async ensureUpcomingFixtures(): Promise<void> {
         if (!process.env.API_SPORTS_KEY) return;
         if (this.syncInProgress) return;
 
         const upcomingCount = await this.countUpcomingRealMatches();
-        if (upcomingCount >= MIN_UPCOMING_THRESHOLD) return;
+        
+        // 1. Critical check: If we have literally 0 matches, always sync
+        if (upcomingCount === 0) {
+            console.log("[SYNC] No upcoming fixtures found. Force sync...");
+            this.syncFixturesForLeagues(DEFAULT_SYNC_LEAGUES).catch(err => console.error("[SYNC] failed:", err));
+            return;
+        }
 
-        console.log(`[SYNC] Only ${upcomingCount} upcoming real fixtures in DB (threshold: ${MIN_UPCOMING_THRESHOLD}). Syncing...`);
-        // We trigger the sync in the background without awaiting it to avoid timeouts in the mobile app
-        this.syncFixturesForLeagues(DEFAULT_SYNC_LEAGUES).catch(err => {
-            console.error("[SYNC] Background sync failed:", err);
+        // 2. Random Ratio check (10% chance to sync)
+        const shouldSyncRandomly = Math.random() < 0.1; // 1 in 10 ratio (approx 9:1)
+        
+        if (shouldSyncRandomly) {
+            console.log("[SYNC] Random 10% ratio sync triggered.");
+            this.syncFixturesForLeagues(DEFAULT_SYNC_LEAGUES).catch(err => console.error("[SYNC] failed:", err));
+            return;
+        }
+
+        // 3. Freshness check: Check when the last match was created/updated
+        const lastMatch = await db.query.matchesTable.findFirst({
+            where: isNotNull(matchesTable.external_id),
+            orderBy: [desc(matchesTable.updated_at)]
         });
+
+        const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const isCacheOld = !lastMatch || lastMatch.updated_at < oneDayAgo;
+
+        if (isCacheOld) {
+            console.log("[SYNC] Cache is older than 24h. Refreshing...");
+            this.syncFixturesForLeagues(DEFAULT_SYNC_LEAGUES).catch(err => console.error("[SYNC] failed:", err));
+            return;
+        }
+
+        // If we reach here, we use the local DB (cache) 90% of the time.
+        // console.log(`[SYNC] Using local cache (${upcomingCount} fixtures available).`);
     }
 
     /**
