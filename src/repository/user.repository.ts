@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "../config/config.db";
-import { userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
+import { userDeleteReasonsTable, userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
 import type { userRegisterData } from "../utils/userData";
 import { password } from "bun";
 
@@ -23,7 +23,10 @@ class UserRepository {
             role: usersTable.role,
             first_name: usersTable.first_name,
             last_name: usersTable.last_name,
-            phone: usersTable.phone
+            bio: usersTable.bio,
+            phone: usersTable.phone,
+            avatar_url: usersTable.avatar_url,
+            created_at: usersTable.created_at
         }).from(usersTable).where(eq(usersTable.id, user.id));
     }
     
@@ -48,6 +51,7 @@ class UserRepository {
         const [newUser] = await db.insert(usersTable).values({
             email: userData.email,
             password_hash: hashed_password,
+            username: userData.username,
             first_name: userData.firstName,
             last_name: userData.lastName,
             role: userData.role || 'user',
@@ -60,6 +64,18 @@ class UserRepository {
         }
 
         return newUser;
+    }
+
+    public async updateUser(userId: string, data: { first_name?: string; last_name?: string; email?: string; phone?: string; avatar?: string; bio?: string, push_token?: string }) {
+        const { avatar, ...rest } = data;
+        return (await db.update(usersTable)
+            .set({ 
+                ...rest,
+                ...(avatar ? { avatar_url: avatar } : {}),
+                updated_at: new Date() 
+            })
+            .where(eq(usersTable.id, userId))
+            .returning())[0];
     }
 
     public async updateUserPassword(userId: string, passwordHash: string) {
@@ -101,7 +117,17 @@ class UserRepository {
         const user = await this.getUserByEmail(email);
         return !!user;
     }
-
+    
+    public async deleteUser(userId: string, reason: string, details?: string): Promise<void> {
+        await Promise.all([
+            await db.delete(usersTable).where(eq(usersTable.id, userId)),
+            await db.insert(userDeleteReasonsTable).values({
+                reason: reason,
+                details: details || null,
+            })
+        ])
+        
+    }
 }
 
 export default UserRepository;

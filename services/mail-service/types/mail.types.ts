@@ -15,6 +15,7 @@ export enum EmailType {
     FORGOT_PASSWORD = 'forgot-password',
     RESET_PASSWORD = 'reset-password',
     RESERVATION_CONFIRMATION = 'reservation-confirmation',
+    ACCOUNT_DELETION = 'account-deletion',
 }
 
 export const mailEnvVars: MailEnvVars = {

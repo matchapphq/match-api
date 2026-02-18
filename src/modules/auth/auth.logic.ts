@@ -1,5 +1,5 @@
 import { password, randomUUIDv7 } from "bun";
-import { JwtUtils } from "../../utils/jwt";
+import { JwtUtils, type TokenPayload } from "../../utils/jwt";
 import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
 import AuthRepository from "../../repository/auth/auth.repository";
@@ -24,7 +24,7 @@ export class AuthLogic {
     /**
      * Register a new user and return user data + tokens.
      */
-    async register(body: any, deviceId: string) {
+    public async register(body: any, deviceId: string) {
         // Check if user already exists
         const existingUser = await this.userRepository.getUserByEmail(body.email);
         if (existingUser) {
@@ -75,7 +75,13 @@ export class AuthLogic {
         const tokens = await this.generateAndStoreTokens(user, deviceId);
 
         return {
-            user: { id: user.id, email: user.email, role: user.role, firstName: user.first_name },
+            user: { 
+                id: user.id, 
+                email: user.email, 
+                role: user.role, 
+                first_name: user.first_name,
+                last_name: user.last_name 
+            },
             ...tokens
         };
     }
@@ -173,11 +179,12 @@ export class AuthLogic {
     // --- Helpers ---
 
     private async generateAndStoreTokens(user: any, deviceId: string, tokenIdToUpdate?: string) {
-        const tokenPayload = {
+        const tokenPayload: TokenPayload = {
             id: user.id,
             email: user.email,
             role: user.role,
-            firstName: user.first_name || user.firstName,
+            firstName: user.first_name || user.firstName || null,
+            last_name: user.last_name || user.lastName,
         };
 
         const [accessToken, refreshToken] = await Promise.all([

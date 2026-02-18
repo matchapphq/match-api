@@ -260,8 +260,7 @@ export class VenuesLogic {
     }
 
     async removeFavorite(userId: string, venueId: string) {
-        const deleted = await this.favoritesRepository.removeFavorite(userId, venueId);
-        if (!deleted) throw new Error("FAVORITE_NOT_FOUND");
+        await this.favoritesRepository.removeFavorite(userId, venueId);
         return true;
     }
 

@@ -3,6 +3,7 @@ import { WaitlistRepository } from "../../repository/waitlist.repository";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import stripe, { CHECKOUT_URLS, isStripeConfigured } from "../../config/stripe";
 import { geocodeAddress } from "../../utils/geocoding";
+import { notifyNewReservation, notifyReservationCancelled } from "../../services/notifications/notification.triggers";
 
 export class PartnerLogic {
     constructor(
@@ -390,7 +391,29 @@ export class PartnerLogic {
             if (result.statusCode === 403) throw new Error("FORBIDDEN");
             throw new Error(result.error || "UPDATE_FAILED");
         }
-        return result.reservation;
+
+        const reservation = result.reservation;
+        
+        // Trigger notifications
+        if (status === 'CONFIRMED') {
+            notifyNewReservation({
+                venueMatchId: reservation.venue_match_id,
+                reservationId: reservation.id,
+                userId: reservation.user_id,
+                partySize: reservation.party_size,
+                status: 'confirmed'
+            }).catch(err => console.error('Failed to send confirmation notification:', err));
+        } else {
+            notifyReservationCancelled({
+                venueMatchId: reservation.venue_match_id,
+                reservationId: reservation.id,
+                userId: reservation.user_id,
+                partySize: reservation.party_size,
+                reason: 'Refusée par l\'établissement'
+            }).catch(err => console.error('Failed to send cancellation notification:', err));
+        }
+
+        return reservation;
     }
 
     async getVenueReservations(userId: string, venueId: string, options: any) {
