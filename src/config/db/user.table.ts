@@ -21,6 +21,7 @@ export const usersTable = pgTable(
         bio: text('bio'),
         phone: varchar('phone', { length: 20 }),
         avatar_url: text('avatar_url'),
+        push_token: text('push_token'),
 
         // Role & Permissions
         role: userRoleEnum('role').default('user').notNull(),

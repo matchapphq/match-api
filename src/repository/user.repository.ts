@@ -66,7 +66,7 @@ class UserRepository {
         return newUser;
     }
 
-    public async updateUser(userId: string, data: { first_name?: string; last_name?: string; email?: string; phone?: string; avatar?: string; bio?: string }) {
+    public async updateUser(userId: string, data: { first_name?: string; last_name?: string; email?: string; phone?: string; avatar?: string; bio?: string, push_token?: string }) {
         const { avatar, ...rest } = data;
         return (await db.update(usersTable)
             .set({ 

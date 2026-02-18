@@ -3,6 +3,7 @@ import { WaitlistRepository } from "../../repository/waitlist.repository";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import stripe, { CHECKOUT_URLS, isStripeConfigured } from "../../config/stripe";
 import { geocodeAddress } from "../../utils/geocoding";
+import { notifyNewReservation, notifyReservationCancelled } from "../../services/notifications/notification.triggers";
 
 export class PartnerLogic {
     constructor(

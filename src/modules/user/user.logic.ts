@@ -105,6 +105,17 @@ export class UserLogic {
     }
 
     /**
+     * Update the user's push notification token.
+     */
+    async updatePushToken(userId: string, pushToken: string) {
+        const updatedUser = await this.userRepository.updateUser(userId, { push_token: pushToken });
+        if (!updatedUser) {
+            throw new Error("USER_NOT_FOUND");
+        }
+        return true;
+    }
+
+    /**
      * Get user favorites with business-level pagination.
      */
     async getFavorites(userId: string, pagination: { page: number; limit: number }) {
