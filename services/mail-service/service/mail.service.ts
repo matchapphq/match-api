@@ -13,13 +13,11 @@ class MailService {
             host: mailEnvVars.SMTP_HOST,
             port: parseInt(mailEnvVars.SMTP_PORT),
             secure: mailEnvVars.SMTP_SECURE,
+            requireTLS: true,
             auth: {
                 user: mailEnvVars.SMTP_USER,
                 pass: mailEnvVars.SMTP_PASSWORD
             },
-            tls: {
-                rejectUnauthorized: false
-            }
         });
     }
     
