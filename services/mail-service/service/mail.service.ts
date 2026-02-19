@@ -17,7 +17,6 @@ class MailService {
                 user: mailEnvVars.SMTP_USER,
                 pass: mailEnvVars.SMTP_PASSWORD
             },
-            connectionTimeout: 15000,
             tls: {
                 rejectUnauthorized: false
             }
