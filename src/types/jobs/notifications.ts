@@ -13,7 +13,8 @@ export enum EmailTemplate {
   WELCOME = 'welcome',
   BOOKING_CONFIRMATION = 'booking_confirmation',
   BOOKING_CANCELLED = 'booking_cancelled',
-  BOOKING_REMINDER = 'booking_reminder'
+  BOOKING_REMINDER = 'booking_reminder',
+  BUG_REPORT = 'bug-report'
 }
 
 export interface NotificationJobBase {

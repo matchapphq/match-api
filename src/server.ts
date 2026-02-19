@@ -24,6 +24,7 @@ import NotificationsService from "./modules/notifications/notifications.routes";
 import ReferralService from "./modules/referral/referral.routes";
 import ReviewsService from "./modules/reviews/reviews.routes";
 import SubscriptionsService from "./modules/subscriptions/subscriptions.routes";
+import SupportService from "./modules/support/support.routes";
 import WebhooksService from "./modules/webhooks/webhooks.routes";
 
 const authRouter = new AuthService();
@@ -47,6 +48,7 @@ const referralRouter = new ReferralService();
 const boostRouter = new BoostService();
 const healthRouter = new HealthService();
 const fidelityRouter = new FidelityService();
+const supportRouter = new SupportService();
 
 const app = new Hono().basePath("/api");
 
@@ -117,6 +119,7 @@ app.route("/partners", partnerRouter.getRouter);
 // Mounting new routes
 app.route("/reviews", reviewsRouter.getRouter); // Direct review actions
 app.route("/notifications", notificationsRouter.getRouter);
+app.route("/support", supportRouter.getRouter);
 app.route("/webhooks", webhooksRouter.getRouter);
 app.route("/coupons", couponsRouter.getRouter);
 
