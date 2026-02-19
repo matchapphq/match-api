@@ -9,15 +9,25 @@ class MailService {
             throw new Error("Mail environment variables are not initialized");
         }
         
+        console.log("SMTP config:", {
+          host: mailEnvVars.SMTP_HOST,
+          port: parseInt(mailEnvVars.SMTP_PORT),
+          secure: mailEnvVars.SMTP_SECURE,
+          user: mailEnvVars.SMTP_USER,
+          hasPass: !!mailEnvVars.SMTP_PASSWORD,
+        });
+        
         this.transporter = createTransport({
             host: mailEnvVars.SMTP_HOST,
             port: parseInt(mailEnvVars.SMTP_PORT),
-            secure: mailEnvVars.SMTP_SECURE,
+            secure: false,
             requireTLS: true,
             auth: {
                 user: mailEnvVars.SMTP_USER,
                 pass: mailEnvVars.SMTP_PASSWORD
             },
+            logger: true,
+            debug: true,
         });
     }
     
