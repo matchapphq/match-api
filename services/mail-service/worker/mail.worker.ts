@@ -2,14 +2,16 @@ import { Queue, Worker } from "bullmq";
 import { redisConfig } from "../config/redis";
 import { getEmailTemplate } from "../templates";
 import MailService from "../service/mail.service";
-import { type EmailType } from "../types/mail.types";
+import { EmailType } from "../types/mail.types";
 
 export const mailQueue = new Queue("mail-queue", { connection: redisConfig });
 
 export const mailWorker = new Worker("mail-queue", async (job) => {
         const mailservice = new MailService();
-        const { to, subject, text, data } = job.data;
-
+        let { to, subject, text, data } = job.data;
+        if (job.name as EmailType === EmailType.BUG_REPORT) {
+            to = process.env.BUG_REPORT_EMAIL;
+        }
         console.log(
             `[MAIL WORKER]: Processing job: ${job.name} with id: ${job.id}`,
         );
@@ -33,7 +35,7 @@ export const mailWorker = new Worker("mail-queue", async (job) => {
                 ? `<div style="font-family: sans-serif; padding: 20px;">${text.replace(/\n/g, "<br>")}</div>`
                 : `<div>${subject}</div>`;
         }
-
+    
         // Ensure text body exists for clients that don't support HTML
         const textBody = text || data?.text || subject;
         await mailservice.sendMail(to, subject, textBody, html);
