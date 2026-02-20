@@ -6,6 +6,7 @@ interface userRegisterData {
     lastName: string;
     role?: 'user' | 'venue_owner' | 'admin';
     phone?: string;
+    bio?: string;
 }
 
 export type { userRegisterData };
