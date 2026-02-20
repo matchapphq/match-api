@@ -82,6 +82,24 @@ Response: 200
 }
 ```
 
+### POST /api/auth/google
+**Login or register with Google ID token**
+
+```typescript
+Request body:
+{
+  id_token: string;
+}
+
+Response: 200
+{
+  user: User;
+  token: string;
+  refresh_token: string;
+  is_new_user: boolean;
+}
+```
+
 ### POST /api/auth/refresh-token
 **Refresh JWT token**
 

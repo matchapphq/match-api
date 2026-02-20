@@ -34,6 +34,8 @@ This document lists all environment variables required to run the Match API.
 | `ACCESS_JWT_SIGN_KEY` | Signed cookie key for Access tokens |
 | `REFRESH_JWT_SIGN_KEY` | Signed cookie key for Refresh tokens |
 | `QR_SECRET` | Secret for HMAC-signing reservation QRs |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID (primary audience accepted for `POST /auth/google`) |
+| `GOOGLE_CLIENT_IDS` | Optional comma-separated list of additional accepted Google client IDs (web/ios/android) |
 
 ## 💳 Stripe Integration
 
