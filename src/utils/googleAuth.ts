@@ -80,7 +80,7 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleProfil
     const derivedLastName = derivedLastNameParts.join(" ").trim();
 
     return {
-        email: payload.email.toLowerCase(),
+        email: payload.email.trim(),
         givenName: payload.given_name?.trim() || derivedFirstName || undefined,
         familyName: payload.family_name?.trim() || derivedLastName || undefined,
         picture: payload.picture,
