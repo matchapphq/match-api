@@ -5,6 +5,7 @@ export const RegisterRequestSchema = z.object({
     username: z.string().min(1, { message: "Username is required" }).optional(),
     firstName: z.string().min(1, { message: "First name is required" }),
     lastName: z.string().min(1, { message: "Last name is required" }),
+    bio: z.string().optional(),
     password: z.string().min(6, { message: "Password must be at least 6 characters" }),
     role: z.enum(['user', 'venue_owner', 'admin']).optional(),
     referralCode: z.string()
@@ -26,6 +27,10 @@ export const LoginRequestSchema = z.object({
     password: z.string().min(1, { message: "Password is required" }),
 })
 
+export const GoogleLoginRequestSchema = z.object({
+    id_token: z.string().min(1, { message: "Google id_token is required" }),
+})
+
 export const ForgotPasswordRequestSchema = z.object({
     email: z.string().email().min(1, { message: "Email is required" }),
 })
@@ -43,6 +48,7 @@ export const ResetPasswordSchema = z.object({
 
 export type RegisterRequestSchemaType = z.infer<typeof RegisterRequestSchema>;
 export type LoginRequestSchemaType = z.infer<typeof LoginRequestSchema>;
+export type GoogleLoginRequestSchemaType = z.infer<typeof GoogleLoginRequestSchema>;
 export type ForgotPasswordRequestSchemaType = z.infer<typeof ForgotPasswordRequestSchema>;
 export type VerifyResetCodeSchemaType = z.infer<typeof VerifyResetCodeSchema>;
 export type ResetPasswordSchemaType = z.infer<typeof ResetPasswordSchema>;

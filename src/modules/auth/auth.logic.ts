@@ -8,6 +8,7 @@ import { userOnaboarding } from "./auth.helper";
 import { Redis } from "ioredis";
 import { mailQueue } from "../../queue/notification.queue";
 import type { userRegisterData } from "../../utils/userData";
+import { verifyGoogleIdToken } from "../../utils/googleAuth";
 
 /**
  * Service handling Pure Business Logic for Authentication.
@@ -83,6 +84,71 @@ export class AuthLogic {
                 last_name: user.last_name 
             },
             ...tokens
+        };
+    }
+
+    /**
+     * Authenticate user with Google ID token.
+     * Creates a user record if no account exists for the Google email.
+     */
+    async googleLogin(idToken: string, deviceId: string) {
+        const googleProfile = await verifyGoogleIdToken(idToken);
+
+        // Only keep fields that map to existing user attributes for now.
+        let user = await this.userRepository.getUserByEmail(googleProfile.email);
+        let isNewUser = false;
+
+        if (!user) {
+            isNewUser = true;
+            const createdUser = await this.userRepository.createGoogleUser({
+                email: googleProfile.email,
+                firstName: googleProfile.givenName,
+                lastName: googleProfile.familyName,
+                phone: googleProfile.phoneNumber,
+                avatarUrl: googleProfile.picture,
+                googleId: googleProfile.sub,
+                role: "user",
+            });
+
+            try {
+                await this.authRepository.savePreferences(createdUser.id, {
+                    ambiances: [],
+                    venue_types: [],
+                    fav_sports: [],
+                    fav_team_ids: [],
+                });
+            } catch (preferencesError) {
+                console.warn("Google signup: unable to save initial preferences", preferencesError);
+            }
+
+            user = await this.userRepository.getUserByEmail(googleProfile.email);
+        }
+
+        if (!user) throw new Error("USER_CREATION_FAILED");
+
+        await this.userRepository.syncGoogleUserData(user.id, {
+            firstName: googleProfile.givenName,
+            lastName: googleProfile.familyName,
+            phone: googleProfile.phoneNumber,
+            avatarUrl: googleProfile.picture,
+            googleId: googleProfile.sub,
+        });
+
+        user = await this.userRepository.getUserByEmail(googleProfile.email);
+        if (!user) throw new Error("USER_CREATION_FAILED");
+
+        const tokens = await this.generateAndStoreTokens(user, deviceId);
+
+        return {
+            user: {
+                id: user.id,
+                email: user.email,
+                role: user.role,
+                first_name: user.first_name,
+                last_name: user.last_name,
+            },
+            isNewUser,
+            ...tokens,
         };
     }
 
@@ -184,7 +250,6 @@ export class AuthLogic {
             email: user.email,
             role: user.role,
             firstName: user.first_name || user.firstName || null,
-            last_name: user.last_name || user.lastName,
         };
 
         const [accessToken, refreshToken] = await Promise.all([
