@@ -6,6 +6,7 @@ import { validator } from "hono/validator";
 import {
     RegisterRequestSchema,
     LoginRequestSchema,
+    GoogleLoginRequestSchema,
     ForgotPasswordRequestSchema,
     VerifyResetCodeSchema,
     ResetPasswordSchema,
@@ -82,6 +83,53 @@ class AuthController {
                 }
                 console.error("Login error:", error);
                 return ctx.json({ error: "Login failed" }, 500);
+            }
+        }
+    );
+
+    public readonly googleLogin = this.factory.createHandlers(
+        zValidator("json", GoogleLoginRequestSchema),
+        async (ctx) => {
+            const { id_token } = ctx.req.valid("json");
+            const deviceId = ctx.req.header("User-Agent") || "Unknown";
+
+            try {
+                const { user, accessToken, refreshToken, isNewUser } = await this.authLogic.googleLogin(
+                    id_token,
+                    deviceId
+                );
+
+                await this.setAuthCookies(ctx, accessToken, refreshToken);
+
+                return ctx.json({
+                    user,
+                    token: accessToken,
+                    refresh_token: refreshToken,
+                    is_new_user: isNewUser,
+                });
+            } catch (error: any) {
+                if (error.message === "GOOGLE_OAUTH_NOT_CONFIGURED") {
+                    return ctx.json({ error: "Google OAuth is not configured on server" }, 500);
+                }
+
+                if (
+                    [
+                        "GOOGLE_TOKEN_INVALID",
+                        "GOOGLE_INVALID_AUDIENCE",
+                        "GOOGLE_INVALID_ISSUER",
+                        "GOOGLE_EMAIL_NOT_VERIFIED",
+                        "GOOGLE_TOKEN_EXPIRED",
+                    ].includes(error.message)
+                ) {
+                    return ctx.json({ error: "Invalid Google token" }, 401);
+                }
+
+                if (error.message === "GOOGLE_USER_NOT_FOUND") {
+                    return ctx.json({ error: "No account found for this Google email" }, 404);
+                }
+
+                console.error("Google login error:", error);
+                return ctx.json({ error: "Google login failed" }, 500);
             }
         }
     );

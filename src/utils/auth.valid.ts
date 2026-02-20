@@ -26,6 +26,10 @@ export const LoginRequestSchema = z.object({
     password: z.string().min(1, { message: "Password is required" }),
 })
 
+export const GoogleLoginRequestSchema = z.object({
+    id_token: z.string().min(1, { message: "Google id_token is required" }),
+})
+
 export const ForgotPasswordRequestSchema = z.object({
     email: z.string().email().min(1, { message: "Email is required" }),
 })
@@ -43,6 +47,7 @@ export const ResetPasswordSchema = z.object({
 
 export type RegisterRequestSchemaType = z.infer<typeof RegisterRequestSchema>;
 export type LoginRequestSchemaType = z.infer<typeof LoginRequestSchema>;
+export type GoogleLoginRequestSchemaType = z.infer<typeof GoogleLoginRequestSchema>;
 export type ForgotPasswordRequestSchemaType = z.infer<typeof ForgotPasswordRequestSchema>;
 export type VerifyResetCodeSchemaType = z.infer<typeof VerifyResetCodeSchema>;
 export type ResetPasswordSchemaType = z.infer<typeof ResetPasswordSchema>;
