@@ -50,6 +50,7 @@ class AuthService {
         this.router.post("/register", ...this.controller.register);
         this.router.post("/login", ...this.controller.login);
         this.router.post("/google", ...this.controller.googleLogin);
+        this.router.post("/apple", ...this.controller.appleLogin);
         this.router.post("/refresh-token", ...this.controller.refreshToken);
         this.router.post("/logout", ...this.controller.logout);
         this.router.post("/forgot-password", ...this.controller.forgotPassword);

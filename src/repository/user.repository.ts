@@ -60,6 +60,18 @@ class UserRepository {
         return user;
     }
 
+    public async getUserByAppleId(appleId: string): Promise<AuthUser | undefined> {
+        const [user] = await db.select({
+            id: usersTable.id,
+            email: usersTable.email,
+            password_hash: usersTable.password_hash,
+            role: usersTable.role,
+            first_name: usersTable.first_name,
+            last_name: usersTable.last_name,
+        }).from(usersTable).where(eq(usersTable.apple_id, appleId));
+        return user;
+    }
+
     public async getUserById(id: string) {
         return (await db.select().from(usersTable).where(eq(usersTable.id, id)))[0];
     }
@@ -113,6 +125,31 @@ class UserRepository {
         return toAuthUser(createdUser);
     }
 
+    public async createAppleUser(data: {
+        email: string;
+        firstName?: string;
+        lastName?: string;
+        appleId: string;
+        role?: 'user' | 'venue_owner' | 'admin';
+    }) {
+        const generatedPassword = `apple-oauth-${randomUUIDv7()}`;
+        const hashedPassword = await password.hash(generatedPassword, { algorithm: "bcrypt", cost: 10 });
+
+        const [createdUser] = await db.insert(usersTable).values({
+            email: data.email,
+            password_hash: hashedPassword,
+            username: null,
+            first_name: data.firstName ?? null,
+            last_name: data.lastName ?? null,
+            role: data.role ?? "user",
+            is_verified: true,
+            apple_id: data.appleId,
+        }).returning();
+
+        if (!createdUser) throw new Error("User creation failed");
+        return toAuthUser(createdUser);
+    }
+
     public async syncGoogleUserData(
         userId: string,
         data: {
@@ -145,6 +182,36 @@ class UserRepository {
         if (data.phone) payload.phone = data.phone;
         if (data.avatarUrl) payload.avatar_url = data.avatarUrl;
         if (data.googleId) payload.google_id = data.googleId;
+
+        await db.update(usersTable).set(payload).where(eq(usersTable.id, userId));
+    }
+
+    public async syncAppleUserData(
+        userId: string,
+        data: {
+            firstName?: string;
+            lastName?: string;
+            appleId: string;
+        }
+    ) {
+        const now = new Date();
+
+        const payload: {
+            username: null;
+            first_name?: string;
+            is_verified: true;
+            apple_id: string;
+            updated_at: Date;
+            last_name?: string;
+        } = {
+            username: null,
+            is_verified: true,
+            apple_id: data.appleId,
+            updated_at: now,
+        };
+
+        if (data.firstName) payload.first_name = data.firstName;
+        if (data.lastName) payload.last_name = data.lastName;
 
         await db.update(usersTable).set(payload).where(eq(usersTable.id, userId));
     }

@@ -100,6 +100,26 @@ Response: 200
 }
 ```
 
+### POST /api/auth/apple
+**Login or register with Apple ID token**
+
+```typescript
+Request body:
+{
+  id_token: string;
+  first_name?: string; // optional; available on first Apple authorization
+  last_name?: string;  // optional; available on first Apple authorization
+}
+
+Response: 200
+{
+  user: User;
+  token: string;
+  refresh_token: string;
+  is_new_user: boolean;
+}
+```
+
 ### POST /api/auth/refresh-token
 **Refresh JWT token**
 
