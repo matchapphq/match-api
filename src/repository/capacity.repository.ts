@@ -477,7 +477,12 @@ export class CapacityRepository {
         const result = await db.query.venueMatchesTable.findFirst({
             where: eq(venueMatchesTable.id, venueMatchId),
             with: {
-                match: true,
+                match: {
+                    with: {
+                        homeTeam: true,
+                        awayTeam: true,
+                    }
+                },
             }
         });
 

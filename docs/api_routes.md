@@ -718,6 +718,49 @@ Request body:
 
 ---
 
+## 📷 Media & Uploads (`/api/media`)
+
+*All routes require authentication*
+
+### POST /api/media/upload
+**Generic file upload**
+
+```typescript
+Request body: (multipart/form-data)
+{
+  file: File;
+  type?: string; // 'general', 'venue', etc.
+}
+
+Response: 200
+{
+  success: true,
+  url: string,
+  message: string
+}
+```
+
+### POST /api/media/avatar
+**Upload user profile picture**
+
+Updates the authenticated user's `avatar_url` automatically.
+
+```typescript
+Request body: (multipart/form-data)
+{
+  file: File;
+}
+
+Response: 200
+{
+  success: true,
+  url: string,
+  message: string
+}
+```
+
+---
+
 ## 🛠️ Infrastructure & Misc
 
 - `GET /api/health` — System health check

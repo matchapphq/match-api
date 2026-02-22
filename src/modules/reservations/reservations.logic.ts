@@ -77,9 +77,9 @@ export class ReservationsLogic {
                 data: {
                     userName: userName,
                     venueName: venueMatch.venue?.name,
-                    matchName: `${venueMatch.match.home_team_id} vs ${venueMatch.match.away_team_id}`,
-                    date: venueMatch.match.scheduled_at,
-                    time: venueMatch.match.scheduled_at.toLocaleTimeString(),
+                    matchName: `${venueMatch.match?.homeTeam?.name || 'TBD'} vs ${venueMatch.match?.awayTeam?.name || 'TBD'}`,
+                    date: venueMatch.match?.scheduled_at,
+                    time: venueMatch.match?.scheduled_at ? new Date(venueMatch.match.scheduled_at).toLocaleTimeString() : '',
                     guests: partySize,
                     bookingId: reservation.id,
                     address: venueMatch.venue?.street_address
@@ -97,7 +97,12 @@ export class ReservationsLogic {
                     partySize,
                     venueMatchId,
                     venue: venueMatch.venue?.name,
-                    match: venueMatch.match ? { scheduledAt: venueMatch.match.scheduled_at } : null
+                    match: venueMatch.match ? { 
+                        scheduledAt: venueMatch.match.scheduled_at,
+                        homeTeam: venueMatch.match.homeTeam,
+                        awayTeam: venueMatch.match.awayTeam,
+                        league: venueMatch.match.league
+                    } : null
                 },
                 qr_code: qrCodeImage
             };
@@ -129,7 +134,12 @@ export class ReservationsLogic {
                     partySize,
                     venueMatchId,
                     venue: venueMatch.venue?.name,
-                    match: venueMatch.match ? { scheduledAt: venueMatch.match.scheduled_at } : null
+                    match: venueMatch.match ? { 
+                        scheduledAt: venueMatch.match.scheduled_at,
+                        homeTeam: venueMatch.match.homeTeam,
+                        awayTeam: venueMatch.match.awayTeam,
+                        league: venueMatch.match.league
+                    } : null
                 }
             };
         }

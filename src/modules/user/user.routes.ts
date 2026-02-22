@@ -5,6 +5,7 @@ import type { HonoEnv } from "../../types/hono.types";
 import { UserLogic } from "./user.logic";
 import UserRepository from "../../repository/user.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
+import { StorageService } from "../../services/storage.service";
 
 /**
  * Service for defining User routes (Router/Module layer).
@@ -22,7 +23,8 @@ class UserService {
         // 1. Manual Dependency Injection (NestJS Module style)
         const userRepository = new UserRepository();
         const favoritesRepository = new FavoritesRepository();
-        const userLogic = new UserLogic(userRepository, favoritesRepository);
+        const storageService = new StorageService();
+        const userLogic = new UserLogic(userRepository, favoritesRepository, storageService);
         
         this.controller = new UserController(userLogic);
 
