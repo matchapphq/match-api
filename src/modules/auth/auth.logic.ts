@@ -9,6 +9,7 @@ import { Redis } from "ioredis";
 import { mailQueue } from "../../queue/notification.queue";
 import type { userRegisterData } from "../../utils/userData";
 import { verifyGoogleIdToken } from "../../utils/googleAuth";
+import { StorageService } from "../../services/storage.service";
 
 /**
  * Service handling Pure Business Logic for Authentication.
@@ -19,7 +20,8 @@ export class AuthLogic {
         private readonly tokenRepository: TokenRepository,
         private readonly authRepository: AuthRepository,
         private readonly referralRepo: typeof referralRepository,
-        private readonly redis: Redis
+        private readonly redis: Redis,
+        private readonly storageService: StorageService
     ) {}
 
     /**
@@ -73,6 +75,9 @@ export class AuthLogic {
         const passwordMatch = await password.verify(body.password, user.password_hash);
         if (!passwordMatch) throw new Error("INVALID_CREDENTIALS");
 
+        // Fetch full user to get avatar_url
+        const fullUser = await this.userRepository.getUserById(user.id);
+
         const tokens = await this.generateAndStoreTokens(user, deviceId);
 
         return {
@@ -81,7 +86,8 @@ export class AuthLogic {
                 email: user.email, 
                 role: user.role, 
                 first_name: user.first_name,
-                last_name: user.last_name 
+                last_name: user.last_name,
+                avatar: this.storageService.getFullUrl(fullUser?.avatar_url)
             },
             ...tokens
         };
@@ -134,18 +140,20 @@ export class AuthLogic {
             googleId: googleProfile.sub,
         });
 
-        user = await this.userRepository.getUserByEmail(googleProfile.email);
-        if (!user) throw new Error("USER_CREATION_FAILED");
+        // Fetch fresh user data
+        const fullUser = await this.userRepository.getUserById(user.id);
+        if (!fullUser) throw new Error("USER_CREATION_FAILED");
 
-        const tokens = await this.generateAndStoreTokens(user, deviceId);
+        const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
 
         return {
             user: {
-                id: user.id,
-                email: user.email,
-                role: user.role,
-                first_name: user.first_name,
-                last_name: user.last_name,
+                id: fullUser.id,
+                email: fullUser.email,
+                role: fullUser.role,
+                first_name: fullUser.first_name,
+                last_name: fullUser.last_name,
+                avatar: this.storageService.getFullUrl(fullUser.avatar_url)
             },
             isNewUser,
             ...tokens,

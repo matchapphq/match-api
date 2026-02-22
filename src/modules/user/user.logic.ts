@@ -1,5 +1,6 @@
 import UserRepository from "../../repository/user.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
+import { StorageService } from "../../services/storage.service";
 import { password as BunPassword } from "bun";
 import { mailQueue } from "../../queue/notification.queue";
 
@@ -10,7 +11,8 @@ import { mailQueue } from "../../queue/notification.queue";
 export class UserLogic {
     constructor(
         private readonly userRepository: UserRepository,
-        private readonly favoritesRepository: FavoritesRepository
+        private readonly favoritesRepository: FavoritesRepository,
+        private readonly storageService: StorageService
     ) {}
 
     /**
@@ -31,7 +33,7 @@ export class UserLogic {
             last_name: userData.last_name,
             bio: userData.bio,
             phone: userData.phone,
-            avatar: userData.avatar_url,
+            avatar: this.storageService.getFullUrl(userData.avatar_url),
             role: userData.role,
             created_at: userData.created_at,
             has_completed_onboarding: true,
@@ -53,7 +55,7 @@ export class UserLogic {
             last_name: updatedUser.last_name,
             bio: updatedUser.bio,
             phone: updatedUser.phone,
-            avatar: updatedUser.avatar_url,
+            avatar: this.storageService.getFullUrl(updatedUser.avatar_url),
             role: updatedUser.role,
             created_at: updatedUser.created_at,
         };

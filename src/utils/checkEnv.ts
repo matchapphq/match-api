@@ -27,6 +27,9 @@ function isEnvsDefined(): boolean {
         "SMTP_PASSWORD",
         "SMTP_SEND_MAIL",
         "SMTP_SEND_NAME",
+        "S3_ACCESS_KEY_ID",
+        "S3_SECRET_ACCESS_KEY",
+        "S3_BUCKET",
     ];
 
     const missingEnvs = requiredEnvs.filter((env) => process.env[env] === undefined);
