@@ -9,6 +9,7 @@ import { Redis } from "ioredis";
 import { mailQueue } from "../../queue/notification.queue";
 import type { userRegisterData } from "../../utils/userData";
 import { verifyGoogleIdToken } from "../../utils/googleAuth";
+import { verifyAppleIdToken } from "../../utils/appleAuth";
 import { StorageService } from "../../services/storage.service";
 
 /**
@@ -154,6 +155,81 @@ export class AuthLogic {
                 first_name: fullUser.first_name,
                 last_name: fullUser.last_name,
                 avatar: this.storageService.getFullUrl(fullUser.avatar_url)
+            },
+            isNewUser,
+            ...tokens,
+        };
+    }
+
+    /**
+     * Authenticate user with Apple ID token.
+     * Creates a user record on first Apple login when email is present.
+     */
+    async appleLogin(
+        idToken: string,
+        deviceId: string,
+        profileHints?: {
+            firstName?: string;
+            lastName?: string;
+        }
+    ) {
+        const appleProfile = await verifyAppleIdToken(idToken);
+
+        const firstName = profileHints?.firstName?.trim() || undefined;
+        const lastName = profileHints?.lastName?.trim() || undefined;
+
+        let user = await this.userRepository.getUserByAppleId(appleProfile.sub);
+        let isNewUser = false;
+
+        if (!user && appleProfile.email) {
+            user = await this.userRepository.getUserByEmail(appleProfile.email);
+        }
+
+        if (!user) {
+            if (!appleProfile.email) {
+                throw new Error("APPLE_EMAIL_REQUIRED_FOR_SIGNUP");
+            }
+
+            isNewUser = true;
+            user = await this.userRepository.createAppleUser({
+                email: appleProfile.email,
+                firstName,
+                lastName,
+                appleId: appleProfile.sub,
+                role: "user",
+            });
+
+            try {
+                await this.authRepository.savePreferences(user.id, {
+                    ambiances: [],
+                    venue_types: [],
+                    fav_sports: [],
+                    fav_team_ids: [],
+                });
+            } catch (preferencesError) {
+                console.warn("Apple signup: unable to save initial preferences", preferencesError);
+            }
+        }
+
+        await this.userRepository.syncAppleUserData(user.id, {
+            firstName,
+            lastName,
+            appleId: appleProfile.sub,
+        });
+
+        const fullUser = await this.userRepository.getUserById(user.id);
+        if (!fullUser) throw new Error("USER_CREATION_FAILED");
+
+        const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
+
+        return {
+            user: {
+                id: fullUser.id,
+                email: fullUser.email,
+                role: fullUser.role,
+                first_name: fullUser.first_name,
+                last_name: fullUser.last_name,
+                avatar: this.storageService.getFullUrl(fullUser.avatar_url),
             },
             isNewUser,
             ...tokens,

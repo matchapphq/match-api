@@ -7,6 +7,7 @@ import {
     RegisterRequestSchema,
     LoginRequestSchema,
     GoogleLoginRequestSchema,
+    AppleLoginRequestSchema,
     ForgotPasswordRequestSchema,
     VerifyResetCodeSchema,
     ResetPasswordSchema,
@@ -130,6 +131,62 @@ class AuthController {
 
                 console.error("Google login error:", error);
                 return ctx.json({ error: "Google login failed" }, 500);
+            }
+        }
+    );
+
+    public readonly appleLogin = this.factory.createHandlers(
+        zValidator("json", AppleLoginRequestSchema),
+        async (ctx) => {
+            const { id_token, first_name, last_name } = ctx.req.valid("json");
+            const deviceId = ctx.req.header("User-Agent") || "Unknown";
+
+            try {
+                const { user, accessToken, refreshToken, isNewUser } = await this.authLogic.appleLogin(
+                    id_token,
+                    deviceId,
+                    {
+                        firstName: first_name,
+                        lastName: last_name,
+                    }
+                );
+
+                await this.setAuthCookies(ctx, accessToken, refreshToken);
+
+                return ctx.json({
+                    user,
+                    token: accessToken,
+                    refresh_token: refreshToken,
+                    is_new_user: isNewUser,
+                });
+            } catch (error: any) {
+                if (
+                    ["APPLE_OAUTH_NOT_CONFIGURED", "APPLE_KEYS_FETCH_FAILED"].includes(error.message)
+                ) {
+                    return ctx.json({ error: "Apple OAuth is not configured on server" }, 500);
+                }
+
+                if (
+                    [
+                        "APPLE_TOKEN_INVALID",
+                        "APPLE_INVALID_SIGNATURE",
+                        "APPLE_SIGNING_KEY_NOT_FOUND",
+                        "APPLE_INVALID_ISSUER",
+                        "APPLE_INVALID_AUDIENCE",
+                        "APPLE_TOKEN_EXPIRED",
+                        "APPLE_SUB_MISSING",
+                        "APPLE_EMAIL_NOT_VERIFIED",
+                    ].includes(error.message)
+                ) {
+                    return ctx.json({ error: "Invalid Apple token" }, 401);
+                }
+
+                if (error.message === "APPLE_EMAIL_REQUIRED_FOR_SIGNUP") {
+                    return ctx.json({ error: "Apple email is required on first login" }, 400);
+                }
+
+                console.error("Apple login error:", error);
+                return ctx.json({ error: "Apple login failed" }, 500);
             }
         }
     );

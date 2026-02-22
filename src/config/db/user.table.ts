@@ -23,6 +23,7 @@ export const usersTable = pgTable(
         avatar_url: text('avatar_url'),
         push_token: text('push_token'),
         google_id: varchar('google_id', { length: 255 }),
+        apple_id: varchar('apple_id', { length: 255 }),
 
         // Role & Permissions
         role: userRoleEnum('role').default('user').notNull(),
