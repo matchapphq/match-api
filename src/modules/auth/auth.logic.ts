@@ -82,14 +82,7 @@ export class AuthLogic {
         const tokens = await this.generateAndStoreTokens(user, deviceId);
 
         return {
-            user: { 
-                id: user.id, 
-                email: user.email, 
-                role: user.role, 
-                first_name: user.first_name,
-                last_name: user.last_name,
-                avatar: this.storageService.getFullUrl(fullUser?.avatar_url)
-            },
+            user: await this.getClientUser(user.id),
             ...tokens
         };
     }
@@ -148,14 +141,7 @@ export class AuthLogic {
         const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
 
         return {
-            user: {
-                id: fullUser.id,
-                email: fullUser.email,
-                role: fullUser.role,
-                first_name: fullUser.first_name,
-                last_name: fullUser.last_name,
-                avatar: this.storageService.getFullUrl(fullUser.avatar_url)
-            },
+            user: await this.getClientUser(fullUser.id),
             isNewUser,
             ...tokens,
         };
@@ -223,14 +209,7 @@ export class AuthLogic {
         const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
 
         return {
-            user: {
-                id: fullUser.id,
-                email: fullUser.email,
-                role: fullUser.role,
-                first_name: fullUser.first_name,
-                last_name: fullUser.last_name,
-                avatar: this.storageService.getFullUrl(fullUser.avatar_url),
-            },
+            user: await this.getClientUser(fullUser.id),
             isNewUser,
             ...tokens,
         };
@@ -369,5 +348,41 @@ export class AuthLogic {
         } catch (error) {
             console.error(`Failed to enqueue welcome email (${template}):`, error);
         }
+    }
+
+    private normalizeStringArray(value: unknown): string[] {
+        return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    }
+
+    private async getClientUser(userId: string) {
+        const rows = await this.userRepository.getMe({ id: userId });
+        if (!rows || rows.length === 0) {
+            throw new Error("USER_CREATION_FAILED");
+        }
+
+        const user = rows[0]!;
+        const authProvider = user.google_id
+            ? "google"
+            : user.apple_id
+              ? "apple"
+              : "email";
+
+        return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            phone: user.phone,
+            avatar: this.storageService.getFullUrl(user.avatar_url),
+            auth_provider: authProvider,
+            preferences: {
+                sports: this.normalizeStringArray(user.fav_sports),
+                ambiance: this.normalizeStringArray(user.ambiances),
+                foodTypes: this.normalizeStringArray(user.venue_types),
+                budget: user.budget || "",
+            },
+            created_at: user.created_at,
+        };
     }
 }

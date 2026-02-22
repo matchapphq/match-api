@@ -44,8 +44,17 @@ class UserRepository {
             bio: usersTable.bio,
             phone: usersTable.phone,
             avatar_url: usersTable.avatar_url,
-            created_at: usersTable.created_at
-        }).from(usersTable).where(eq(usersTable.id, user.id));
+            google_id: usersTable.google_id,
+            apple_id: usersTable.apple_id,
+            created_at: usersTable.created_at,
+            fav_sports: userPreferencesTable.fav_sports,
+            fav_team_ids: userPreferencesTable.fav_team_ids,
+            ambiances: userPreferencesTable.ambiances,
+            venue_types: userPreferencesTable.venue_types,
+            budget: userPreferencesTable.budget,
+        }).from(usersTable)
+            .leftJoin(userPreferencesTable, eq(userPreferencesTable.user_id, usersTable.id))
+            .where(eq(usersTable.id, user.id));
     }
     
     public async getUserByEmail(email: string): Promise<AuthUser | undefined> {
