@@ -61,6 +61,13 @@ class UserController {
                 phone: body.phone,
                 bio: body.bio,
                 avatar: body.avatar,
+                fav_sports: Array.isArray(body.fav_sports) ? body.fav_sports : undefined,
+                fav_team_ids: Array.isArray(body.fav_team_ids) ? body.fav_team_ids : undefined,
+                ambiances: Array.isArray(body.ambiances) ? body.ambiances : undefined,
+                venue_types: Array.isArray(body.venue_types) ? body.venue_types : undefined,
+                budget: typeof body.budget === "string" ? body.budget : undefined,
+                home_lat: typeof body.home_lat === "number" ? body.home_lat : undefined,
+                home_lng: typeof body.home_lng === "number" ? body.home_lng : undefined,
             };
 
             // Remove undefined fields
