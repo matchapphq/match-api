@@ -36,6 +36,8 @@ This document lists all environment variables required to run the Match API.
 | `QR_SECRET` | Secret for HMAC-signing reservation QRs |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID (primary audience accepted for `POST /auth/google`) |
 | `GOOGLE_CLIENT_IDS` | Optional comma-separated list of additional accepted Google client IDs (web/ios/android) |
+| `APPLE_CLIENT_ID` | Apple OAuth audience (Bundle ID or Service ID accepted for `POST /auth/apple`) |
+| `APPLE_CLIENT_IDS` | Optional comma-separated list of additional Apple audiences (e.g. iOS Bundle ID + Service ID) |
 
 ## 💳 Stripe Integration
 
