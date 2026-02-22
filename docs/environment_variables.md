@@ -34,6 +34,10 @@ This document lists all environment variables required to run the Match API.
 | `ACCESS_JWT_SIGN_KEY` | Signed cookie key for Access tokens |
 | `REFRESH_JWT_SIGN_KEY` | Signed cookie key for Refresh tokens |
 | `QR_SECRET` | Secret for HMAC-signing reservation QRs |
+| `GOOGLE_CLIENT_ID` | Google OAuth Client ID (primary audience accepted for `POST /auth/google`) |
+| `GOOGLE_CLIENT_IDS` | Optional comma-separated list of additional accepted Google client IDs (web/ios/android) |
+| `APPLE_CLIENT_ID` | Apple OAuth audience (Bundle ID or Service ID accepted for `POST /auth/apple`) |
+| `APPLE_CLIENT_IDS` | Optional comma-separated list of additional Apple audiences (e.g. iOS Bundle ID + Service ID) |
 
 ## 💳 Stripe Integration
 
@@ -63,6 +67,17 @@ This document lists all environment variables required to run the Match API.
 | :--- | :--- |
 | `REDIS_URL` | Redis connection for BullMQ |
 | `LOCATIONIQ_KEY` | API Key for Geocoding (Address to Lat/Lng) |
+
+## 📁 Media Storage (S3 / Cloudflare R2)
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `S3_ACCESS_KEY_ID` | S3 Access Key | `AKIA...` |
+| `S3_SECRET_ACCESS_KEY` | S3 Secret Key | `secret...` |
+| `S3_BUCKET` | S3 Bucket Name | `match-media` |
+| `S3_REGION` | S3 Region (default: us-east-1) | `eu-west-3` |
+| `S3_ENDPOINT` | Optional custom endpoint (for R2/Minio) | `https://<id>.r2.cloudflarestorage.com` |
+| `S3_PUBLIC_URL` | Optional custom public URL / CDN | `https://cdn.matchapp.fr` |
 
 ---
 [« Back to Documentation Index](./index.md)

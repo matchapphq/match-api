@@ -8,6 +8,9 @@ import { userOnaboarding } from "./auth.helper";
 import { Redis } from "ioredis";
 import { mailQueue } from "../../queue/notification.queue";
 import type { userRegisterData } from "../../utils/userData";
+import { verifyGoogleIdToken } from "../../utils/googleAuth";
+import { verifyAppleIdToken } from "../../utils/appleAuth";
+import { StorageService } from "../../services/storage.service";
 
 /**
  * Service handling Pure Business Logic for Authentication.
@@ -18,7 +21,8 @@ export class AuthLogic {
         private readonly tokenRepository: TokenRepository,
         private readonly authRepository: AuthRepository,
         private readonly referralRepo: typeof referralRepository,
-        private readonly redis: Redis
+        private readonly redis: Redis,
+        private readonly storageService: StorageService
     ) {}
 
     /**
@@ -72,17 +76,142 @@ export class AuthLogic {
         const passwordMatch = await password.verify(body.password, user.password_hash);
         if (!passwordMatch) throw new Error("INVALID_CREDENTIALS");
 
+        // Fetch full user to get avatar_url
+        const fullUser = await this.userRepository.getUserById(user.id);
+
         const tokens = await this.generateAndStoreTokens(user, deviceId);
 
         return {
-            user: { 
-                id: user.id, 
-                email: user.email, 
-                role: user.role, 
-                first_name: user.first_name,
-                last_name: user.last_name 
-            },
+            user: await this.getClientUser(user.id),
             ...tokens
+        };
+    }
+
+    /**
+     * Authenticate user with Google ID token.
+     * Creates a user record if no account exists for the Google email.
+     */
+    async googleLogin(idToken: string, deviceId: string) {
+        const googleProfile = await verifyGoogleIdToken(idToken);
+
+        // Only keep fields that map to existing user attributes for now.
+        let user = await this.userRepository.getUserByEmail(googleProfile.email);
+        let isNewUser = false;
+
+        if (!user) {
+            isNewUser = true;
+            const createdUser = await this.userRepository.createGoogleUser({
+                email: googleProfile.email,
+                firstName: googleProfile.givenName,
+                lastName: googleProfile.familyName,
+                phone: googleProfile.phoneNumber,
+                avatarUrl: googleProfile.picture,
+                googleId: googleProfile.sub,
+                role: "user",
+            });
+
+            try {
+                await this.authRepository.savePreferences(createdUser.id, {
+                    ambiances: [],
+                    venue_types: [],
+                    fav_sports: [],
+                    fav_team_ids: [],
+                });
+            } catch (preferencesError) {
+                console.warn("Google signup: unable to save initial preferences", preferencesError);
+            }
+
+            user = await this.userRepository.getUserByEmail(googleProfile.email);
+        }
+
+        if (!user) throw new Error("USER_CREATION_FAILED");
+
+        await this.userRepository.syncGoogleUserData(user.id, {
+            firstName: googleProfile.givenName,
+            lastName: googleProfile.familyName,
+            phone: googleProfile.phoneNumber,
+            avatarUrl: googleProfile.picture,
+            googleId: googleProfile.sub,
+        });
+
+        // Fetch fresh user data
+        const fullUser = await this.userRepository.getUserById(user.id);
+        if (!fullUser) throw new Error("USER_CREATION_FAILED");
+
+        const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
+
+        return {
+            user: await this.getClientUser(fullUser.id),
+            isNewUser,
+            ...tokens,
+        };
+    }
+
+    /**
+     * Authenticate user with Apple ID token.
+     * Creates a user record on first Apple login when email is present.
+     */
+    async appleLogin(
+        idToken: string,
+        deviceId: string,
+        profileHints?: {
+            firstName?: string;
+            lastName?: string;
+        }
+    ) {
+        const appleProfile = await verifyAppleIdToken(idToken);
+
+        const firstName = profileHints?.firstName?.trim() || undefined;
+        const lastName = profileHints?.lastName?.trim() || undefined;
+
+        let user = await this.userRepository.getUserByAppleId(appleProfile.sub);
+        let isNewUser = false;
+
+        if (!user && appleProfile.email) {
+            user = await this.userRepository.getUserByEmail(appleProfile.email);
+        }
+
+        if (!user) {
+            if (!appleProfile.email) {
+                throw new Error("APPLE_EMAIL_REQUIRED_FOR_SIGNUP");
+            }
+
+            isNewUser = true;
+            user = await this.userRepository.createAppleUser({
+                email: appleProfile.email,
+                firstName,
+                lastName,
+                appleId: appleProfile.sub,
+                role: "user",
+            });
+
+            try {
+                await this.authRepository.savePreferences(user.id, {
+                    ambiances: [],
+                    venue_types: [],
+                    fav_sports: [],
+                    fav_team_ids: [],
+                });
+            } catch (preferencesError) {
+                console.warn("Apple signup: unable to save initial preferences", preferencesError);
+            }
+        }
+
+        await this.userRepository.syncAppleUserData(user.id, {
+            firstName,
+            lastName,
+            appleId: appleProfile.sub,
+        });
+
+        const fullUser = await this.userRepository.getUserById(user.id);
+        if (!fullUser) throw new Error("USER_CREATION_FAILED");
+
+        const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
+
+        return {
+            user: await this.getClientUser(fullUser.id),
+            isNewUser,
+            ...tokens,
         };
     }
 
@@ -184,7 +313,6 @@ export class AuthLogic {
             email: user.email,
             role: user.role,
             firstName: user.first_name || user.firstName || null,
-            last_name: user.last_name || user.lastName,
         };
 
         const [accessToken, refreshToken] = await Promise.all([
@@ -220,5 +348,41 @@ export class AuthLogic {
         } catch (error) {
             console.error(`Failed to enqueue welcome email (${template}):`, error);
         }
+    }
+
+    private normalizeStringArray(value: unknown): string[] {
+        return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    }
+
+    private async getClientUser(userId: string) {
+        const rows = await this.userRepository.getMe({ id: userId });
+        if (!rows || rows.length === 0) {
+            throw new Error("USER_CREATION_FAILED");
+        }
+
+        const user = rows[0]!;
+        const authProvider = user.google_id
+            ? "google"
+            : user.apple_id
+              ? "apple"
+              : "email";
+
+        return {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            first_name: user.first_name,
+            last_name: user.last_name,
+            phone: user.phone,
+            avatar: this.storageService.getFullUrl(user.avatar_url),
+            auth_provider: authProvider,
+            preferences: {
+                sports: this.normalizeStringArray(user.fav_sports),
+                ambiance: this.normalizeStringArray(user.ambiances),
+                foodTypes: this.normalizeStringArray(user.venue_types),
+                budget: user.budget || "",
+            },
+            created_at: user.created_at,
+        };
     }
 }

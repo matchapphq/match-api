@@ -12,6 +12,7 @@ import PartnerService from "./modules/partner/partner.routes";
 import ReservationsService from "./modules/reservations/reservations.routes";
 import UserService from "./modules/user/user.routes";
 import VenueService from "./modules/venues/venues.routes";
+import MediaService from "./modules/media/media.routes";
 
 // New Services
 import AnalyticsService from "./modules/analytics/analytics.routes";
@@ -35,6 +36,7 @@ const matchesRouter = new MatchesService();
 const sportsRouter = new SportsService();
 const reservationsRouter = new ReservationsService();
 const partnerRouter = new PartnerService();
+const mediaRouter = new MediaService();
 
 // New Service Instances
 const reviewsRouter = new ReviewsService();
@@ -82,6 +84,7 @@ app.route("/auth", authRouter.getRouter);
 app.route("/users", userRouter.getRouter); // Replaces /profile for user-centric routes
 app.route("/discovery", discoveryRouter.getRouter);
 app.route("/venues", venueRouter.getRouter);
+app.route("/media", mediaRouter.getRouter);
 // Global amenities route (public) - direct DB query
 app.get("/amenities", async (c) => {
     try {

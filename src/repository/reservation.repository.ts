@@ -108,7 +108,12 @@ export class ReservationRepository {
                                 phone: true,
                             }
                         },
-                        match: true
+                        match: {
+                            with: {
+                                homeTeam: true,
+                                awayTeam: true,
+                            }
+                        }
                     }
                 }
             }
@@ -133,7 +138,12 @@ export class ReservationRepository {
                                 street_address: true,
                             }
                         },
-                        match: true
+                        match: {
+                            with: {
+                                homeTeam: true,
+                                awayTeam: true,
+                            }
+                        }
                     }
                 }
             }
@@ -158,7 +168,12 @@ export class ReservationRepository {
                                 street_address: true,
                             }
                         },
-                        match: true
+                        match: {
+                            with: {
+                                homeTeam: true,
+                                awayTeam: true,
+                            }
+                        }
                     }
                 }
             },

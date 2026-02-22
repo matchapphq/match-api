@@ -5,6 +5,7 @@ import UserRepository from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
 import AuthRepository from "../../repository/auth/auth.repository";
 import referralRepository from "../../repository/referral.repository";
+import { StorageService } from "../../services/storage.service";
 import { Redis } from "ioredis";
 
 /**
@@ -23,6 +24,7 @@ class AuthService {
         const userRepository = new UserRepository();
         const tokenRepository = new TokenRepository();
         const authRepository = new AuthRepository();
+        const storageService = new StorageService();
         const redis = new Redis({ 
             host: process.env.REDIS_HOST || 'localhost', 
             port: parseInt(process.env.REDIS_PORT || '6379'),
@@ -34,7 +36,8 @@ class AuthService {
             tokenRepository,
             authRepository,
             referralRepository,
-            redis
+            redis,
+            storageService
         );
 
         this.controller = new AuthController(authLogic);
@@ -46,6 +49,8 @@ class AuthService {
     private initRoutes() {
         this.router.post("/register", ...this.controller.register);
         this.router.post("/login", ...this.controller.login);
+        this.router.post("/google", ...this.controller.googleLogin);
+        this.router.post("/apple", ...this.controller.appleLogin);
         this.router.post("/refresh-token", ...this.controller.refreshToken);
         this.router.post("/logout", ...this.controller.logout);
         this.router.post("/forgot-password", ...this.controller.forgotPassword);

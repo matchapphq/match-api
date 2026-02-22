@@ -82,6 +82,44 @@ Response: 200
 }
 ```
 
+### POST /api/auth/google
+**Login or register with Google ID token**
+
+```typescript
+Request body:
+{
+  id_token: string;
+}
+
+Response: 200
+{
+  user: User;
+  token: string;
+  refresh_token: string;
+  is_new_user: boolean;
+}
+```
+
+### POST /api/auth/apple
+**Login or register with Apple ID token**
+
+```typescript
+Request body:
+{
+  id_token: string;
+  first_name?: string; // optional; available on first Apple authorization
+  last_name?: string;  // optional; available on first Apple authorization
+}
+
+Response: 200
+{
+  user: User;
+  token: string;
+  refresh_token: string;
+  is_new_user: boolean;
+}
+```
+
 ### POST /api/auth/refresh-token
 **Refresh JWT token**
 
@@ -697,6 +735,49 @@ Request body:
 - `PUT /api/notifications/read-all` — Mark all read
 - `PUT /api/notifications/:notificationId/read` — Mark single read
 - `DELETE /api/notifications/:notificationId` — Remove notification
+
+---
+
+## 📷 Media & Uploads (`/api/media`)
+
+*All routes require authentication*
+
+### POST /api/media/upload
+**Generic file upload**
+
+```typescript
+Request body: (multipart/form-data)
+{
+  file: File;
+  type?: string; // 'general', 'venue', etc.
+}
+
+Response: 200
+{
+  success: true,
+  url: string,
+  message: string
+}
+```
+
+### POST /api/media/avatar
+**Upload user profile picture**
+
+Updates the authenticated user's `avatar_url` automatically.
+
+```typescript
+Request body: (multipart/form-data)
+{
+  file: File;
+}
+
+Response: 200
+{
+  success: true,
+  url: string,
+  message: string
+}
+```
 
 ---
 

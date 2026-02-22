@@ -1,5 +1,6 @@
 import UserRepository from "../../repository/user.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
+import { StorageService } from "../../services/storage.service";
 import { password as BunPassword } from "bun";
 import { mailQueue } from "../../queue/notification.queue";
 
@@ -10,7 +11,8 @@ import { mailQueue } from "../../queue/notification.queue";
 export class UserLogic {
     constructor(
         private readonly userRepository: UserRepository,
-        private readonly favoritesRepository: FavoritesRepository
+        private readonly favoritesRepository: FavoritesRepository,
+        private readonly storageService: StorageService
     ) {}
 
     /**
@@ -22,41 +24,114 @@ export class UserLogic {
         if (!users || users.length === 0) {
             throw new Error("USER_NOT_FOUND");
         }
-        
-        const userData = (await this.userRepository.getUserById(userId))!;
+
+        const userData = users[0]!;
+        const toArray = (value: unknown): string[] =>
+            Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+        const authProvider = userData.google_id
+            ? "google"
+            : userData.apple_id
+              ? "apple"
+              : "email";
+        const sports = toArray(userData.fav_sports);
+        const ambiances = toArray(userData.ambiances);
+        const venueTypes = toArray(userData.venue_types);
+        const needsCompletion = authProvider !== "email" && userData.role === "user";
+        const hasCompletedOnboarding =
+            !needsCompletion ||
+            (Boolean(userData.phone?.trim()) &&
+                sports.length > 0 &&
+                ambiances.length > 0 &&
+                venueTypes.length > 0 &&
+                Boolean(userData.budget));
+
         return {
             id: userData.id,
             email: userData.email,
             first_name: userData.first_name,
             last_name: userData.last_name,
-            phone: userData.phone,
             bio: userData.bio,
-            avatar: userData.avatar_url,
+            phone: userData.phone,
+            avatar: this.storageService.getFullUrl(userData.avatar_url),
             role: userData.role,
+            auth_provider: authProvider,
+            preferences: {
+                sports,
+                ambiance: ambiances,
+                foodTypes: venueTypes,
+                budget: userData.budget || "",
+            },
             created_at: userData.created_at,
-            has_completed_onboarding: true,
+            has_completed_onboarding: hasCompletedOnboarding,
         };
     }
 
     /**
      * Update the current user's profile.
      */
-    async updateUser(userId: string, data: { first_name?: string; last_name?: string; email?: string; phone?: string; avatar?: string; bio?: string }) {
-        const updatedUser = await this.userRepository.updateUser(userId, data);
-        if (!updatedUser) {
-            throw new Error("USER_NOT_FOUND");
+    async updateUser(
+        userId: string,
+        data: {
+            first_name?: string;
+            last_name?: string;
+            email?: string;
+            phone?: string;
+            bio?: string;
+            avatar?: string;
+            fav_sports?: string[];
+            fav_team_ids?: string[];
+            ambiances?: string[];
+            venue_types?: string[];
+            budget?: string;
+            home_lat?: number;
+            home_lng?: number;
         }
-        return {
-            id: updatedUser.id,
-            email: updatedUser.email,
-            first_name: updatedUser.first_name,
-            last_name: updatedUser.last_name,
-            phone: updatedUser.phone,
-            bio: updatedUser.bio,
-            avatar: updatedUser.avatar_url,
-            role: updatedUser.role,
-            created_at: updatedUser.created_at,
-        };
+    ) {
+        const {
+            fav_sports,
+            fav_team_ids,
+            ambiances,
+            venue_types,
+            budget,
+            home_lat,
+            home_lng,
+            ...profileUpdates
+        } = data;
+
+        if (Object.keys(profileUpdates).length > 0) {
+            const updatedUser = await this.userRepository.updateUser(userId, profileUpdates);
+            if (!updatedUser) {
+                throw new Error("USER_NOT_FOUND");
+            }
+        } else {
+            const existingUser = await this.userRepository.getUserById(userId);
+            if (!existingUser) {
+                throw new Error("USER_NOT_FOUND");
+            }
+        }
+
+        const hasPreferencesPatch =
+            fav_sports !== undefined ||
+            fav_team_ids !== undefined ||
+            ambiances !== undefined ||
+            venue_types !== undefined ||
+            budget !== undefined ||
+            home_lat !== undefined ||
+            home_lng !== undefined;
+
+        if (hasPreferencesPatch) {
+            await this.userRepository.saveUserPreferences(userId, {
+                fav_sports,
+                fav_team_ids,
+                ambiances,
+                venue_types,
+                budget,
+                home_lat,
+                home_lng,
+            });
+        }
+
+        return this.getUserProfile(userId);
     }
     
     /**
