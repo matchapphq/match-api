@@ -58,7 +58,6 @@ export class StorageService {
                 type: file.type,
                 acl: "public-read",
             });
-            console.log(`bytes: ${response}`);
         } catch (error) {
             console.error(`Error uploading file: ${error}`);
             throw error;
