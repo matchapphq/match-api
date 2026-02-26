@@ -40,6 +40,11 @@ class UserController {
         return typeof user?.iat === "number" ? user.iat : undefined;
     }
 
+    private getTokenSessionId(ctx: Context<HonoEnv>): string | undefined {
+        const user = ctx.get('user') as (HonoEnv["Variables"]["user"] & { sid?: string }) | undefined;
+        return typeof user?.sid === "string" ? user.sid : undefined;
+    }
+
     /**
      * GET /users/me
      */
@@ -119,7 +124,11 @@ class UserController {
     readonly getSessions = this.factory.createHandlers(async (ctx) => {
         try {
             const userId = this.getUserId(ctx);
-            const sessions = await this.userLogic.getSessions(userId, this.getTokenIssuedAt(ctx));
+            const sessions = await this.userLogic.getSessions(
+                userId,
+                this.getTokenIssuedAt(ctx),
+                this.getTokenSessionId(ctx)
+            );
             return ctx.json({ sessions });
         } catch (error: any) {
             if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
@@ -131,7 +140,11 @@ class UserController {
     readonly revokeOtherSessions = this.factory.createHandlers(async (ctx) => {
         try {
             const userId = this.getUserId(ctx);
-            const result = await this.userLogic.revokeOtherSessions(userId, this.getTokenIssuedAt(ctx));
+            const result = await this.userLogic.revokeOtherSessions(
+                userId,
+                this.getTokenIssuedAt(ctx),
+                this.getTokenSessionId(ctx)
+            );
             return ctx.json({
                 message: "Other sessions revoked",
                 revoked: result.revoked,
@@ -186,6 +199,25 @@ class UserController {
 
     readonly updateNotificationPreferences = this.factory.createHandlers(async (ctx) => {
         return ctx.json({ msg: "Update notification settings" });
+    });
+
+    /**
+     * POST /users/me/session-heartbeat
+     * Explicitly refresh session last activity.
+     */
+    readonly touchSessionHeartbeat = this.factory.createHandlers(async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            await this.userLogic.touchSessionActivity(
+                userId,
+                this.getTokenIssuedAt(ctx),
+                this.getTokenSessionId(ctx)
+            );
+            return ctx.json({ success: true });
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            return ctx.json({ error: "Failed to update session activity" }, 500);
+        }
     });
 
     /**

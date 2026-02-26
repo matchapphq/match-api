@@ -39,6 +39,7 @@ class UserService {
         this.router.get("/me", authMiddleware, ...this.controller.getMe);
         this.router.put("/me", authMiddleware, ...this.controller.updateMe);
         this.router.put("/me/password", authMiddleware, ...this.controller.updatePassword);
+        this.router.post("/me/session-heartbeat", authMiddleware, ...this.controller.touchSessionHeartbeat);
         this.router.get("/me/sessions", authMiddleware, ...this.controller.getSessions);
         this.router.delete("/me/sessions/others", authMiddleware, ...this.controller.revokeOtherSessions);
         this.router.delete("/me/sessions/:sessionId", authMiddleware, ...this.controller.revokeSession);

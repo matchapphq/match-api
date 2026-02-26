@@ -184,9 +184,9 @@ export class UserLogic {
         return true;
     }
 
-    async getSessions(userId: string, tokenIssuedAt?: number) {
+    async getSessions(userId: string, tokenIssuedAt?: number, tokenSessionId?: string) {
         const sessions = await this.getActiveSessions(userId);
-        const currentSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt);
+        const currentSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt, tokenSessionId);
 
         return sessions
             .sort((a, b) => this.toMs(b.updated_at) - this.toMs(a.updated_at))
@@ -209,13 +209,13 @@ export class UserLogic {
         return true;
     }
 
-    async revokeOtherSessions(userId: string, tokenIssuedAt?: number) {
+    async revokeOtherSessions(userId: string, tokenIssuedAt?: number, tokenSessionId?: string) {
         const sessions = await this.getActiveSessions(userId);
         if (sessions.length === 0) {
             return { revoked: 0, kept_session_id: null as string | null };
         }
 
-        const currentSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt);
+        const currentSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt, tokenSessionId);
         if (!currentSessionId) {
             const revoked = await this.tokenRepository.deleteTokensByUserId(userId);
             return { revoked, kept_session_id: null as string | null };
@@ -225,11 +225,42 @@ export class UserLogic {
         return { revoked, kept_session_id: currentSessionId };
     }
 
+    async touchSessionActivity(userId: string, tokenIssuedAt?: number, tokenSessionId?: string) {
+        if (tokenSessionId) {
+            const touched = await this.tokenRepository.touchSessionById(userId, tokenSessionId);
+            if (touched) {
+                return true;
+            }
+        }
+
+        if (tokenIssuedAt) {
+            await this.tokenRepository.touchNearestSessionByIssuedAt(userId, tokenIssuedAt);
+            return true;
+        }
+
+        const sessions = await this.getActiveSessions(userId);
+        const latestSession = sessions
+            .slice()
+            .sort((a, b) => this.toMs(b.updated_at) - this.toMs(a.updated_at))[0];
+
+        if (!latestSession) {
+            return false;
+        }
+
+        await this.tokenRepository.touchSessionById(userId, latestSession.id);
+        return true;
+    }
+
     private resolveCurrentSessionId(
         sessions: Array<{ id: string; updated_at: Date | string }>,
-        tokenIssuedAt?: number
+        tokenIssuedAt?: number,
+        tokenSessionId?: string
     ): string | null {
         if (sessions.length === 0) return null;
+
+        if (tokenSessionId && sessions.some((session) => session.id === tokenSessionId)) {
+            return tokenSessionId;
+        }
 
         if (!tokenIssuedAt) {
             return sessions

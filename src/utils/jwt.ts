@@ -12,6 +12,9 @@ export type TokenPayload = {
     email: string;
     firstName: string | null;
     role: "user" | "venue_owner" | "admin";
+    sid?: string;
+    iat?: number;
+    exp?: number;
 }
 
 export class JwtUtils {

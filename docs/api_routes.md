@@ -297,8 +297,20 @@ Response: 200
 }
 ```
 
+### POST /api/users/me/session-heartbeat
+**Refresh current session activity timestamp**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  success: true;
+}
+```
+
 ### DELETE /api/users/me/sessions/others
-**Revoke all other sessions (keeps current session inferred from JWT issue time)**
+**Revoke all other sessions (keeps current session based on JWT session id)**
 
 ```typescript
 Headers: Authorization: Bearer <token>

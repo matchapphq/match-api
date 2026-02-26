@@ -4,11 +4,12 @@ import { and, eq, ne } from "drizzle-orm";
 import { password } from "bun";
 
 class TokenRepository {
-    async createToken(token: string, userId: string, device: string): Promise<void> {
+    async createToken(token: string, userId: string, device: string, sessionId?: string): Promise<void> {
         const hashedToken = await password.hash(token, 'bcrypt');
 
         try {
             await db.insert(tokenTable).values({
+                ...(sessionId ? { id: sessionId } : {}),
                 hash_token: hashedToken,
                 userId: userId,
                 device: device,
@@ -61,6 +62,44 @@ class TokenRepository {
         return sessionIds.length;
     }
 
+    async touchNearestSessionByIssuedAt(userId: string, tokenIssuedAt: number): Promise<void> {
+        const sessions = await this.getAllTokensByUserId(userId);
+        if (!sessions || sessions.length === 0) {
+            return;
+        }
+
+        const issuedAtMs = tokenIssuedAt * 1000;
+        const nearestSession = sessions
+            .slice()
+            .sort((a, b) =>
+                Math.abs(this.toMs(a.updated_at) - issuedAtMs) -
+                Math.abs(this.toMs(b.updated_at) - issuedAtMs)
+            )[0];
+
+        if (!nearestSession) {
+            return;
+        }
+
+        await db
+            .update(tokenTable)
+            .set({ updated_at: new Date() })
+            .where(eq(tokenTable.id, nearestSession.id));
+    }
+
+    async touchSessionById(userId: string, sessionId: string): Promise<boolean> {
+        const session = await this.getTokenById(sessionId);
+        if (!session || session.userId !== userId) {
+            return false;
+        }
+
+        await db
+            .update(tokenTable)
+            .set({ updated_at: new Date() })
+            .where(eq(tokenTable.id, session.id));
+
+        return true;
+    }
+
     async deleteTokensByUserId(userId: string): Promise<number> {
         const existingTokens = await db
             .select({ id: tokenTable.id })
@@ -109,6 +148,11 @@ class TokenRepository {
         }
 
         throw new Error("Invalid token");
+    }
+
+    private toMs(value: Date | string | null | undefined) {
+        if (!value) return 0;
+        return value instanceof Date ? value.getTime() : new Date(value).getTime();
     }
 }
 

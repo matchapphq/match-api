@@ -241,16 +241,17 @@ class AuthController {
         } catch {}
 
         const accessPayload = accessToken
-            ? ((await JwtUtils.verifyAccessToken(accessToken)) as (({ id: string; iat?: number }) | null))
+            ? ((await JwtUtils.verifyAccessToken(accessToken)) as (({ id: string; iat?: number; sid?: string }) | null))
             : null;
         const refreshPayload = !accessPayload && refreshToken
-            ? (await JwtUtils.verifyRefreshToken(refreshToken))
+            ? ((await JwtUtils.verifyRefreshToken(refreshToken)) as ({ id: string; sid?: string } | null))
             : null;
 
         const logoutResult = await this.authLogic.logout({
             userId: accessPayload?.id || refreshPayload?.id,
             refreshToken,
             tokenIssuedAt: accessPayload?.iat,
+            tokenSessionId: accessPayload?.sid || refreshPayload?.sid,
         });
 
         deleteCookie(ctx, "refresh_token", { path: "/auth/refresh" });

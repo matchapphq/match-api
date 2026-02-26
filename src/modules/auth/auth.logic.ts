@@ -233,24 +233,40 @@ export class AuthLogic {
             throw new Error("SESSION_EXPIRED_INACTIVE");
         }
 
-        let matchedToken = null;
-        for (const t of activeSessions) {
-            const isValid = await password.verify(oldRefreshToken, t.hash_token);
-            if (isValid) {
-                matchedToken = t;
-                break;
-            }
-        }
+        let matchedToken = null as (typeof activeSessions)[number] | null;
 
-        if (!matchedToken) {
-            for (const t of dbTokens) {
+        if (payload.sid) {
+            const sidSession = activeSessions.find((session) => session.id === payload.sid);
+            if (!sidSession) {
+                throw new Error("INVALID_SESSION");
+            }
+
+            const isValid = await password.verify(oldRefreshToken, sidSession.hash_token);
+            if (!isValid) {
+                throw new Error("INVALID_SESSION");
+            }
+
+            matchedToken = sidSession;
+        } else {
+            for (const t of activeSessions) {
                 const isValid = await password.verify(oldRefreshToken, t.hash_token);
                 if (isValid) {
-                    throw new Error("SESSION_EXPIRED_INACTIVE");
+                    matchedToken = t;
+                    break;
                 }
             }
-            await this.tokenRepository.deleteTokensByUserId(payload.id);
-            throw new Error("SESSION_HIJACK_DETECTED");
+
+            if (!matchedToken) {
+                for (const t of dbTokens) {
+                    const isValid = await password.verify(oldRefreshToken, t.hash_token);
+                    if (isValid) {
+                        throw new Error("SESSION_EXPIRED_INACTIVE");
+                    }
+                }
+
+                // Legacy refresh token (without sid) that no longer maps to any DB session.
+                throw new Error("INVALID_SESSION");
+            }
         }
 
         const tokens = await this.generateAndStoreTokens(payload, deviceId, matchedToken.id);
@@ -265,8 +281,9 @@ export class AuthLogic {
         userId?: string;
         refreshToken?: string | null;
         tokenIssuedAt?: number;
+        tokenSessionId?: string;
     }) {
-        const { userId, refreshToken, tokenIssuedAt } = params;
+        const { userId, refreshToken, tokenIssuedAt, tokenSessionId } = params;
         if (!userId) {
             return { revoked: false };
         }
@@ -275,6 +292,14 @@ export class AuthLogic {
         const sessions = await this.filterActiveSessions(userId, dbSessions);
         if (!sessions || sessions.length === 0) {
             return { revoked: false };
+        }
+
+        if (tokenSessionId) {
+            const session = sessions.find((candidate) => candidate.id === tokenSessionId);
+            if (session) {
+                await this.tokenRepository.deleteToken(session.id);
+                return { revoked: true };
+            }
         }
 
         if (refreshToken) {
@@ -287,7 +312,7 @@ export class AuthLogic {
             }
         }
 
-        const inferredSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt);
+        const inferredSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt, tokenSessionId);
         if (!inferredSessionId) {
             return { revoked: false };
         }
@@ -361,11 +386,13 @@ export class AuthLogic {
     // --- Helpers ---
 
     private async generateAndStoreTokens(user: any, deviceId: string, tokenIdToUpdate?: string) {
+        const sessionId = tokenIdToUpdate ?? (randomUUIDv7() as string);
         const tokenPayload: TokenPayload = {
             id: user.id,
             email: user.email,
             role: user.role,
             firstName: user.first_name || user.firstName || null,
+            sid: sessionId,
         };
 
         const [accessToken, refreshToken] = await Promise.all([
@@ -376,7 +403,7 @@ export class AuthLogic {
         if (tokenIdToUpdate) {
             await this.tokenRepository.updateToken(refreshToken, user.id, deviceId, tokenIdToUpdate);
         } else {
-            await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
+            await this.tokenRepository.createToken(refreshToken, user.id, deviceId, sessionId);
         }
 
         return { accessToken, refreshToken };
@@ -409,9 +436,14 @@ export class AuthLogic {
 
     private resolveCurrentSessionId(
         sessions: Array<{ id: string; updated_at: Date | string }>,
-        tokenIssuedAt?: number
+        tokenIssuedAt?: number,
+        tokenSessionId?: string
     ): string | null {
         if (sessions.length === 0) return null;
+
+        if (tokenSessionId && sessions.some((session) => session.id === tokenSessionId)) {
+            return tokenSessionId;
+        }
 
         if (!tokenIssuedAt) {
             return sessions
