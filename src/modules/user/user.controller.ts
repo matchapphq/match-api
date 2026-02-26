@@ -146,6 +146,9 @@ class UserController {
         } catch (error: any) {
             if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
             if (error.message === "USER_NOT_FOUND") return ctx.json({ error: "User not found" }, 404);
+            if (error.message === "CURRENT_PASSWORD_REQUIRED") {
+                return ctx.json({ error: "Current password is required" }, 400);
+            }
             if (error.message === "INVALID_CURRENT_PASSWORD") {
                 return ctx.json({ error: "Current password is incorrect" }, 400);
             }

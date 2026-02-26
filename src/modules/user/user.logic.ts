@@ -168,15 +168,24 @@ export class UserLogic {
     }
     
     
-    async updatePassword(userId: string, data: { current_password: string; new_password: string }) {
+    async updatePassword(userId: string, data: { current_password?: string; new_password: string }) {
         const user = await this.userRepository.getUserById(userId);
         if (!user) {
             throw new Error("USER_NOT_FOUND");
         }
 
-        const isPasswordValid = await BunPassword.verify(data.current_password, user.password_hash);
-        if (!isPasswordValid) {
-            throw new Error("INVALID_CURRENT_PASSWORD");
+        const hasSocialProvider = Boolean(user.google_id || user.apple_id);
+        const currentPassword = data.current_password?.trim();
+
+        if (!currentPassword) {
+            if (!hasSocialProvider) {
+                throw new Error("CURRENT_PASSWORD_REQUIRED");
+            }
+        } else {
+            const isPasswordValid = await BunPassword.verify(currentPassword, user.password_hash);
+            if (!isPasswordValid) {
+                throw new Error("INVALID_CURRENT_PASSWORD");
+            }
         }
 
         const newPasswordHash = await BunPassword.hash(data.new_password, { algorithm: "bcrypt", cost: 10 });

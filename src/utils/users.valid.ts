@@ -1,4 +1,3 @@
-import { password } from "bun";
 import z from "zod";
 
 export const DeleteRequestSchema = z.object({
@@ -8,7 +7,7 @@ export const DeleteRequestSchema = z.object({
 })
 
 export const UpdatePasswordSchema = z.object({
-    current_password: z.string().min(1, { message: "Current password is required" }),
+    current_password: z.string().min(1, { message: "Current password is required" }).optional(),
     new_password: z.string().min(6, { message: "New password must be at least 6 characters" }),
     confirm_password: z.string().min(6, { message: "Password confirmation must be at least 6 characters" }),
 }).refine((data) => data.new_password === data.confirm_password, {
