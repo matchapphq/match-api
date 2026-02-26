@@ -244,6 +244,44 @@ export class AuthLogic {
     }
 
     /**
+     * Logout current session by revoking the matching refresh token row.
+     * Falls back to nearest session inferred from access token issue time.
+     */
+    async logout(params: {
+        userId?: string;
+        refreshToken?: string | null;
+        tokenIssuedAt?: number;
+    }) {
+        const { userId, refreshToken, tokenIssuedAt } = params;
+        if (!userId) {
+            return { revoked: false };
+        }
+
+        const sessions = await this.tokenRepository.getAllTokensByUserId(userId);
+        if (!sessions || sessions.length === 0) {
+            return { revoked: false };
+        }
+
+        if (refreshToken) {
+            for (const session of sessions) {
+                const isMatch = await password.verify(refreshToken, session.hash_token);
+                if (isMatch) {
+                    await this.tokenRepository.deleteToken(session.id);
+                    return { revoked: true };
+                }
+            }
+        }
+
+        const inferredSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt);
+        if (!inferredSessionId) {
+            return { revoked: false };
+        }
+
+        await this.tokenRepository.deleteToken(inferredSessionId);
+        return { revoked: true };
+    }
+
+    /**
      * Handle forgot password request.
      */
     async forgotPassword(email: string) {
@@ -352,6 +390,34 @@ export class AuthLogic {
 
     private normalizeStringArray(value: unknown): string[] {
         return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    }
+
+    private resolveCurrentSessionId(
+        sessions: Array<{ id: string; updated_at: Date | string }>,
+        tokenIssuedAt?: number
+    ): string | null {
+        if (sessions.length === 0) return null;
+
+        if (!tokenIssuedAt) {
+            return sessions
+                .slice()
+                .sort((a, b) => this.toMs(b.updated_at) - this.toMs(a.updated_at))[0]
+                ?.id ?? null;
+        }
+
+        const issuedAtMs = tokenIssuedAt * 1000;
+        return sessions
+            .slice()
+            .sort((a, b) =>
+                Math.abs(this.toMs(a.updated_at) - issuedAtMs) -
+                Math.abs(this.toMs(b.updated_at) - issuedAtMs)
+            )[0]
+            ?.id ?? null;
+    }
+
+    private toMs(value: Date | string | null | undefined) {
+        if (!value) return 0;
+        return value instanceof Date ? value.getTime() : new Date(value).getTime();
     }
 
     private async getClientUser(userId: string) {

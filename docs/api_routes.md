@@ -136,14 +136,20 @@ Response: 200
 ```
 
 ### POST /api/auth/logout
-**Logout user (invalidate token)**
+**Logout user (revoke current session when possible)**
 
 ```typescript
 Headers: Authorization: Bearer <token>
 
+Optional request body:
+{
+  refresh_token?: string; // Recommended to revoke the exact current session
+}
+
 Response: 200
 {
   message: string;
+  session_revoked: boolean;
 }
 ```
 

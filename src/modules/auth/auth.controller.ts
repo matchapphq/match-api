@@ -218,9 +218,46 @@ class AuthController {
     });
 
     public readonly logout = this.factory.createHandlers(async (ctx) => {
-        deleteCookie(ctx, "refresh_token");
-        deleteCookie(ctx, "access_token");
-        return ctx.json({ message: "Logged out successfully" });
+        const refreshTokenCookie = await getSignedCookie(ctx, JwtUtils.REFRESH_JWT_SIGN_KEY, "refresh_token");
+        const accessTokenCookie = await getSignedCookie(ctx, JwtUtils.ACCESS_JWT_SIGN_KEY, "access_token");
+
+        let refreshToken: string | undefined =
+            typeof refreshTokenCookie === "string" ? refreshTokenCookie : undefined;
+        let accessToken: string | undefined =
+            typeof accessTokenCookie === "string" ? accessTokenCookie : undefined;
+
+        if (!accessToken) {
+            const authHeader = ctx.req.header("Authorization");
+            if (authHeader?.startsWith("Bearer ")) {
+                accessToken = authHeader.substring(7);
+            }
+        }
+
+        try {
+            const body = await ctx.req.json();
+            if (!refreshToken && typeof body?.refresh_token === "string") {
+                refreshToken = body.refresh_token;
+            }
+        } catch {}
+
+        const accessPayload = accessToken
+            ? ((await JwtUtils.verifyAccessToken(accessToken)) as (({ id: string; iat?: number }) | null))
+            : null;
+        const refreshPayload = !accessPayload && refreshToken
+            ? (await JwtUtils.verifyRefreshToken(refreshToken))
+            : null;
+
+        const logoutResult = await this.authLogic.logout({
+            userId: accessPayload?.id || refreshPayload?.id,
+            refreshToken,
+            tokenIssuedAt: accessPayload?.iat,
+        });
+
+        deleteCookie(ctx, "refresh_token", { path: "/auth/refresh" });
+        deleteCookie(ctx, "refresh_token", { path: "/" });
+        deleteCookie(ctx, "access_token", { path: "/" });
+
+        return ctx.json({ message: "Logged out successfully", session_revoked: logoutResult.revoked });
     });
 
     public readonly forgotPassword = this.factory.createHandlers(
