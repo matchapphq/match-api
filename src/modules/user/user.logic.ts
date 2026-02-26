@@ -4,6 +4,7 @@ import TokenRepository from "../../repository/token.repository";
 import { StorageService } from "../../services/storage.service";
 import { password as BunPassword } from "bun";
 import { mailQueue } from "../../queue/notification.queue";
+import { decodeSessionDevice } from "../../utils/session-device";
 
 /**
  * Service handling Pure Business Logic for Users.
@@ -190,13 +191,21 @@ export class UserLogic {
 
         return sessions
             .sort((a, b) => this.toMs(b.updated_at) - this.toMs(a.updated_at))
-            .map((session) => ({
-                id: session.id,
-                device: session.device,
-                created_at: session.created_at,
-                updated_at: session.updated_at,
-                is_current: session.id === currentSessionId,
-            }));
+            .map((session) => {
+                const deviceInfo = decodeSessionDevice(session.device);
+                return {
+                    id: session.id,
+                    device: deviceInfo.userAgent,
+                    location: {
+                        city: deviceInfo.location.city,
+                        region: deviceInfo.location.region,
+                        country: deviceInfo.location.country,
+                    },
+                    created_at: session.created_at,
+                    updated_at: session.updated_at,
+                    is_current: session.id === currentSessionId,
+                };
+            });
     }
 
     async revokeSession(userId: string, sessionId: string) {
@@ -225,16 +234,25 @@ export class UserLogic {
         return { revoked, kept_session_id: currentSessionId };
     }
 
-    async touchSessionActivity(userId: string, tokenIssuedAt?: number, tokenSessionId?: string) {
+    async touchSessionActivity(
+        userId: string,
+        tokenIssuedAt?: number,
+        tokenSessionId?: string,
+        sessionDevice?: string
+    ) {
         if (tokenSessionId) {
-            const touched = await this.tokenRepository.touchSessionById(userId, tokenSessionId);
+            const touched = await this.tokenRepository.touchSessionById(userId, tokenSessionId, {
+                device: sessionDevice,
+            });
             if (touched) {
                 return true;
             }
         }
 
         if (tokenIssuedAt) {
-            await this.tokenRepository.touchNearestSessionByIssuedAt(userId, tokenIssuedAt);
+            await this.tokenRepository.touchNearestSessionByIssuedAt(userId, tokenIssuedAt, {
+                device: sessionDevice,
+            });
             return true;
         }
 
@@ -247,7 +265,9 @@ export class UserLogic {
             return false;
         }
 
-        await this.tokenRepository.touchSessionById(userId, latestSession.id);
+        await this.tokenRepository.touchSessionById(userId, latestSession.id, {
+            device: sessionDevice,
+        });
         return true;
     }
 

@@ -31,7 +31,7 @@ export class AuthLogic {
     /**
      * Register a new user and return user data + tokens.
      */
-    public async register(body: any, deviceId: string) {
+    public async register(body: any, sessionDevice: string) {
         // Check if user already exists
         const existingUser = await this.userRepository.getUserByEmail(body.email);
         if (existingUser) {
@@ -64,7 +64,7 @@ export class AuthLogic {
             await this.enqueueWelcomeEmail(user, "welcome", "/discovery");
         }
 
-        const tokens = await this.generateAndStoreTokens(user, deviceId);
+        const tokens = await this.generateAndStoreTokens(user, sessionDevice);
 
         return { user, ...tokens };
     }
@@ -72,7 +72,7 @@ export class AuthLogic {
     /**
      * Authenticate user and return data + tokens.
      */
-    async login(body: any, deviceId: string) {
+    async login(body: any, sessionDevice: string) {
         const user = await this.userRepository.getUserByEmail(body.email);
         if (!user) throw new Error("INVALID_CREDENTIALS");
 
@@ -82,7 +82,7 @@ export class AuthLogic {
         // Fetch full user to get avatar_url
         const fullUser = await this.userRepository.getUserById(user.id);
 
-        const tokens = await this.generateAndStoreTokens(user, deviceId);
+        const tokens = await this.generateAndStoreTokens(user, sessionDevice);
 
         return {
             user: await this.getClientUser(user.id),
@@ -94,7 +94,7 @@ export class AuthLogic {
      * Authenticate user with Google ID token.
      * Creates a user record if no account exists for the Google email.
      */
-    async googleLogin(idToken: string, deviceId: string) {
+    async googleLogin(idToken: string, sessionDevice: string) {
         const googleProfile = await verifyGoogleIdToken(idToken);
 
         // Only keep fields that map to existing user attributes for now.
@@ -141,7 +141,7 @@ export class AuthLogic {
         const fullUser = await this.userRepository.getUserById(user.id);
         if (!fullUser) throw new Error("USER_CREATION_FAILED");
 
-        const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
+        const tokens = await this.generateAndStoreTokens(fullUser, sessionDevice);
 
         return {
             user: await this.getClientUser(fullUser.id),
@@ -156,7 +156,7 @@ export class AuthLogic {
      */
     async appleLogin(
         idToken: string,
-        deviceId: string,
+        sessionDevice: string,
         profileHints?: {
             firstName?: string;
             lastName?: string;
@@ -209,7 +209,7 @@ export class AuthLogic {
         const fullUser = await this.userRepository.getUserById(user.id);
         if (!fullUser) throw new Error("USER_CREATION_FAILED");
 
-        const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
+        const tokens = await this.generateAndStoreTokens(fullUser, sessionDevice);
 
         return {
             user: await this.getClientUser(fullUser.id),
@@ -221,7 +221,7 @@ export class AuthLogic {
     /**
      * Refresh access token using a valid refresh token.
      */
-    async refreshToken(oldRefreshToken: string, deviceId: string) {
+    async refreshToken(oldRefreshToken: string, sessionDevice: string) {
         const payload = await JwtUtils.verifyRefreshToken(oldRefreshToken);
         if (!payload) throw new Error("INVALID_REFRESH_TOKEN");
 
@@ -269,7 +269,7 @@ export class AuthLogic {
             }
         }
 
-        const tokens = await this.generateAndStoreTokens(payload, deviceId, matchedToken.id);
+        const tokens = await this.generateAndStoreTokens(payload, sessionDevice, matchedToken.id);
         return tokens;
     }
 
@@ -385,7 +385,7 @@ export class AuthLogic {
 
     // --- Helpers ---
 
-    private async generateAndStoreTokens(user: any, deviceId: string, tokenIdToUpdate?: string) {
+    private async generateAndStoreTokens(user: any, sessionDevice: string, tokenIdToUpdate?: string) {
         const sessionId = tokenIdToUpdate ?? (randomUUIDv7() as string);
         const tokenPayload: TokenPayload = {
             id: user.id,
@@ -401,9 +401,9 @@ export class AuthLogic {
         ]);
 
         if (tokenIdToUpdate) {
-            await this.tokenRepository.updateToken(refreshToken, user.id, deviceId, tokenIdToUpdate);
+            await this.tokenRepository.updateToken(refreshToken, user.id, sessionDevice, tokenIdToUpdate);
         } else {
-            await this.tokenRepository.createToken(refreshToken, user.id, deviceId, sessionId);
+            await this.tokenRepository.createToken(refreshToken, user.id, sessionDevice, sessionId);
         }
 
         return { accessToken, refreshToken };

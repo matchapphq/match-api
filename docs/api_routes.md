@@ -290,6 +290,11 @@ Response: 200
   sessions: Array<{
     id: string;
     device: string;
+    location: {
+      city: string | null;
+      region: string | null;
+      country: string | null;
+    };
     created_at: string;
     updated_at: string;
     is_current: boolean;
@@ -298,7 +303,7 @@ Response: 200
 ```
 
 ### POST /api/users/me/session-heartbeat
-**Refresh current session activity timestamp**
+**Refresh current session activity timestamp and last known location**
 
 ```typescript
 Headers: Authorization: Bearer <token>

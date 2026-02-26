@@ -6,6 +6,7 @@ import type { HonoEnv } from "../../types/hono.types";
 import { UserLogic } from "./user.logic";
 import { zValidator } from "@hono/zod-validator";
 import { DeleteRequestSchema, type DeleteRequestSchemaType, UpdatePasswordSchema, type UpdatePasswordSchemaType } from "../../utils/users.valid";
+import { encodeSessionDevice, resolveSessionDeviceFromHeaders } from "../../utils/session-device";
 
 // Validation schema for pagination
 const PaginationSchema = z.object({
@@ -43,6 +44,39 @@ class UserController {
     private getTokenSessionId(ctx: Context<HonoEnv>): string | undefined {
         const user = ctx.get('user') as (HonoEnv["Variables"]["user"] & { sid?: string }) | undefined;
         return typeof user?.sid === "string" ? user.sid : undefined;
+    }
+
+    private parseLocationOverride(rawBody: unknown):
+        | {
+              city: string | null;
+              region: string | null;
+              country: string | null;
+          }
+        | null {
+        if (!rawBody || typeof rawBody !== "object") {
+            return null;
+        }
+
+        const maybeLocation = Reflect.get(rawBody as object, "location");
+        if (!maybeLocation || typeof maybeLocation !== "object") {
+            return null;
+        }
+
+        const clean = (value: unknown): string | null => {
+            if (typeof value !== "string") return null;
+            const trimmed = value.trim();
+            return trimmed.length > 0 ? trimmed : null;
+        };
+
+        const city = clean(Reflect.get(maybeLocation as object, "city"));
+        const region = clean(Reflect.get(maybeLocation as object, "region"));
+        const country = clean(Reflect.get(maybeLocation as object, "country"));
+
+        if (!city && !region && !country) {
+            return null;
+        }
+
+        return { city, region, country };
     }
 
     /**
@@ -124,12 +158,38 @@ class UserController {
     readonly getSessions = this.factory.createHandlers(async (ctx) => {
         try {
             const userId = this.getUserId(ctx);
+            const tokenSessionId = this.getTokenSessionId(ctx);
             const sessions = await this.userLogic.getSessions(
                 userId,
                 this.getTokenIssuedAt(ctx),
-                this.getTokenSessionId(ctx)
+                tokenSessionId,
             );
-            return ctx.json({ sessions });
+
+            const resolvedDevice = await resolveSessionDeviceFromHeaders(
+                ctx.req.raw.headers,
+                ctx.req.header("User-Agent"),
+            );
+
+            const hydratedSessions = sessions.map((session) => {
+                if (session.id !== tokenSessionId) return session;
+
+                const hasStoredLocation = Boolean(
+                    session.location?.city || session.location?.region || session.location?.country,
+                );
+
+                if (hasStoredLocation) return session;
+
+                return {
+                    ...session,
+                    location: {
+                        city: session.location?.city || resolvedDevice.location.city,
+                        region: session.location?.region || resolvedDevice.location.region,
+                        country: session.location?.country || resolvedDevice.location.country,
+                    },
+                };
+            });
+
+            return ctx.json({ sessions: hydratedSessions });
         } catch (error: any) {
             if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
             console.error("Error fetching sessions:", error);
@@ -143,7 +203,7 @@ class UserController {
             const result = await this.userLogic.revokeOtherSessions(
                 userId,
                 this.getTokenIssuedAt(ctx),
-                this.getTokenSessionId(ctx)
+                this.getTokenSessionId(ctx),
             );
             return ctx.json({
                 message: "Other sessions revoked",
@@ -172,7 +232,7 @@ class UserController {
                 console.error("Error revoking session:", error);
                 return ctx.json({ error: "Failed to revoke session" }, 500);
             }
-        }
+        },
     );
 
     readonly deleteMe = this.factory.createHandlers(zValidator("json", DeleteRequestSchema), async (ctx) => {
@@ -208,10 +268,31 @@ class UserController {
     readonly touchSessionHeartbeat = this.factory.createHandlers(async (ctx) => {
         try {
             const userId = this.getUserId(ctx);
+            let body: unknown = null;
+            try {
+                body = await ctx.req.json();
+            } catch {}
+
+            const locationOverride = this.parseLocationOverride(body);
+            const resolvedDevice = await resolveSessionDeviceFromHeaders(
+                ctx.req.raw.headers,
+                ctx.req.header("User-Agent"),
+            );
+
+            if (locationOverride) {
+                resolvedDevice.location = {
+                    city: locationOverride.city || resolvedDevice.location.city,
+                    region: locationOverride.region || resolvedDevice.location.region,
+                    country: locationOverride.country || resolvedDevice.location.country,
+                };
+            }
+
+            const sessionDevice = encodeSessionDevice(resolvedDevice);
             await this.userLogic.touchSessionActivity(
                 userId,
                 this.getTokenIssuedAt(ctx),
-                this.getTokenSessionId(ctx)
+                this.getTokenSessionId(ctx),
+                sessionDevice,
             );
             return ctx.json({ success: true });
         } catch (error: any) {

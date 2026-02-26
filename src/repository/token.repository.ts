@@ -62,7 +62,11 @@ class TokenRepository {
         return sessionIds.length;
     }
 
-    async touchNearestSessionByIssuedAt(userId: string, tokenIssuedAt: number): Promise<void> {
+    async touchNearestSessionByIssuedAt(
+        userId: string,
+        tokenIssuedAt: number,
+        updates?: { device?: string }
+    ): Promise<void> {
         const sessions = await this.getAllTokensByUserId(userId);
         if (!sessions || sessions.length === 0) {
             return;
@@ -82,11 +86,18 @@ class TokenRepository {
 
         await db
             .update(tokenTable)
-            .set({ updated_at: new Date() })
+            .set({
+                updated_at: new Date(),
+                ...(updates?.device ? { device: updates.device } : {}),
+            })
             .where(eq(tokenTable.id, nearestSession.id));
     }
 
-    async touchSessionById(userId: string, sessionId: string): Promise<boolean> {
+    async touchSessionById(
+        userId: string,
+        sessionId: string,
+        updates?: { device?: string }
+    ): Promise<boolean> {
         const session = await this.getTokenById(sessionId);
         if (!session || session.userId !== userId) {
             return false;
@@ -94,7 +105,10 @@ class TokenRepository {
 
         await db
             .update(tokenTable)
-            .set({ updated_at: new Date() })
+            .set({
+                updated_at: new Date(),
+                ...(updates?.device ? { device: updates.device } : {}),
+            })
             .where(eq(tokenTable.id, session.id));
 
         return true;
