@@ -1,16 +1,31 @@
 import { Queue, Worker } from "bullmq";
 import { redisConfig } from "../config/redis";
 import { getEmailTemplate } from "../templates";
+import { getDataExportRequestTemplate } from "../templates/data-export-request";
 import MailService from "../service/mail.service";
 import { EmailType } from "../types/mail.types";
+
+const DEFAULT_DATA_EXPORT_EMAIL = "data@matchapp.fr";
 
 export const mailQueue = new Queue("mail-queue", { connection: redisConfig });
 
 export const mailWorker = new Worker("mail-queue", async (job) => {
         const mailservice = new MailService();
-        let { to, subject, text, data } = job.data;
+        let { to, subject, text, data, replyTo } = job.data;
+        const templateType = (
+            typeof data?.template === "string" ? data.template : job.name
+        ) as EmailType;
+        if (!subject && typeof data?.subject === "string") {
+            subject = data.subject;
+        }
+        if (!text && typeof data?.text === "string") {
+            text = data.text;
+        }
         if (job.name as EmailType === EmailType.BUG_REPORT) {
             to = process.env.BUG_REPORT_EMAIL;
+        }
+        if (job.name as EmailType === EmailType.DATA_EXPORT_REQUEST) {
+            to = process.env.DATA_EXPORT_EMAIL || DEFAULT_DATA_EXPORT_EMAIL;
         }
         console.log(
             `[MAIL WORKER]: Processing job: ${job.name} with id: ${job.id}`,
@@ -18,12 +33,19 @@ export const mailWorker = new Worker("mail-queue", async (job) => {
         let html = job.data.html;
 
         // If a specific template type is provided, generate the HTML
-        if (!html && job.name) {
+        if (!html && templateType) {
             try {
-                html = getEmailTemplate(job.name as EmailType, data || {});
+                const isDataExportTemplate =
+                    templateType === EmailType.DATA_EXPORT_REQUEST ||
+                    job.name === EmailType.DATA_EXPORT_REQUEST ||
+                    data?.template === EmailType.DATA_EXPORT_REQUEST;
+
+                html = isDataExportTemplate
+                    ? getDataExportRequestTemplate(data || {})
+                    : getEmailTemplate(templateType, data || {});
             } catch (error) {
                 console.warn(
-                    `Template generation failed for type '${job.name}'. Falling back to simple text.`,
+                    `Template generation failed for type '${templateType}'. Falling back to simple text.`,
                     error,
                 );
             }
@@ -37,8 +59,9 @@ export const mailWorker = new Worker("mail-queue", async (job) => {
         }
     
         // Ensure text body exists for clients that don't support HTML
-        const textBody = text || data?.text || subject;
-        await mailservice.sendMail(to, subject, textBody, html);
+        const finalSubject = subject || "Match Notification";
+        const textBody = text || data?.text || finalSubject;
+        await mailservice.sendMail(to, finalSubject, textBody, html, replyTo);
     }, {
         connection: redisConfig,
         concurrency: 5,
