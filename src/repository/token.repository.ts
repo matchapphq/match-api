@@ -52,6 +52,15 @@ class TokenRepository {
         await db.delete(tokenTable).where(eq(tokenTable.id, sessionId));
     }
 
+    async deleteTokensByIds(sessionIds: string[]): Promise<number> {
+        if (sessionIds.length === 0) {
+            return 0;
+        }
+
+        await Promise.all(sessionIds.map((sessionId) => this.deleteToken(sessionId)));
+        return sessionIds.length;
+    }
+
     async deleteTokensByUserId(userId: string): Promise<number> {
         const existingTokens = await db
             .select({ id: tokenTable.id })

@@ -10,6 +10,9 @@ import { mailQueue } from "../../queue/notification.queue";
  * No Hono/HTTP dependencies here.
  */
 export class UserLogic {
+    private readonly sessionInactivityMs =
+        Math.max(1, Number(process.env.SESSION_INACTIVITY_DAYS || 7)) * 24 * 60 * 60 * 1000;
+
     constructor(
         private readonly userRepository: UserRepository,
         private readonly favoritesRepository: FavoritesRepository,
@@ -182,7 +185,7 @@ export class UserLogic {
     }
 
     async getSessions(userId: string, tokenIssuedAt?: number) {
-        const sessions = await this.tokenRepository.getAllTokensByUserId(userId);
+        const sessions = await this.getActiveSessions(userId);
         const currentSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt);
 
         return sessions
@@ -207,7 +210,7 @@ export class UserLogic {
     }
 
     async revokeOtherSessions(userId: string, tokenIssuedAt?: number) {
-        const sessions = await this.tokenRepository.getAllTokensByUserId(userId);
+        const sessions = await this.getActiveSessions(userId);
         if (sessions.length === 0) {
             return { revoked: 0, kept_session_id: null as string | null };
         }
@@ -247,6 +250,25 @@ export class UserLogic {
     private toMs(value: Date | string | null | undefined) {
         if (!value) return 0;
         return value instanceof Date ? value.getTime() : new Date(value).getTime();
+    }
+
+    private async getActiveSessions(userId: string) {
+        const sessions = await this.tokenRepository.getAllTokensByUserId(userId);
+        if (sessions.length === 0) {
+            return sessions;
+        }
+
+        const cutoffMs = Date.now() - this.sessionInactivityMs;
+        const staleSessionIds = sessions
+            .filter((session) => this.toMs(session.updated_at) <= cutoffMs)
+            .map((session) => session.id);
+
+        if (staleSessionIds.length > 0) {
+            await this.tokenRepository.deleteTokensByIds(staleSessionIds);
+        }
+
+        const staleSessionSet = new Set(staleSessionIds);
+        return sessions.filter((session) => !staleSessionSet.has(session.id));
     }
 
     /**

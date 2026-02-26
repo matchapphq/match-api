@@ -279,6 +279,9 @@ Response: 200
 ### GET /api/users/me/sessions
 **List active login sessions for the authenticated user**
 
+Inactive sessions are automatically revoked when they are older than
+`SESSION_INACTIVITY_DAYS` (default: `7` days) based on `updated_at`.
+
 ```typescript
 Headers: Authorization: Bearer <token>
 

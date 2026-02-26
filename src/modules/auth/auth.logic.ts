@@ -16,6 +16,9 @@ import { StorageService } from "../../services/storage.service";
  * Service handling Pure Business Logic for Authentication.
  */
 export class AuthLogic {
+    private readonly sessionInactivityMs =
+        Math.max(1, Number(process.env.SESSION_INACTIVITY_DAYS || 7)) * 24 * 60 * 60 * 1000;
+
     constructor(
         private readonly userRepository: UserRepository,
         private readonly tokenRepository: TokenRepository,
@@ -225,8 +228,13 @@ export class AuthLogic {
         const dbTokens = await this.tokenRepository.getAllTokensByUserId(payload.id);
         if (!dbTokens || dbTokens.length === 0) throw new Error("INVALID_SESSION");
 
+        const activeSessions = await this.filterActiveSessions(payload.id, dbTokens);
+        if (activeSessions.length === 0) {
+            throw new Error("SESSION_EXPIRED_INACTIVE");
+        }
+
         let matchedToken = null;
-        for (const t of dbTokens) {
+        for (const t of activeSessions) {
             const isValid = await password.verify(oldRefreshToken, t.hash_token);
             if (isValid) {
                 matchedToken = t;
@@ -235,6 +243,12 @@ export class AuthLogic {
         }
 
         if (!matchedToken) {
+            for (const t of dbTokens) {
+                const isValid = await password.verify(oldRefreshToken, t.hash_token);
+                if (isValid) {
+                    throw new Error("SESSION_EXPIRED_INACTIVE");
+                }
+            }
             await this.tokenRepository.deleteTokensByUserId(payload.id);
             throw new Error("SESSION_HIJACK_DETECTED");
         }
@@ -257,7 +271,8 @@ export class AuthLogic {
             return { revoked: false };
         }
 
-        const sessions = await this.tokenRepository.getAllTokensByUserId(userId);
+        const dbSessions = await this.tokenRepository.getAllTokensByUserId(userId);
+        const sessions = await this.filterActiveSessions(userId, dbSessions);
         if (!sessions || sessions.length === 0) {
             return { revoked: false };
         }
@@ -418,6 +433,27 @@ export class AuthLogic {
     private toMs(value: Date | string | null | undefined) {
         if (!value) return 0;
         return value instanceof Date ? value.getTime() : new Date(value).getTime();
+    }
+
+    private async filterActiveSessions<T extends { id: string; updated_at: Date | string }>(
+        userId: string,
+        sessions: T[]
+    ): Promise<T[]> {
+        if (sessions.length === 0) {
+            return sessions;
+        }
+
+        const cutoffMs = Date.now() - this.sessionInactivityMs;
+        const staleSessionIds = sessions
+            .filter((session) => this.toMs(session.updated_at) <= cutoffMs)
+            .map((session) => session.id);
+
+        if (staleSessionIds.length > 0) {
+            await this.tokenRepository.deleteTokensByIds(staleSessionIds);
+        }
+
+        const staleSet = new Set(staleSessionIds);
+        return sessions.filter((session) => !staleSet.has(session.id));
     }
 
     private async getClientUser(userId: string) {
