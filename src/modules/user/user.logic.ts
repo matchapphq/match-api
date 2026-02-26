@@ -1,5 +1,6 @@
 import UserRepository from "../../repository/user.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
+import TokenRepository from "../../repository/token.repository";
 import { StorageService } from "../../services/storage.service";
 import { password as BunPassword } from "bun";
 import { mailQueue } from "../../queue/notification.queue";
@@ -12,6 +13,7 @@ export class UserLogic {
     constructor(
         private readonly userRepository: UserRepository,
         private readonly favoritesRepository: FavoritesRepository,
+        private readonly tokenRepository: TokenRepository,
         private readonly storageService: StorageService
     ) {}
 
@@ -177,6 +179,74 @@ export class UserLogic {
         await this.userRepository.updateUserPassword(userId, newPasswordHash);
         
         return true;
+    }
+
+    async getSessions(userId: string, tokenIssuedAt?: number) {
+        const sessions = await this.tokenRepository.getAllTokensByUserId(userId);
+        const currentSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt);
+
+        return sessions
+            .sort((a, b) => this.toMs(b.updated_at) - this.toMs(a.updated_at))
+            .map((session) => ({
+                id: session.id,
+                device: session.device,
+                created_at: session.created_at,
+                updated_at: session.updated_at,
+                is_current: session.id === currentSessionId,
+            }));
+    }
+
+    async revokeSession(userId: string, sessionId: string) {
+        const session = await this.tokenRepository.getTokenById(sessionId);
+        if (!session || session.userId !== userId) {
+            throw new Error("SESSION_NOT_FOUND");
+        }
+
+        await this.tokenRepository.deleteToken(sessionId);
+        return true;
+    }
+
+    async revokeOtherSessions(userId: string, tokenIssuedAt?: number) {
+        const sessions = await this.tokenRepository.getAllTokensByUserId(userId);
+        if (sessions.length === 0) {
+            return { revoked: 0, kept_session_id: null as string | null };
+        }
+
+        const currentSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt);
+        if (!currentSessionId) {
+            const revoked = await this.tokenRepository.deleteTokensByUserId(userId);
+            return { revoked, kept_session_id: null as string | null };
+        }
+
+        const revoked = await this.tokenRepository.deleteTokensByUserIdExcept(userId, currentSessionId);
+        return { revoked, kept_session_id: currentSessionId };
+    }
+
+    private resolveCurrentSessionId(
+        sessions: Array<{ id: string; updated_at: Date | string }>,
+        tokenIssuedAt?: number
+    ): string | null {
+        if (sessions.length === 0) return null;
+
+        if (!tokenIssuedAt) {
+            return sessions
+                .sort((a, b) => this.toMs(b.updated_at) - this.toMs(a.updated_at))[0]
+                ?.id ?? null;
+        }
+
+        const issuedAtMs = tokenIssuedAt * 1000;
+        return sessions
+            .slice()
+            .sort((a, b) =>
+                Math.abs(this.toMs(a.updated_at) - issuedAtMs) -
+                Math.abs(this.toMs(b.updated_at) - issuedAtMs)
+            )[0]
+            ?.id ?? null;
+    }
+
+    private toMs(value: Date | string | null | undefined) {
+        if (!value) return 0;
+        return value instanceof Date ? value.getTime() : new Date(value).getTime();
     }
 
     /**

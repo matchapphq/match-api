@@ -13,6 +13,10 @@ const PaginationSchema = z.object({
     limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
 
+const SessionParamSchema = z.object({
+    sessionId: z.string().uuid(),
+});
+
 /**
  * Controller for User operations.
  * Handles HTTP mapping and uses UserLogic for business rules.
@@ -29,6 +33,11 @@ class UserController {
             throw new Error("Unauthorized");
         }
         return user.id;
+    }
+
+    private getTokenIssuedAt(ctx: Context<HonoEnv>): number | undefined {
+        const user = ctx.get('user') as (HonoEnv["Variables"]["user"] & { iat?: number }) | undefined;
+        return typeof user?.iat === "number" ? user.iat : undefined;
     }
 
     /**
@@ -106,6 +115,52 @@ class UserController {
             return ctx.json({ error: "Failed to update password" }, 500);
         }
     });
+
+    readonly getSessions = this.factory.createHandlers(async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const sessions = await this.userLogic.getSessions(userId, this.getTokenIssuedAt(ctx));
+            return ctx.json({ sessions });
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Error fetching sessions:", error);
+            return ctx.json({ error: "Failed to fetch sessions" }, 500);
+        }
+    });
+
+    readonly revokeOtherSessions = this.factory.createHandlers(async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const result = await this.userLogic.revokeOtherSessions(userId, this.getTokenIssuedAt(ctx));
+            return ctx.json({
+                message: "Other sessions revoked",
+                revoked: result.revoked,
+                kept_session_id: result.kept_session_id,
+            });
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Error revoking other sessions:", error);
+            return ctx.json({ error: "Failed to revoke other sessions" }, 500);
+        }
+    });
+
+    readonly revokeSession = this.factory.createHandlers(
+        zValidator("param", SessionParamSchema),
+        async (ctx) => {
+            const { sessionId } = ctx.req.valid("param");
+
+            try {
+                const userId = this.getUserId(ctx);
+                await this.userLogic.revokeSession(userId, sessionId);
+                return ctx.json({ message: "Session revoked" });
+            } catch (error: any) {
+                if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+                if (error.message === "SESSION_NOT_FOUND") return ctx.json({ error: "Session not found" }, 404);
+                console.error("Error revoking session:", error);
+                return ctx.json({ error: "Failed to revoke session" }, 500);
+            }
+        }
+    );
 
     readonly deleteMe = this.factory.createHandlers(zValidator("json", DeleteRequestSchema), async (ctx) => {
         const body: DeleteRequestSchemaType = ctx.req.valid("json");

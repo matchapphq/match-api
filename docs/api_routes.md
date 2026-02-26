@@ -270,6 +270,50 @@ Response: 200
 }
 ```
 
+### GET /api/users/me/sessions
+**List active login sessions for the authenticated user**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  sessions: Array<{
+    id: string;
+    device: string;
+    created_at: string;
+    updated_at: string;
+    is_current: boolean;
+  }>;
+}
+```
+
+### DELETE /api/users/me/sessions/others
+**Revoke all other sessions (keeps current session inferred from JWT issue time)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  message: "Other sessions revoked";
+  revoked: number;
+  kept_session_id: string | null;
+}
+```
+
+### DELETE /api/users/me/sessions/:sessionId
+**Revoke a specific session by id**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  message: "Session revoked";
+}
+```
+
 ### DELETE /api/users/me
 **Delete user account (soft delete)**
 
