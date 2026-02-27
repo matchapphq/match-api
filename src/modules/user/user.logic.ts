@@ -192,12 +192,12 @@ export class UserLogic {
             throw new Error("USER_NOT_FOUND");
         }
 
-        const trimmedPassword = typeof password === "string" ? password.trim() : "";
-        if (!trimmedPassword) {
+        const rawPassword = typeof password === "string" ? password : "";
+        if (!rawPassword.trim()) {
             throw new Error("PASSWORD_REQUIRED");
         }
 
-        const isPasswordValid = await BunPassword.verify(trimmedPassword, user.password_hash);
+        const isPasswordValid = await BunPassword.verify(rawPassword, user.password_hash);
         if (!isPasswordValid) {
             throw new Error("INVALID_PASSWORD");
         }
@@ -237,9 +237,9 @@ export class UserLogic {
         }
 
         const hasSocialProvider = Boolean(user.google_id || user.apple_id);
-        const currentPassword = data.current_password?.trim();
+        const currentPassword = typeof data.current_password === "string" ? data.current_password : "";
 
-        if (!currentPassword) {
+        if (!currentPassword.trim()) {
             if (!hasSocialProvider) {
                 throw new Error("CURRENT_PASSWORD_REQUIRED");
             }

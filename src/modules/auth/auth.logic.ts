@@ -303,17 +303,23 @@ export class AuthLogic {
         let matchedToken = null as (typeof activeSessions)[number] | null;
 
         if (payload.sid) {
-            const sidSession = activeSessions.find((session) => session.id === payload.sid);
+            const sidSession = dbTokens.find((session) => session.id === payload.sid);
             if (!sidSession) {
                 throw new Error("INVALID_SESSION");
             }
 
-            const isValid = await password.verify(oldRefreshToken, sidSession.hash_token);
-            if (!isValid) {
-                throw new Error("INVALID_SESSION");
+            const activeSidSession = activeSessions.find((session) => session.id === payload.sid);
+            if (!activeSidSession) {
+                throw new Error("SESSION_EXPIRED_INACTIVE");
             }
 
-            matchedToken = sidSession;
+            const isValid = await password.verify(oldRefreshToken, sidSession.hash_token);
+            if (!isValid) {
+                await this.tokenRepository.deleteToken(sidSession.id).catch(() => undefined);
+                throw new Error("SESSION_HIJACK_DETECTED");
+            }
+
+            matchedToken = activeSidSession;
         } else {
             for (const t of activeSessions) {
                 const isValid = await password.verify(oldRefreshToken, t.hash_token);
@@ -331,8 +337,8 @@ export class AuthLogic {
                     }
                 }
 
-                // Legacy refresh token (without sid) that no longer maps to any DB session.
-                throw new Error("INVALID_SESSION");
+                await this.tokenRepository.deleteTokensByUserId(payload.id).catch(() => undefined);
+                throw new Error("SESSION_HIJACK_DETECTED");
             }
         }
 
