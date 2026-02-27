@@ -34,9 +34,8 @@ class MailService {
         html: string,
         replyTo?: string,
     ): Promise<void> {
-        const effectiveReplyTo = (replyTo && replyTo.trim().length > 0)
-            ? replyTo.trim()
-            : this.defaultReplyTo;
+        // Product requirement: all replies must go to support.
+        const effectiveReplyTo = this.defaultReplyTo;
 
         await this.transporter.sendMail(
             {
