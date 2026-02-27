@@ -169,7 +169,11 @@ export class UserLogic {
     }
 
     async getPrivacyPreferences(userId: string) {
-        return await this.userRepository.getPrivacyPreferences(userId);
+        const preferences = await this.userRepository.getPrivacyPreferences(userId);
+        return {
+            ...preferences,
+            account_deletion_grace_days: this.accountDeletionGraceDays,
+        };
     }
 
     async updatePrivacyPreferences(
@@ -180,7 +184,11 @@ export class UserLogic {
             legal_updates_email?: boolean;
         }
     ) {
-        return await this.userRepository.updatePrivacyPreferences(userId, updates);
+        const preferences = await this.userRepository.updatePrivacyPreferences(userId, updates);
+        return {
+            ...preferences,
+            account_deletion_grace_days: this.accountDeletionGraceDays,
+        };
     }
     
     /**
