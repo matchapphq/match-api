@@ -22,7 +22,7 @@ export const mailWorker = new Worker("mail-queue", async (job) => {
             text = data.text;
         }
         if (job.name as EmailType === EmailType.BUG_REPORT) {
-            to = process.env.BUG_REPORT_EMAIL;
+            to = process.env.BUG_REPORT_EMAIL || to || process.env.SMTP_SEND_MAIL || "support@matchapp.fr";
         }
         if (job.name as EmailType === EmailType.DATA_EXPORT_REQUEST) {
             to = process.env.DATA_EXPORT_EMAIL || DEFAULT_DATA_EXPORT_EMAIL;
