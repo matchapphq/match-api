@@ -4,7 +4,7 @@ import TokenRepository from "../../repository/token.repository";
 import { StorageService } from "../../services/storage.service";
 import { password as BunPassword } from "bun";
 import { mailQueue } from "../../queue/notification.queue";
-import { decodeSessionDevice } from "../../utils/session-device";
+import { decodeSessionDevice, mergeSessionDevicePreservingLocation } from "../../utils/session-device";
 
 /**
  * Service handling Pure Business Logic for Users.
@@ -306,34 +306,25 @@ export class UserLogic {
         sessionDevice?: string
     ) {
         if (tokenSessionId) {
-            const touched = await this.tokenRepository.touchSessionById(userId, tokenSessionId, {
-                device: sessionDevice,
-            });
-            if (touched) {
-                return true;
+            let nextSessionDevice = sessionDevice;
+            if (sessionDevice) {
+                const existingSession = await this.tokenRepository.getTokenById(tokenSessionId);
+                if (existingSession && existingSession.userId === userId) {
+                    nextSessionDevice = mergeSessionDevicePreservingLocation(
+                        existingSession.device,
+                        sessionDevice,
+                    );
+                }
             }
-        }
 
-        if (tokenIssuedAt) {
-            await this.tokenRepository.touchNearestSessionByIssuedAt(userId, tokenIssuedAt, {
-                device: sessionDevice,
+            const touched = await this.tokenRepository.touchSessionById(userId, tokenSessionId, {
+                device: nextSessionDevice,
             });
-            return true;
+            return touched;
         }
 
-        const sessions = await this.getActiveSessions(userId);
-        const latestSession = sessions
-            .slice()
-            .sort((a, b) => this.toMs(b.updated_at) - this.toMs(a.updated_at))[0];
-
-        if (!latestSession) {
-            return false;
-        }
-
-        await this.tokenRepository.touchSessionById(userId, latestSession.id, {
-            device: sessionDevice,
-        });
-        return true;
+        // Safety: never infer another session to avoid cross-session activity updates.
+        return false;
     }
 
     private resolveCurrentSessionId(

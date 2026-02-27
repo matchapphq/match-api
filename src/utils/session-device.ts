@@ -103,6 +103,26 @@ export const encodeSessionDevice = (info: SessionDeviceInfo): string => {
     return `${SESSION_DEVICE_PREFIX}${JSON.stringify(payload)}`;
 };
 
+export const mergeSessionDevicePreservingLocation = (
+    previousRawDevice: string,
+    nextRawDevice: string,
+): string => {
+    const previous = decodeSessionDevice(previousRawDevice);
+    const next = decodeSessionDevice(nextRawDevice);
+
+    const merged: SessionDeviceInfo = {
+        userAgent: sanitize(next.userAgent) || sanitize(previous.userAgent) || "Unknown",
+        ip: next.ip || previous.ip || null,
+        location: {
+            city: next.location.city || previous.location.city || null,
+            region: next.location.region || previous.location.region || null,
+            country: next.location.country || previous.location.country || null,
+        },
+    };
+
+    return encodeSessionDevice(merged);
+};
+
 export const decodeSessionDevice = (rawDevice: string): SessionDeviceInfo => {
     if (!rawDevice.startsWith(SESSION_DEVICE_PREFIX)) {
         return {

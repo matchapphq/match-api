@@ -42,10 +42,13 @@ class TokenRepository {
             throw new Error("Token not found");
         }
 
+        // Refresh-token rotation should not count as user activity.
+        // Preserve `updated_at`; real activity is tracked by explicit heartbeat touches.
         await db.update(tokenTable).set({
             hash_token: hashedToken,
             userId: userId,
             device: device,
+            updated_at: existingSession.updated_at,
         }).where(eq(tokenTable.id, sessionId));
     }
 
