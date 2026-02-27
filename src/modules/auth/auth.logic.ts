@@ -13,14 +13,19 @@ import { verifyAppleIdToken } from "../../utils/appleAuth";
 import { StorageService } from "../../services/storage.service";
 import { EmailType } from "../../types/mail.types";
 
+const parsePositiveDays = (envValue: string | undefined, defaultDays: number): number => {
+    const parsed = Number(envValue);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultDays;
+};
+
 /**
  * Service handling Pure Business Logic for Authentication.
  */
 export class AuthLogic {
     private readonly sessionInactivityMs =
-        Math.max(1, Number(process.env.SESSION_INACTIVITY_DAYS || 7)) * 24 * 60 * 60 * 1000;
+        parsePositiveDays(process.env.SESSION_INACTIVITY_DAYS, 7) * 24 * 60 * 60 * 1000;
     private readonly accountDeletionGraceDays =
-        Math.max(1, Number(process.env.ACCOUNT_DELETION_GRACE_DAYS || 30));
+        parsePositiveDays(process.env.ACCOUNT_DELETION_GRACE_DAYS, 30);
     private readonly accountDeletionGraceMs = this.accountDeletionGraceDays * 24 * 60 * 60 * 1000;
 
     constructor(

@@ -255,16 +255,21 @@ class AuthController {
             ? ((await JwtUtils.verifyRefreshToken(refreshToken)) as ({ id: string; sid?: string } | null))
             : null;
 
-        const logoutResult = await this.authLogic.logout({
-            userId: accessPayload?.id || refreshPayload?.id,
-            refreshToken,
-            tokenIssuedAt: accessPayload?.iat,
-            tokenSessionId: accessPayload?.sid || refreshPayload?.sid,
-        });
-
-        deleteCookie(ctx, "refresh_token", { path: "/auth/refresh" });
-        deleteCookie(ctx, "refresh_token", { path: "/" });
-        deleteCookie(ctx, "access_token", { path: "/" });
+        let logoutResult: { revoked: boolean } = { revoked: false };
+        try {
+            logoutResult = await this.authLogic.logout({
+                userId: accessPayload?.id || refreshPayload?.id,
+                refreshToken,
+                tokenIssuedAt: accessPayload?.iat,
+                tokenSessionId: accessPayload?.sid || refreshPayload?.sid,
+            });
+        } catch (error) {
+            console.error("Logout error:", error);
+        } finally {
+            deleteCookie(ctx, "refresh_token", { path: "/auth/refresh" });
+            deleteCookie(ctx, "refresh_token", { path: "/" });
+            deleteCookie(ctx, "access_token", { path: "/" });
+        }
 
         return ctx.json({ message: "Logged out successfully", session_revoked: logoutResult.revoked });
     });

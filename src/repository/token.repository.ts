@@ -69,37 +69,6 @@ class TokenRepository {
         return deletedTokens.length;
     }
 
-    async touchNearestSessionByIssuedAt(
-        userId: string,
-        tokenIssuedAt: number,
-        updates?: { device?: string }
-    ): Promise<void> {
-        const sessions = await this.getAllTokensByUserId(userId);
-        if (!sessions || sessions.length === 0) {
-            return;
-        }
-
-        const issuedAtMs = tokenIssuedAt * 1000;
-        const nearestSession = sessions
-            .slice()
-            .sort((a, b) =>
-                Math.abs(this.toMs(a.updated_at) - issuedAtMs) -
-                Math.abs(this.toMs(b.updated_at) - issuedAtMs)
-            )[0];
-
-        if (!nearestSession) {
-            return;
-        }
-
-        await db
-            .update(tokenTable)
-            .set({
-                updated_at: new Date(),
-                ...(updates?.device ? { device: updates.device } : {}),
-            })
-            .where(eq(tokenTable.id, nearestSession.id));
-    }
-
     async touchSessionById(
         userId: string,
         sessionId: string,

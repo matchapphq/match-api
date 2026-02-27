@@ -177,10 +177,19 @@ class UserController {
                 tokenSessionId,
             );
 
-            const resolvedDevice = await resolveSessionDeviceFromHeaders(
-                ctx.req.raw.headers,
-                ctx.req.header("User-Agent"),
+            const shouldHydrateCurrentSessionLocation = Boolean(
+                tokenSessionId &&
+                sessions.some((session) =>
+                    session.id === tokenSessionId &&
+                    !Boolean(session.location?.city || session.location?.region || session.location?.country),
+                ),
             );
+            const resolvedDevice = shouldHydrateCurrentSessionLocation
+                ? await resolveSessionDeviceFromHeaders(
+                    ctx.req.raw.headers,
+                    ctx.req.header("User-Agent"),
+                )
+                : null;
 
             const hydratedSessions = sessions.map((session) => {
                 if (session.id !== tokenSessionId) return session;
@@ -194,9 +203,9 @@ class UserController {
                 return {
                     ...session,
                     location: {
-                        city: session.location?.city || resolvedDevice.location.city,
-                        region: session.location?.region || resolvedDevice.location.region,
-                        country: session.location?.country || resolvedDevice.location.country,
+                        city: session.location?.city || resolvedDevice?.location.city || null,
+                        region: session.location?.region || resolvedDevice?.location.region || null,
+                        country: session.location?.country || resolvedDevice?.location.country || null,
                     },
                 };
             });

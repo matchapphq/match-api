@@ -31,6 +31,21 @@ const sanitize = (value: string | null | undefined): string | null => {
     return trimmed.length > 0 ? trimmed : null;
 };
 
+const isSessionGeoIpEnabled = (): boolean => process.env.SESSION_GEOIP_ENABLED !== "false";
+
+const getSessionGeoIpProviders = (ip: string): string[] => {
+    const configuredProvider = sanitize(process.env.SESSION_GEOIP_PROVIDER_URL);
+    if (configuredProvider) {
+        return [configuredProvider.replace("{ip}", encodeURIComponent(ip))];
+    }
+
+    return [
+        `https://ipapi.co/${encodeURIComponent(ip)}/json/`,
+        `https://ipwho.is/${encodeURIComponent(ip)}`,
+        `https://ipinfo.io/${encodeURIComponent(ip)}/json`,
+    ];
+};
+
 const stripQuotes = (value: string): string => {
     if (
         (value.startsWith('"') && value.endsWith('"')) ||
@@ -185,11 +200,11 @@ const setCachedSessionLocation = (ip: string, location: SessionLocation | null):
 };
 
 const fetchSessionLocationForIp = async (ip: string): Promise<SessionLocation | null> => {
-    const providers = [
-        `https://ipapi.co/${encodeURIComponent(ip)}/json/`,
-        `https://ipwho.is/${encodeURIComponent(ip)}`,
-        `https://ipinfo.io/${encodeURIComponent(ip)}/json`,
-    ];
+    if (!isSessionGeoIpEnabled()) {
+        return null;
+    }
+
+    const providers = getSessionGeoIpProviders(ip);
 
     for (const provider of providers) {
         try {
@@ -217,8 +232,15 @@ const fetchSessionLocationForIp = async (ip: string): Promise<SessionLocation | 
             if (location) {
                 return location;
             }
-        } catch {
-            // Try the next provider.
+        } catch (error) {
+            const providerLabel = (() => {
+                try {
+                    return new URL(provider).hostname;
+                } catch {
+                    return "configured-provider";
+                }
+            })();
+            console.warn("[SESSION_GEOIP] Provider lookup failed:", providerLabel, error);
         }
     }
 

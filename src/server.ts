@@ -54,9 +54,14 @@ const fidelityRouter = new FidelityService();
 const supportRouter = new SupportService();
 const userRepository = new UserRepository();
 
-const accountDeletionGraceDays = Math.max(1, Number(process.env.ACCOUNT_DELETION_GRACE_DAYS || 30));
+const parsePositiveNumber = (envValue: string | undefined, fallback: number): number => {
+    const parsed = Number(envValue);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const accountDeletionGraceDays = parsePositiveNumber(process.env.ACCOUNT_DELETION_GRACE_DAYS, 30);
 const accountDeletionCleanupIntervalMs =
-    Math.max(1, Number(process.env.ACCOUNT_DELETION_CLEANUP_INTERVAL_HOURS || 6)) * 60 * 60 * 1000;
+    parsePositiveNumber(process.env.ACCOUNT_DELETION_CLEANUP_INTERVAL_HOURS, 6) * 60 * 60 * 1000;
 
 const runDeletedUsersCleanup = async () => {
     const cutoffDate = new Date(Date.now() - accountDeletionGraceDays * 24 * 60 * 60 * 1000);
