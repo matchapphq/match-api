@@ -250,6 +250,13 @@ class UserController {
             }
         } catch (error: any) {
             if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            if (error.message === "USER_NOT_FOUND") return ctx.json({ error: "User not found" }, 404);
+            if (error.message === "PASSWORD_REQUIRED") {
+                return ctx.json({ error: "Password is required" }, 400);
+            }
+            if (error.message === "INVALID_PASSWORD") {
+                return ctx.json({ error: "Invalid password" }, 400);
+            }
             console.error("Error deleting user:", error);
             return ctx.json({ error: "Failed to delete user account" }, 500);
         }

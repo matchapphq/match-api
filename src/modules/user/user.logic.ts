@@ -13,6 +13,9 @@ import { decodeSessionDevice } from "../../utils/session-device";
 export class UserLogic {
     private readonly sessionInactivityMs =
         Math.max(1, Number(process.env.SESSION_INACTIVITY_DAYS || 7)) * 24 * 60 * 60 * 1000;
+    private readonly accountDeletionGraceDays =
+        Math.max(1, Number(process.env.ACCOUNT_DELETION_GRACE_DAYS || 30));
+    private readonly accountDeletionGraceMs = this.accountDeletionGraceDays * 24 * 60 * 60 * 1000;
 
     constructor(
         private readonly userRepository: UserRepository,
@@ -148,22 +151,41 @@ export class UserLogic {
         if (!user) {
             throw new Error("USER_NOT_FOUND");
         }
-        
-        const isPasswordValid = await BunPassword.verify(password, user.password_hash);
+
+        const trimmedPassword = typeof password === "string" ? password.trim() : "";
+        if (!trimmedPassword) {
+            throw new Error("PASSWORD_REQUIRED");
+        }
+
+        const isPasswordValid = await BunPassword.verify(trimmedPassword, user.password_hash);
         if (!isPasswordValid) {
             throw new Error("INVALID_PASSWORD");
         }
-        
-        // Send confirmation email before deleting the user record
-        await mailQueue.add("account-deletion", {
-            to: user.email,
-            subject: "Confirmation de suppression de compte - Match",
-            data: {
-                userName: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email,
-            }
-        });
 
         await this.userRepository.deleteUser(userId, reason, details);
+        await this.tokenRepository.deleteTokensByUserId(userId);
+
+        const reactivationDeadline = new Date(Date.now() + this.accountDeletionGraceMs).toISOString();
+
+        // Best effort email notification, must never block account deletion.
+        try {
+            await mailQueue.add("account-deletion", {
+                to: user.email,
+                subject:
+                    user.role === "venue_owner"
+                        ? `Compte partenaire désactivé (réactivation possible ${this.accountDeletionGraceDays} jours)`
+                        : `Compte désactivé (réactivation possible ${this.accountDeletionGraceDays} jours)`,
+                data: {
+                    userName: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email,
+                    role: user.role,
+                    graceDays: this.accountDeletionGraceDays,
+                    reactivationDeadline,
+                }
+            });
+        } catch (error) {
+            console.error("[USER] Account deletion email enqueue failed:", error);
+        }
+
         return true;
     }
     

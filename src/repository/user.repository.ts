@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { db } from "../config/config.db";
 import { userDeleteReasonsTable, userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
 import type { userRegisterData } from "../utils/userData";
@@ -21,6 +21,8 @@ type AuthUser = {
     role: 'user' | 'venue_owner' | 'admin';
     first_name: string | null;
     last_name: string | null;
+    deleted_at: Date | null;
+    is_active: boolean;
 };
 
 const toAuthUser = (user: typeof usersTable.$inferSelect): AuthUser => ({
@@ -30,6 +32,8 @@ const toAuthUser = (user: typeof usersTable.$inferSelect): AuthUser => ({
     role: user.role,
     first_name: user.first_name,
     last_name: user.last_name,
+    deleted_at: user.deleted_at,
+    is_active: Boolean(user.is_active),
 });
 
 class UserRepository {
@@ -64,9 +68,15 @@ class UserRepository {
             password_hash: usersTable.password_hash,
             role: usersTable.role,
             first_name: usersTable.first_name,
-            last_name: usersTable.last_name
+            last_name: usersTable.last_name,
+            deleted_at: usersTable.deleted_at,
+            is_active: usersTable.is_active,
         }).from(usersTable).where(eq(usersTable.email, email));
-        return user;
+        if (!user) return undefined;
+        return {
+            ...user,
+            is_active: Boolean(user.is_active),
+        };
     }
 
     public async getUserByAppleId(appleId: string): Promise<AuthUser | undefined> {
@@ -77,8 +87,14 @@ class UserRepository {
             role: usersTable.role,
             first_name: usersTable.first_name,
             last_name: usersTable.last_name,
+            deleted_at: usersTable.deleted_at,
+            is_active: usersTable.is_active,
         }).from(usersTable).where(eq(usersTable.apple_id, appleId));
-        return user;
+        if (!user) return undefined;
+        return {
+            ...user,
+            is_active: Boolean(user.is_active),
+        };
     }
 
     public async getUserById(id: string) {
@@ -285,13 +301,60 @@ class UserRepository {
     }
     
     public async deleteUser(userId: string, reason: string, details?: string): Promise<void> {
-        await Promise.all([
-            db.delete(usersTable).where(eq(usersTable.id, userId)),
-            db.insert(userDeleteReasonsTable).values({
+        const softDeletedUsers = await db
+            .update(usersTable)
+            .set({
+                deleted_at: new Date(),
+                is_active: false,
+                updated_at: new Date(),
+            })
+            .where(eq(usersTable.id, userId))
+            .returning();
+
+        if (softDeletedUsers.length === 0) {
+            throw new Error("USER_NOT_FOUND");
+        }
+
+        try {
+            await db.insert(userDeleteReasonsTable).values({
                 reason: reason,
                 details: details ?? null,
+            });
+        } catch (error) {
+            console.error("[USER_REPOSITORY] Failed to store deletion reason:", error);
+        }
+    }
+
+    public async reactivateUser(userId: string): Promise<boolean> {
+        const reactivatedUsers = await db
+            .update(usersTable)
+            .set({
+                deleted_at: null,
+                is_active: true,
+                updated_at: new Date(),
             })
-        ]);
+            .where(eq(usersTable.id, userId))
+            .returning();
+
+        return reactivatedUsers.length > 0;
+    }
+
+    public async deleteUserPermanentlyById(userId: string): Promise<boolean> {
+        const deletedUsers = await db
+            .delete(usersTable)
+            .where(eq(usersTable.id, userId))
+            .returning();
+
+        return deletedUsers.length > 0;
+    }
+
+    public async purgeDeletedUsersBefore(cutoffDate: Date): Promise<number> {
+        const deletedUsers = await db
+            .delete(usersTable)
+            .where(and(isNotNull(usersTable.deleted_at), lte(usersTable.deleted_at, cutoffDate)))
+            .returning();
+
+        return deletedUsers.length;
     }
 }
 

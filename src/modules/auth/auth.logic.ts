@@ -18,6 +18,9 @@ import { StorageService } from "../../services/storage.service";
 export class AuthLogic {
     private readonly sessionInactivityMs =
         Math.max(1, Number(process.env.SESSION_INACTIVITY_DAYS || 7)) * 24 * 60 * 60 * 1000;
+    private readonly accountDeletionGraceDays =
+        Math.max(1, Number(process.env.ACCOUNT_DELETION_GRACE_DAYS || 30));
+    private readonly accountDeletionGraceMs = this.accountDeletionGraceDays * 24 * 60 * 60 * 1000;
 
     constructor(
         private readonly userRepository: UserRepository,
@@ -32,6 +35,8 @@ export class AuthLogic {
      * Register a new user and return user data + tokens.
      */
     public async register(body: any, sessionDevice: string) {
+        await this.purgeExpiredDeletedAccounts();
+
         // Check if user already exists
         const existingUser = await this.userRepository.getUserByEmail(body.email);
         if (existingUser) {
@@ -73,14 +78,22 @@ export class AuthLogic {
      * Authenticate user and return data + tokens.
      */
     async login(body: any, sessionDevice: string) {
+        await this.purgeExpiredDeletedAccounts();
+
         const user = await this.userRepository.getUserByEmail(body.email);
         if (!user) throw new Error("INVALID_CREDENTIALS");
+
+        if (this.isDeletionExpired(user.deleted_at)) {
+            await this.userRepository.deleteUserPermanentlyById(user.id).catch(() => undefined);
+            throw new Error("INVALID_CREDENTIALS");
+        }
 
         const passwordMatch = await password.verify(body.password, user.password_hash);
         if (!passwordMatch) throw new Error("INVALID_CREDENTIALS");
 
-        // Fetch full user to get avatar_url
-        const fullUser = await this.userRepository.getUserById(user.id);
+        if (user.deleted_at) {
+            await this.userRepository.reactivateUser(user.id);
+        }
 
         const tokens = await this.generateAndStoreTokens(user, sessionDevice);
 
@@ -95,11 +108,18 @@ export class AuthLogic {
      * Creates a user record if no account exists for the Google email.
      */
     async googleLogin(idToken: string, sessionDevice: string) {
+        await this.purgeExpiredDeletedAccounts();
+
         const googleProfile = await verifyGoogleIdToken(idToken);
 
         // Only keep fields that map to existing user attributes for now.
         let user = await this.userRepository.getUserByEmail(googleProfile.email);
         let isNewUser = false;
+
+        if (user && this.isDeletionExpired(user.deleted_at)) {
+            await this.userRepository.deleteUserPermanentlyById(user.id).catch(() => undefined);
+            user = undefined;
+        }
 
         if (!user) {
             isNewUser = true;
@@ -128,6 +148,10 @@ export class AuthLogic {
         }
 
         if (!user) throw new Error("USER_CREATION_FAILED");
+
+        if (user.deleted_at) {
+            await this.userRepository.reactivateUser(user.id);
+        }
 
         await this.userRepository.syncGoogleUserData(user.id, {
             firstName: googleProfile.givenName,
@@ -162,6 +186,8 @@ export class AuthLogic {
             lastName?: string;
         }
     ) {
+        await this.purgeExpiredDeletedAccounts();
+
         const appleProfile = await verifyAppleIdToken(idToken);
 
         const firstName = profileHints?.firstName?.trim() || undefined;
@@ -170,8 +196,17 @@ export class AuthLogic {
         let user = await this.userRepository.getUserByAppleId(appleProfile.sub);
         let isNewUser = false;
 
+        if (user && this.isDeletionExpired(user.deleted_at)) {
+            await this.userRepository.deleteUserPermanentlyById(user.id).catch(() => undefined);
+            user = undefined;
+        }
+
         if (!user && appleProfile.email) {
             user = await this.userRepository.getUserByEmail(appleProfile.email);
+            if (user && this.isDeletionExpired(user.deleted_at)) {
+                await this.userRepository.deleteUserPermanentlyById(user.id).catch(() => undefined);
+                user = undefined;
+            }
         }
 
         if (!user) {
@@ -198,6 +233,10 @@ export class AuthLogic {
             } catch (preferencesError) {
                 console.warn("Apple signup: unable to save initial preferences", preferencesError);
             }
+        }
+
+        if (user.deleted_at) {
+            await this.userRepository.reactivateUser(user.id);
         }
 
         await this.userRepository.syncAppleUserData(user.id, {
@@ -486,6 +525,20 @@ export class AuthLogic {
 
         const staleSet = new Set(staleSessionIds);
         return sessions.filter((session) => !staleSet.has(session.id));
+    }
+
+    private async purgeExpiredDeletedAccounts() {
+        const cutoffDate = new Date(Date.now() - this.accountDeletionGraceMs);
+        try {
+            await this.userRepository.purgeDeletedUsersBefore(cutoffDate);
+        } catch (error) {
+            console.error("[AUTH] Unable to purge expired deleted accounts:", error);
+        }
+    }
+
+    private isDeletionExpired(deletedAt: Date | string | null | undefined) {
+        if (!deletedAt) return false;
+        return this.toMs(deletedAt) <= Date.now() - this.accountDeletionGraceMs;
     }
 
     private async getClientUser(userId: string) {
