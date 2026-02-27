@@ -5,6 +5,7 @@ import { StorageService } from "../../services/storage.service";
 import { password as BunPassword } from "bun";
 import { mailQueue } from "../../queue/notification.queue";
 import { decodeSessionDevice, mergeSessionDevicePreservingLocation } from "../../utils/session-device";
+import { EmailType } from "../../types/mail.types";
 
 /**
  * Service handling Pure Business Logic for Users.
@@ -246,6 +247,31 @@ export class UserLogic {
 
         const newPasswordHash = await BunPassword.hash(data.new_password, { algorithm: "bcrypt", cost: 10 });
         await this.userRepository.updateUserPassword(userId, newPasswordHash);
+
+        // Best effort security notification: do not block password update if mail enqueue fails.
+        try {
+            const userName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.email;
+            await mailQueue.add(EmailType.PASSWORD_CHANGED, {
+                to: user.email,
+                subject: "Alerte de sécurité: votre mot de passe a été modifié",
+                data: {
+                    template: EmailType.PASSWORD_CHANGED,
+                    userName,
+                    changedAt: new Date().toISOString(),
+                    supportEmail: "support@matchapp.fr",
+                    text: "Alerte de sécurité: le mot de passe de votre compte Match a été modifié. Si vous ne reconnaissez pas cette activité ou si vous n'êtes pas à l'origine de ce changement, répondez à cet email ou contactez immédiatement support@matchapp.fr.",
+                },
+            }, {
+                removeOnComplete: true,
+                attempts: 3,
+                backoff: {
+                    type: "exponential" as const,
+                    delay: 1000,
+                },
+            });
+        } catch (error) {
+            console.error("[USER] Password changed email enqueue failed:", error);
+        }
         
         return true;
     }

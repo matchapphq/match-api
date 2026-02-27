@@ -9,6 +9,7 @@ import { getAccountDeletionTemplate } from './account-deletion';
 import { getBugReportTemplate } from './bug-report';
 import { getDataExportRequestTemplate } from './data-export-request';
 import { getBaseLayout } from './layout';
+import { getPasswordChangedTemplate } from './password-changed';
 
 const TEMPLATE_ALIASES: Record<string, EmailType> = {
   welcome: EmailType.WELCOME,
@@ -22,6 +23,9 @@ const TEMPLATE_ALIASES: Record<string, EmailType> = {
   'forgot-password': EmailType.FORGOT_PASSWORD,
   reset_password: EmailType.RESET_PASSWORD,
   'reset-password': EmailType.RESET_PASSWORD,
+  passwordchanged: EmailType.PASSWORD_CHANGED,
+  password_changed: EmailType.PASSWORD_CHANGED,
+  'password-changed': EmailType.PASSWORD_CHANGED,
   reservation_confirmation: EmailType.RESERVATION_CONFIRMATION,
   'reservation-confirmation': EmailType.RESERVATION_CONFIRMATION,
   account_deletion: EmailType.ACCOUNT_DELETION,
@@ -48,6 +52,8 @@ export const getEmailTemplate = (type: EmailType | string, data: any): string =>
     case EmailType.RESET_PASSWORD:
     case EmailType.FORGOT_PASSWORD:
       return getResetPasswordTemplate(data);
+    case EmailType.PASSWORD_CHANGED:
+      return getPasswordChangedTemplate(data);
     case EmailType.WELCOME:
       return getWelcomeTemplate(data);
     case EmailType.WELCOME_BACK:
