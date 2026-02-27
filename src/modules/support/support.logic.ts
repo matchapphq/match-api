@@ -5,6 +5,7 @@ import { EmailType } from "../../types/mail.types";
 
 export class SupportLogic {
     private static readonly DATA_EXPORT_RECIPIENT = "data@matchapp.fr";
+    private static readonly BUG_REPORT_RECIPIENT = "dev@matchapp.fr";
 
     private static buildDataExportText(data: {
         traceId: string;
@@ -75,11 +76,10 @@ export class SupportLogic {
         description: string;
         metadata?: any;
     }) {
-        const adminEmail = process.env.SMTP_SEND_MAIL || 'support@matchapp.fr';
         const traceId = randomUUIDv7();
         // Queue the bug report email to the admin
         await mailQueue.add(EmailType.BUG_REPORT, {
-            to: adminEmail,
+            to: process.env.BUG_REPORT_EMAIL || SupportLogic.BUG_REPORT_RECIPIENT,
             traceId,
             data: {
                 subject: `[BUG REPORT] ${data.userName}`,
