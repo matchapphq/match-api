@@ -30,7 +30,13 @@ export const authMiddleware = createMiddleware(async (c, next) => {
         return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const payload = await JwtUtils.verifyAccessToken(token);
+    let payload;
+    try {
+        payload = await JwtUtils.verifyAccessToken(token);
+    } catch (error) {
+        console.error("[AUTH_MIDDLEWARE] Failed to verify access token:", error);
+        return c.json({ error: "Failed to verify access token" }, 500);
+    }
 
     if (!payload) {
         return c.json({ error: "Invalid token" }, 401);

@@ -15,6 +15,11 @@ export type SessionDeviceInfo = {
 
 const SESSION_DEVICE_PREFIX = "session:v1:";
 const SESSION_LOCATION_CACHE_MS = 10 * 60 * 1000;
+const SESSION_LOCATION_CACHE_MAX_ENTRIES = 1024;
+const SESSION_GEOIP_LOOKUP_DEADLINE_MS = 1500;
+const SESSION_GEOIP_PROVIDER_TIMEOUT_MS = 700;
+const MAX_SESSION_USER_AGENT_LENGTH = 512;
+const MAX_SESSION_LOCATION_LENGTH = 120;
 
 const sessionLocationCache = new Map<
     string,
@@ -29,6 +34,12 @@ const sanitize = (value: string | null | undefined): string | null => {
     if (typeof value !== "string") return null;
     const trimmed = value.trim();
     return trimmed.length > 0 ? trimmed : null;
+};
+
+const trimToMaxLength = (value: string | null | undefined, maxLength: number): string | null => {
+    const sanitized = sanitize(value);
+    if (!sanitized) return null;
+    return sanitized.slice(0, maxLength);
 };
 
 const isSessionGeoIpEnabled = (): boolean => process.env.SESSION_GEOIP_ENABLED !== "false";
@@ -162,14 +173,18 @@ const normalizeLocation = (payload: {
     country?: unknown;
     country_name?: unknown;
 }): SessionLocation | null => {
-    const city = sanitize(typeof payload.city === "string" ? payload.city : null);
-    const region = sanitize(typeof payload.region === "string" ? payload.region : null);
-    const country = sanitize(
+    const city = trimToMaxLength(typeof payload.city === "string" ? payload.city : null, MAX_SESSION_LOCATION_LENGTH);
+    const region = trimToMaxLength(
+        typeof payload.region === "string" ? payload.region : null,
+        MAX_SESSION_LOCATION_LENGTH,
+    );
+    const country = trimToMaxLength(
         typeof payload.country_name === "string"
             ? payload.country_name
             : typeof payload.country === "string"
               ? payload.country
               : null,
+        MAX_SESSION_LOCATION_LENGTH,
     );
 
     if (!city && !region && !country) {
@@ -192,10 +207,24 @@ const getCachedSessionLocation = (ip: string): SessionLocation | null | undefine
 };
 
 const setCachedSessionLocation = (ip: string, location: SessionLocation | null): SessionLocation | null => {
+    const now = Date.now();
+    for (const [cachedIp, cached] of sessionLocationCache) {
+        if (cached.expiresAt <= now) {
+            sessionLocationCache.delete(cachedIp);
+        }
+    }
+
     sessionLocationCache.set(ip, {
-        expiresAt: Date.now() + SESSION_LOCATION_CACHE_MS,
+        expiresAt: now + SESSION_LOCATION_CACHE_MS,
         location,
     });
+
+    while (sessionLocationCache.size > SESSION_LOCATION_CACHE_MAX_ENTRIES) {
+        const oldestIp = sessionLocationCache.keys().next().value;
+        if (!oldestIp) break;
+        sessionLocationCache.delete(oldestIp);
+    }
+
     return location;
 };
 
@@ -205,11 +234,17 @@ const fetchSessionLocationForIp = async (ip: string): Promise<SessionLocation | 
     }
 
     const providers = getSessionGeoIpProviders(ip);
+    const deadlineAt = Date.now() + SESSION_GEOIP_LOOKUP_DEADLINE_MS;
 
     for (const provider of providers) {
+        const remainingMs = deadlineAt - Date.now();
+        if (remainingMs <= 0) {
+            break;
+        }
+
         try {
             const response = await axios.get(provider, {
-                timeout: 1500,
+                timeout: Math.min(SESSION_GEOIP_PROVIDER_TIMEOUT_MS, remainingMs),
                 headers: {
                     Accept: "application/json",
                 },
@@ -274,11 +309,10 @@ const resolveLocationFromIp = async (ip: string | null): Promise<SessionLocation
 
 export const encodeSessionDevice = (info: SessionDeviceInfo): string => {
     const payload = {
-        ua: info.userAgent,
-        ip: info.ip,
-        city: info.location.city,
-        region: info.location.region,
-        country: info.location.country,
+        ua: trimToMaxLength(info.userAgent, MAX_SESSION_USER_AGENT_LENGTH) || "Unknown",
+        city: trimToMaxLength(info.location.city, MAX_SESSION_LOCATION_LENGTH),
+        region: trimToMaxLength(info.location.region, MAX_SESSION_LOCATION_LENGTH),
+        country: trimToMaxLength(info.location.country, MAX_SESSION_LOCATION_LENGTH),
     };
     return `${SESSION_DEVICE_PREFIX}${JSON.stringify(payload)}`;
 };
@@ -291,12 +325,24 @@ export const mergeSessionDevicePreservingLocation = (
     const next = decodeSessionDevice(nextRawDevice);
 
     const merged: SessionDeviceInfo = {
-        userAgent: sanitize(next.userAgent) || sanitize(previous.userAgent) || "Unknown",
-        ip: next.ip || previous.ip || null,
+        userAgent:
+            trimToMaxLength(next.userAgent, MAX_SESSION_USER_AGENT_LENGTH) ||
+            trimToMaxLength(previous.userAgent, MAX_SESSION_USER_AGENT_LENGTH) ||
+            "Unknown",
+        ip: null,
         location: {
-            city: next.location.city || previous.location.city || null,
-            region: next.location.region || previous.location.region || null,
-            country: next.location.country || previous.location.country || null,
+            city:
+                trimToMaxLength(next.location.city, MAX_SESSION_LOCATION_LENGTH) ||
+                trimToMaxLength(previous.location.city, MAX_SESSION_LOCATION_LENGTH) ||
+                null,
+            region:
+                trimToMaxLength(next.location.region, MAX_SESSION_LOCATION_LENGTH) ||
+                trimToMaxLength(previous.location.region, MAX_SESSION_LOCATION_LENGTH) ||
+                null,
+            country:
+                trimToMaxLength(next.location.country, MAX_SESSION_LOCATION_LENGTH) ||
+                trimToMaxLength(previous.location.country, MAX_SESSION_LOCATION_LENGTH) ||
+                null,
         },
     };
 
@@ -322,12 +368,12 @@ export const decodeSessionDevice = (rawDevice: string): SessionDeviceInfo => {
         };
 
         return {
-            userAgent: sanitize(parsed.ua as string | undefined) || "Unknown",
-            ip: sanitize(parsed.ip as string | undefined),
+            userAgent: trimToMaxLength(parsed.ua as string | undefined, MAX_SESSION_USER_AGENT_LENGTH) || "Unknown",
+            ip: null,
             location: {
-                city: sanitize(parsed.city as string | undefined),
-                region: sanitize(parsed.region as string | undefined),
-                country: sanitize(parsed.country as string | undefined),
+                city: trimToMaxLength(parsed.city as string | undefined, MAX_SESSION_LOCATION_LENGTH),
+                region: trimToMaxLength(parsed.region as string | undefined, MAX_SESSION_LOCATION_LENGTH),
+                country: trimToMaxLength(parsed.country as string | undefined, MAX_SESSION_LOCATION_LENGTH),
             },
         };
     } catch {
@@ -343,7 +389,7 @@ export const resolveSessionDeviceFromHeaders = async (
     headers: Headers,
     fallbackUserAgent: string | null | undefined,
 ): Promise<SessionDeviceInfo> => {
-    const userAgent = sanitize(fallbackUserAgent) || "Unknown";
+    const userAgent = trimToMaxLength(fallbackUserAgent, MAX_SESSION_USER_AGENT_LENGTH) || "Unknown";
     const ip =
         normalizeIp(
             firstHeaderValue(headers, [

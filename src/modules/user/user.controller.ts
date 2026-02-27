@@ -33,6 +33,7 @@ const SessionParamSchema = z.object({
  */
 class UserController {
     private readonly factory = createFactory<HonoEnv>();
+    private static readonly MAX_LOCATION_OVERRIDE_LENGTH = 120;
 
     constructor(private readonly userLogic: UserLogic) {}
 
@@ -74,7 +75,8 @@ class UserController {
         const clean = (value: unknown): string | null => {
             if (typeof value !== "string") return null;
             const trimmed = value.trim();
-            return trimmed.length > 0 ? trimmed : null;
+            if (trimmed.length === 0) return null;
+            return trimmed.slice(0, UserController.MAX_LOCATION_OVERRIDE_LENGTH);
         };
 
         const city = clean(Reflect.get(maybeLocation as object, "city"));

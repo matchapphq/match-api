@@ -28,7 +28,17 @@ class TokenRepository {
     }
 
     async getTokenById(sessionId: string) {
-        return (await db.select().from(tokenTable).where(eq(tokenTable.id, sessionId)))[0] ?? null;
+        return (
+            await db
+                .select({
+                    id: tokenTable.id,
+                    userId: tokenTable.userId,
+                    device: tokenTable.device,
+                    updated_at: tokenTable.updated_at,
+                })
+                .from(tokenTable)
+                .where(eq(tokenTable.id, sessionId))
+        )[0] ?? null;
     }
 
     async getAllTokensByUserId(userId: string) {
@@ -138,11 +148,6 @@ class TokenRepository {
         }
 
         throw new Error("Invalid token");
-    }
-
-    private toMs(value: Date | string | null | undefined) {
-        if (!value) return 0;
-        return value instanceof Date ? value.getTime() : new Date(value).getTime();
     }
 }
 

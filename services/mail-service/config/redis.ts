@@ -8,7 +8,7 @@ function getRedisPort(): number {
     if (!rawPort) return DEFAULT_REDIS_PORT;
 
     const port = Number(rawPort);
-    if (!Number.isInteger(port) || port < 0 || port > 65535) {
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) {
         console.warn(
             `[MAIL SERVICE]: Invalid REDIS_PORT "${rawPort}", falling back to ${DEFAULT_REDIS_PORT}.`,
         );
