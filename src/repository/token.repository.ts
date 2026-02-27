@@ -1,6 +1,6 @@
 import { tokenTable } from "../config/db/token.table";
 import { db } from "../config/config.db";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { password } from "bun";
 
 class TokenRepository {
@@ -61,8 +61,12 @@ class TokenRepository {
             return 0;
         }
 
-        await Promise.all(sessionIds.map((sessionId) => this.deleteToken(sessionId)));
-        return sessionIds.length;
+        const deletedTokens = await db
+            .delete(tokenTable)
+            .where(inArray(tokenTable.id, sessionIds))
+            .returning();
+
+        return deletedTokens.length;
     }
 
     async touchNearestSessionByIssuedAt(
