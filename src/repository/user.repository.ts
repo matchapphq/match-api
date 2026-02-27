@@ -79,8 +79,8 @@ const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
 };
 
 const DEFAULT_PRIVACY_PREFERENCES: PrivacyPreferences = {
-    analytics_consent: true,
-    marketing_consent: true,
+    analytics_consent: false,
+    marketing_consent: false,
     legal_updates_email: true,
 };
 
