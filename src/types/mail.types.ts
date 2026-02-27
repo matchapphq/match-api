@@ -10,6 +10,7 @@ export interface MailEnvVars {
 
 export enum EmailType {
     WELCOME = 'welcome',
+    WELCOME_BACK = 'welcome-back',
     WELCOME_PARTNER = 'welcome-partner',
     VENUE_PAYMENT_SUCCESS = 'venue-payment-success',
     FORGOT_PASSWORD = 'forgot-password',

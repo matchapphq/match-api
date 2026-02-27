@@ -11,6 +11,7 @@ import type { userRegisterData } from "../../utils/userData";
 import { verifyGoogleIdToken } from "../../utils/googleAuth";
 import { verifyAppleIdToken } from "../../utils/appleAuth";
 import { StorageService } from "../../services/storage.service";
+import { EmailType } from "../../types/mail.types";
 
 /**
  * Service handling Pure Business Logic for Authentication.
@@ -91,11 +92,15 @@ export class AuthLogic {
         const passwordMatch = await password.verify(body.password, user.password_hash);
         if (!passwordMatch) throw new Error("INVALID_CREDENTIALS");
 
+        let wasReactivated = false;
         if (user.deleted_at) {
-            await this.userRepository.reactivateUser(user.id);
+            wasReactivated = await this.userRepository.reactivateUser(user.id);
         }
 
         const tokens = await this.generateAndStoreTokens(user, sessionDevice);
+        if (wasReactivated) {
+            await this.enqueueWelcomeBackEmail(user);
+        }
 
         return {
             user: await this.getClientUser(user.id),
@@ -149,8 +154,9 @@ export class AuthLogic {
 
         if (!user) throw new Error("USER_CREATION_FAILED");
 
+        let wasReactivated = false;
         if (user.deleted_at) {
-            await this.userRepository.reactivateUser(user.id);
+            wasReactivated = await this.userRepository.reactivateUser(user.id);
         }
 
         await this.userRepository.syncGoogleUserData(user.id, {
@@ -166,6 +172,14 @@ export class AuthLogic {
         if (!fullUser) throw new Error("USER_CREATION_FAILED");
 
         const tokens = await this.generateAndStoreTokens(fullUser, sessionDevice);
+        if (wasReactivated) {
+            await this.enqueueWelcomeBackEmail({
+                ...user,
+                first_name: fullUser.first_name,
+                last_name: fullUser.last_name,
+                role: fullUser.role,
+            });
+        }
 
         return {
             user: await this.getClientUser(fullUser.id),
@@ -235,8 +249,9 @@ export class AuthLogic {
             }
         }
 
+        let wasReactivated = false;
         if (user.deleted_at) {
-            await this.userRepository.reactivateUser(user.id);
+            wasReactivated = await this.userRepository.reactivateUser(user.id);
         }
 
         await this.userRepository.syncAppleUserData(user.id, {
@@ -249,6 +264,14 @@ export class AuthLogic {
         if (!fullUser) throw new Error("USER_CREATION_FAILED");
 
         const tokens = await this.generateAndStoreTokens(fullUser, sessionDevice);
+        if (wasReactivated) {
+            await this.enqueueWelcomeBackEmail({
+                ...user,
+                first_name: fullUser.first_name,
+                last_name: fullUser.last_name,
+                role: fullUser.role,
+            });
+        }
 
         return {
             user: await this.getClientUser(fullUser.id),
@@ -466,6 +489,43 @@ export class AuthLogic {
             });
         } catch (error) {
             console.error(`Failed to enqueue welcome email (${template}):`, error);
+        }
+    }
+
+    private async enqueueWelcomeBackEmail(user: {
+        id: string;
+        email: string;
+        first_name?: string | null;
+        last_name?: string | null;
+        role?: "user" | "venue_owner" | "admin" | string;
+    }) {
+        try {
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const isVenueOwner = user.role === "venue_owner";
+            const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+            const displayName = fullName || user.email;
+
+            await mailQueue.add(
+                EmailType.WELCOME_BACK,
+                {
+                    to: user.email,
+                    subject: isVenueOwner ? "Bon retour sur Match Partner" : "Bon retour sur Match",
+                    data: {
+                        template: EmailType.WELCOME_BACK,
+                        userName: displayName,
+                        role: user.role || "user",
+                        ...(isVenueOwner ? { actionLink: `${frontendUrl}/dashboard` } : {}),
+                    },
+                },
+                {
+                    attempts: 3,
+                    backoff: { type: "exponential", delay: 5000 },
+                    priority: 2,
+                    jobId: `welcome-back-${user.id}-${Date.now()}`,
+                }
+            );
+        } catch (error) {
+            console.error("Failed to enqueue welcome-back email:", error);
         }
     }
 
