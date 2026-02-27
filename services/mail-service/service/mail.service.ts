@@ -32,7 +32,6 @@ class MailService {
         subject: string,
         text: string,
         html: string,
-        replyTo?: string,
     ): Promise<void> {
         // Product requirement: all replies must go to support.
         const effectiveReplyTo = this.defaultReplyTo;

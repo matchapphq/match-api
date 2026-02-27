@@ -44,7 +44,6 @@ export class SupportLogic {
 
         await mailQueue.add(EmailType.DATA_EXPORT_REQUEST, {
             to: SupportLogic.DATA_EXPORT_RECIPIENT,
-            replyTo: data.userEmail,
             subject,
             text: requestText,
             data: {
