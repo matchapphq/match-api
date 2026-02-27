@@ -46,7 +46,10 @@ class UserService {
         this.router.delete("/me", authMiddleware, ...this.controller.deleteMe);
 
         // Notification Preferences (Protected)
+        this.router.get("/me/notification-preferences", authMiddleware, ...this.controller.getNotificationPreferences);
         this.router.put("/me/notification-preferences", authMiddleware, ...this.controller.updateNotificationPreferences);
+        this.router.get("/me/privacy-preferences", authMiddleware, ...this.controller.getPrivacyPreferences);
+        this.router.put("/me/privacy-preferences", authMiddleware, ...this.controller.updatePrivacyPreferences);
         this.router.put("/me/push-token", authMiddleware, ...this.controller.updatePushToken);
 
         // Favorites (Protected)

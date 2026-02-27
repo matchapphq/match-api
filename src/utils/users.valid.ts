@@ -15,5 +15,27 @@ export const UpdatePasswordSchema = z.object({
     path: ["confirm_password"],
 });
 
+export const UpdateNotificationPreferencesSchema = z.object({
+    email_reservations: z.boolean().optional(),
+    email_marketing: z.boolean().optional(),
+    email_updates: z.boolean().optional(),
+    push_reservations: z.boolean().optional(),
+    push_marketing: z.boolean().optional(),
+    push_updates: z.boolean().optional(),
+    sms_reservations: z.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+    message: "At least one notification preference must be provided",
+});
+
+export const UpdatePrivacyPreferencesSchema = z.object({
+    analytics_consent: z.boolean().optional(),
+    marketing_consent: z.boolean().optional(),
+    legal_updates_email: z.boolean().optional(),
+}).refine((data) => Object.keys(data).length > 0, {
+    message: "At least one privacy preference must be provided",
+});
+
 export type DeleteRequestSchemaType = z.infer<typeof DeleteRequestSchema>;
 export type UpdatePasswordSchemaType = z.infer<typeof UpdatePasswordSchema>;
+export type UpdateNotificationPreferencesSchemaType = z.infer<typeof UpdateNotificationPreferencesSchema>;
+export type UpdatePrivacyPreferencesSchemaType = z.infer<typeof UpdatePrivacyPreferencesSchema>;

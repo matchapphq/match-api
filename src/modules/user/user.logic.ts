@@ -142,6 +142,40 @@ export class UserLogic {
 
         return this.getUserProfile(userId);
     }
+
+    async getNotificationPreferences(userId: string) {
+        return await this.userRepository.getNotificationPreferences(userId);
+    }
+
+    async updateNotificationPreferences(
+        userId: string,
+        updates: {
+            email_reservations?: boolean;
+            email_marketing?: boolean;
+            email_updates?: boolean;
+            push_reservations?: boolean;
+            push_marketing?: boolean;
+            push_updates?: boolean;
+            sms_reservations?: boolean;
+        }
+    ) {
+        return await this.userRepository.updateNotificationPreferences(userId, updates);
+    }
+
+    async getPrivacyPreferences(userId: string) {
+        return await this.userRepository.getPrivacyPreferences(userId);
+    }
+
+    async updatePrivacyPreferences(
+        userId: string,
+        updates: {
+            analytics_consent?: boolean;
+            marketing_consent?: boolean;
+            legal_updates_email?: boolean;
+        }
+    ) {
+        return await this.userRepository.updatePrivacyPreferences(userId, updates);
+    }
     
     /**
      * Delete user account after verifying password.

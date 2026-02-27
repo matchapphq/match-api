@@ -14,6 +14,38 @@ export interface SavePreferencesData {
     fav_team_ids?: string[];
 }
 
+export interface NotificationPreferences {
+    email_reservations: boolean;
+    email_marketing: boolean;
+    email_updates: boolean;
+    push_reservations: boolean;
+    push_marketing: boolean;
+    push_updates: boolean;
+    sms_reservations: boolean;
+}
+
+export interface UpdateNotificationPreferencesData {
+    email_reservations?: boolean;
+    email_marketing?: boolean;
+    email_updates?: boolean;
+    push_reservations?: boolean;
+    push_marketing?: boolean;
+    push_updates?: boolean;
+    sms_reservations?: boolean;
+}
+
+export interface PrivacyPreferences {
+    analytics_consent: boolean;
+    marketing_consent: boolean;
+    legal_updates_email: boolean;
+}
+
+export interface UpdatePrivacyPreferencesData {
+    analytics_consent?: boolean;
+    marketing_consent?: boolean;
+    legal_updates_email?: boolean;
+}
+
 type AuthUser = {
     id: string;
     email: string;
@@ -36,7 +68,102 @@ const toAuthUser = (user: typeof usersTable.$inferSelect): AuthUser => ({
     is_active: Boolean(user.is_active),
 });
 
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+    email_reservations: true,
+    email_marketing: false,
+    email_updates: true,
+    push_reservations: true,
+    push_marketing: false,
+    push_updates: true,
+    sms_reservations: false,
+};
+
+const DEFAULT_PRIVACY_PREFERENCES: PrivacyPreferences = {
+    analytics_consent: true,
+    marketing_consent: true,
+    legal_updates_email: true,
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return value as Record<string, unknown>;
+};
+
+const asBoolean = (value: unknown, fallback: boolean): boolean =>
+    typeof value === "boolean" ? value : fallback;
+
+const normalizeNotificationPreferences = (settings: unknown): NotificationPreferences => {
+    const raw = asRecord(settings);
+    const legacyEmail = asBoolean(raw.email, DEFAULT_NOTIFICATION_PREFERENCES.email_updates);
+    const legacyPush = asBoolean(raw.push, DEFAULT_NOTIFICATION_PREFERENCES.push_updates);
+    const legacySms = asBoolean(raw.sms, DEFAULT_NOTIFICATION_PREFERENCES.sms_reservations);
+    const legacyMarketing = asBoolean(raw.marketing, DEFAULT_NOTIFICATION_PREFERENCES.email_marketing);
+
+    return {
+        email_reservations: asBoolean(raw.email_reservations, legacyEmail),
+        email_marketing: asBoolean(raw.email_marketing, legacyMarketing),
+        email_updates: asBoolean(raw.email_updates, legacyEmail),
+        push_reservations: asBoolean(raw.push_reservations, legacyPush),
+        push_marketing: asBoolean(raw.push_marketing, legacyMarketing),
+        push_updates: asBoolean(raw.push_updates, legacyPush),
+        sms_reservations: asBoolean(raw.sms_reservations, legacySms),
+    };
+};
+
+const normalizePrivacyPreferences = (settings: unknown): PrivacyPreferences => {
+    const raw = asRecord(settings);
+
+    return {
+        analytics_consent: asBoolean(raw.analytics_consent, DEFAULT_PRIVACY_PREFERENCES.analytics_consent),
+        marketing_consent: asBoolean(raw.marketing_consent, DEFAULT_PRIVACY_PREFERENCES.marketing_consent),
+        legal_updates_email: asBoolean(raw.legal_updates_email, DEFAULT_PRIVACY_PREFERENCES.legal_updates_email),
+    };
+};
+
+const mergePreferenceSettings = (
+    existingSettings: Record<string, unknown>,
+    notifications: NotificationPreferences,
+    privacy: PrivacyPreferences
+): Record<string, unknown> => ({
+    ...existingSettings,
+    ...notifications,
+    ...privacy,
+    // Legacy keys kept for backward compatibility with old payloads/readers.
+    email: notifications.email_reservations || notifications.email_updates,
+    push: notifications.push_reservations || notifications.push_updates,
+    sms: notifications.sms_reservations,
+    marketing: notifications.email_marketing || notifications.push_marketing || privacy.marketing_consent,
+});
+
 class UserRepository {
+    private async getUserPreferenceRow(userId: string) {
+        const [preferences] = await db.select({
+            id: userPreferencesTable.id,
+            notification_settings: userPreferencesTable.notification_settings,
+        }).from(userPreferencesTable).where(eq(userPreferencesTable.user_id, userId));
+
+        return preferences ?? null;
+    }
+
+    private async upsertPreferenceSettings(userId: string, settings: Record<string, unknown>) {
+        const existing = await this.getUserPreferenceRow(userId);
+        const payload: Partial<NewUserPreferences> = {
+            notification_settings: settings,
+            updated_at: new Date(),
+        };
+
+        if (existing) {
+            await db.update(userPreferencesTable)
+                .set(payload)
+                .where(eq(userPreferencesTable.id, existing.id));
+            return;
+        }
+
+        await db.insert(userPreferencesTable).values({
+            user_id: userId,
+            ...payload,
+        } as NewUserPreferences);
+    }
     
     public async getMe(user: { id: string }) {
         return await db.select({
@@ -293,6 +420,54 @@ class UserRepository {
                 ...preferenceData,
             } as NewUserPreferences).returning())[0];
         }
+    }
+
+    public async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+        const existing = await this.getUserPreferenceRow(userId);
+        return normalizeNotificationPreferences(existing?.notification_settings);
+    }
+
+    public async updateNotificationPreferences(
+        userId: string,
+        updates: UpdateNotificationPreferencesData
+    ): Promise<NotificationPreferences> {
+        const existing = await this.getUserPreferenceRow(userId);
+        const existingSettings = asRecord(existing?.notification_settings);
+
+        const nextNotifications: NotificationPreferences = {
+            ...normalizeNotificationPreferences(existingSettings),
+            ...updates,
+        };
+
+        const nextPrivacy = normalizePrivacyPreferences(existingSettings);
+        const mergedSettings = mergePreferenceSettings(existingSettings, nextNotifications, nextPrivacy);
+        await this.upsertPreferenceSettings(userId, mergedSettings);
+
+        return nextNotifications;
+    }
+
+    public async getPrivacyPreferences(userId: string): Promise<PrivacyPreferences> {
+        const existing = await this.getUserPreferenceRow(userId);
+        return normalizePrivacyPreferences(existing?.notification_settings);
+    }
+
+    public async updatePrivacyPreferences(
+        userId: string,
+        updates: UpdatePrivacyPreferencesData
+    ): Promise<PrivacyPreferences> {
+        const existing = await this.getUserPreferenceRow(userId);
+        const existingSettings = asRecord(existing?.notification_settings);
+
+        const nextNotifications = normalizeNotificationPreferences(existingSettings);
+        const nextPrivacy: PrivacyPreferences = {
+            ...normalizePrivacyPreferences(existingSettings),
+            ...updates,
+        };
+
+        const mergedSettings = mergePreferenceSettings(existingSettings, nextNotifications, nextPrivacy);
+        await this.upsertPreferenceSettings(userId, mergedSettings);
+
+        return nextPrivacy;
     }
     
     public async doesUserExist(email: string): Promise<boolean> {

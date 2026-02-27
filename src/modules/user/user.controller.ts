@@ -5,7 +5,16 @@ import type { Context } from "hono";
 import type { HonoEnv } from "../../types/hono.types";
 import { UserLogic } from "./user.logic";
 import { zValidator } from "@hono/zod-validator";
-import { DeleteRequestSchema, type DeleteRequestSchemaType, UpdatePasswordSchema, type UpdatePasswordSchemaType } from "../../utils/users.valid";
+import {
+    DeleteRequestSchema,
+    type DeleteRequestSchemaType,
+    UpdateNotificationPreferencesSchema,
+    type UpdateNotificationPreferencesSchemaType,
+    UpdatePasswordSchema,
+    type UpdatePasswordSchemaType,
+    UpdatePrivacyPreferencesSchema,
+    type UpdatePrivacyPreferencesSchemaType,
+} from "../../utils/users.valid";
 import { encodeSessionDevice, resolveSessionDeviceFromHeaders } from "../../utils/session-device";
 
 // Validation schema for pagination
@@ -267,9 +276,61 @@ class UserController {
         return ctx.json({ msg: "Get public user profile" });
     });
 
-    readonly updateNotificationPreferences = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({ msg: "Update notification settings" });
+    readonly getNotificationPreferences = this.factory.createHandlers(async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const preferences = await this.userLogic.getNotificationPreferences(userId);
+            return ctx.json(preferences);
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Error fetching notification preferences:", error);
+            return ctx.json({ error: "Failed to fetch notification preferences" }, 500);
+        }
     });
+
+    readonly updateNotificationPreferences = this.factory.createHandlers(
+        zValidator("json", UpdateNotificationPreferencesSchema),
+        async (ctx) => {
+            try {
+                const userId = this.getUserId(ctx);
+                const body: UpdateNotificationPreferencesSchemaType = ctx.req.valid("json");
+                const preferences = await this.userLogic.updateNotificationPreferences(userId, body);
+                return ctx.json(preferences);
+            } catch (error: any) {
+                if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+                console.error("Error updating notification preferences:", error);
+                return ctx.json({ error: "Failed to update notification preferences" }, 500);
+            }
+        },
+    );
+
+    readonly getPrivacyPreferences = this.factory.createHandlers(async (ctx) => {
+        try {
+            const userId = this.getUserId(ctx);
+            const preferences = await this.userLogic.getPrivacyPreferences(userId);
+            return ctx.json(preferences);
+        } catch (error: any) {
+            if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+            console.error("Error fetching privacy preferences:", error);
+            return ctx.json({ error: "Failed to fetch privacy preferences" }, 500);
+        }
+    });
+
+    readonly updatePrivacyPreferences = this.factory.createHandlers(
+        zValidator("json", UpdatePrivacyPreferencesSchema),
+        async (ctx) => {
+            try {
+                const userId = this.getUserId(ctx);
+                const body: UpdatePrivacyPreferencesSchemaType = ctx.req.valid("json");
+                const preferences = await this.userLogic.updatePrivacyPreferences(userId, body);
+                return ctx.json(preferences);
+            } catch (error: any) {
+                if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
+                console.error("Error updating privacy preferences:", error);
+                return ctx.json({ error: "Failed to update privacy preferences" }, 500);
+            }
+        },
+    );
 
     /**
      * POST /users/me/session-heartbeat
