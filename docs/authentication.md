@@ -47,6 +47,12 @@ Unlike pure stateless JWT, we store the hash of active Refresh Tokens in the `to
 - Instantly logout a user from all devices (`DELETE FROM tokens WHERE user_id = ...`).
 - Detect **Refresh Token Reuse**: If an old token is used twice, we know it's a potential breach and can revoke all sessions for that user.
 
+### Session-bound JWTs
+- Access and refresh tokens carry a session id (`sid`).
+- Authenticated requests validate that `sid` still exists in the `tokens` table.
+- Sessions older than `SESSION_INACTIVITY_DAYS` without heartbeat activity are revoked automatically.
+- `POST /api/users/me/session-heartbeat` refreshes the current session activity timestamp.
+
 ### Cookie vs Header
 - **Web Clients**: Use `httpOnly` cookies automatically handled by the browser.
 - **Mobile Clients**: Use the JSON response body to store tokens in secure storage.

@@ -33,6 +33,9 @@ This document lists all environment variables required to run the Match API.
 | `REFRESH_SECRET_KEY` | Key for signing Refresh JWTs |
 | `ACCESS_JWT_SIGN_KEY` | Signed cookie key for Access tokens |
 | `REFRESH_JWT_SIGN_KEY` | Signed cookie key for Refresh tokens |
+| `SESSION_INACTIVITY_DAYS` | Max inactivity window before a session is auto-revoked (default: `7`) |
+| `ACCOUNT_DELETION_GRACE_DAYS` | Soft-delete grace period before permanent account purge (default: `30`) |
+| `ACCOUNT_DELETION_CLEANUP_INTERVAL_HOURS` | Interval between deleted-account purge runs (default: `6`) |
 | `QR_SECRET` | Secret for HMAC-signing reservation QRs |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID (primary audience accepted for `POST /auth/google`) |
 | `GOOGLE_CLIENT_IDS` | Optional comma-separated list of additional accepted Google client IDs (web/ios/android) |
@@ -60,6 +63,10 @@ This document lists all environment variables required to run the Match API.
 | `SMTP_PASSWORD` | SMTP password |
 | `SMTP_SEND_MAIL` | Default "from" email address |
 | `SMTP_SEND_NAME` | Default "from" name |
+| `SMTP_NO_REPLY` | Optional override for the SMTP sender address used as the visible `from` |
+| `SUPPORT_EMAIL` | Reply-to mailbox used for all outgoing emails (default: `support@matchapp.fr`) |
+| `BUG_REPORT_EMAIL` | Destination mailbox for bug reports (default: `dev@matchapp.fr`) |
+| `DATA_EXPORT_EMAIL` | Destination mailbox for GDPR export requests (default: `data@matchapp.fr`) |
 
 ## 📍 Services
 
@@ -67,6 +74,16 @@ This document lists all environment variables required to run the Match API.
 | :--- | :--- |
 | `REDIS_URL` | Redis connection for BullMQ |
 | `LOCATIONIQ_KEY` | API Key for Geocoding (Address to Lat/Lng) |
+| `SESSION_GEOIP_ENABLED` | Enable server-side IP-to-location fallback when proxy geo headers are missing (default: enabled unless set to `false`) |
+| `SESSION_GEOIP_PROVIDER_URL` | Optional single GeoIP provider template using `{ip}` placeholder |
+
+## 🧾 Account Deactivation Notes
+
+- `ACCOUNT_DELETION_GRACE_DAYS` is the source of truth for:
+  - API responses from `GET/PUT /api/users/me/privacy-preferences`
+  - account-deactivation emails
+  - web/mobile account-deactivation UI copy
+- Clients do not define this value locally. Change it in the backend env and restart the API.
 
 ## 📁 Media Storage (S3 / Cloudflare R2)
 

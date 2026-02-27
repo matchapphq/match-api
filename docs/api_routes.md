@@ -132,6 +132,7 @@ Request body:
 Response: 200
 {
   token: string;
+  refresh_token: string;
 }
 ```
 
@@ -308,6 +309,15 @@ Response: 200
 ```typescript
 Headers: Authorization: Bearer <token>
 
+Optional request body:
+{
+  location?: {
+    city?: string | null;
+    region?: string | null;
+    country?: string | null;
+  };
+}
+
 Response: 200
 {
   success: true;
@@ -343,12 +353,59 @@ Response: 200
 ### DELETE /api/users/me
 **Delete user account (soft delete)**
 
+Soft-deletes the account immediately, revokes active sessions, and keeps the account recoverable
+for `ACCOUNT_DELETION_GRACE_DAYS` days before permanent purge.
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  reason: string;
+  details?: string;
+  password: string;
+}
+
+Response: 200
+{
+  msg: "Delete user account";
+}
+```
+
+### GET /api/users/me/privacy-preferences
+**Get privacy preferences and account-deactivation grace period metadata**
+
 ```typescript
 Headers: Authorization: Bearer <token>
 
 Response: 200
 {
-  message: string;
+  analytics_consent: boolean;
+  marketing_consent: boolean;
+  legal_updates_email: boolean;
+  account_deletion_grace_days: number;
+}
+```
+
+### PUT /api/users/me/privacy-preferences
+**Update privacy preferences**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body:
+{
+  analytics_consent?: boolean;
+  marketing_consent?: boolean;
+  legal_updates_email?: boolean;
+}
+
+Response: 200
+{
+  analytics_consent: boolean;
+  marketing_consent: boolean;
+  legal_updates_email: boolean;
+  account_deletion_grace_days: number;
 }
 ```
 
@@ -360,16 +417,24 @@ Headers: Authorization: Bearer <token>
 
 Request body:
 {
-  email_notifications?: boolean;
-  push_notifications?: boolean;
-  sms_notifications?: boolean;
-  match_notifications?: boolean;
-  reservation_reminders?: boolean;
+  email_reservations?: boolean;
+  email_marketing?: boolean;
+  email_updates?: boolean;
+  push_reservations?: boolean;
+  push_marketing?: boolean;
+  push_updates?: boolean;
+  sms_reservations?: boolean;
 }
 
 Response: 200
 {
-  notification_preferences: object;
+  email_reservations: boolean;
+  email_marketing: boolean;
+  email_updates: boolean;
+  push_reservations: boolean;
+  push_marketing: boolean;
+  push_updates: boolean;
+  sms_reservations: boolean;
 }
 ```
 
