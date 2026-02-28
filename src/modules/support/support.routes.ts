@@ -18,6 +18,7 @@ export default class SupportService {
 
   private initRoutes() {
     this.router.post("/bug-report", (c) => this.controller.reportBug(c));
+    this.router.post("/contact-request", authMiddleware, (c) => this.controller.requestSupportContact(c));
     this.router.post("/data-export-request", authMiddleware, (c) => this.controller.requestDataExport(c));
   }
 
