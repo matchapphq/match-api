@@ -8,6 +8,7 @@ import { getReservationConfirmationTemplate } from './reservation-confirmation';
 import { getAccountDeletionTemplate } from './account-deletion';
 import { getBugReportTemplate } from './bug-report';
 import { getDataExportRequestTemplate } from './data-export-request';
+import { getSupportContactRequestTemplate } from './support-contact-request';
 import { getBaseLayout } from './layout';
 import { getPasswordChangedTemplate } from './password-changed';
 
@@ -34,6 +35,8 @@ const TEMPLATE_ALIASES: Record<string, EmailType> = {
   'bug-report': EmailType.BUG_REPORT,
   data_export_request: EmailType.DATA_EXPORT_REQUEST,
   'data-export-request': EmailType.DATA_EXPORT_REQUEST,
+  support_contact_request: EmailType.SUPPORT_CONTACT_REQUEST,
+  'support-contact-request': EmailType.SUPPORT_CONTACT_REQUEST,
 };
 
 const normalizeTemplateType = (type: EmailType | string): EmailType | null => {
@@ -70,6 +73,8 @@ export const getEmailTemplate = (type: EmailType | string, data: any): string =>
       return getBugReportTemplate(data);
     case EmailType.DATA_EXPORT_REQUEST:
       return getDataExportRequestTemplate(data);
+    case EmailType.SUPPORT_CONTACT_REQUEST:
+      return getSupportContactRequestTemplate(data);
     default:
       return getBaseLayout(`<p>${data.text || 'Message from Match'}</p>`, 'Match Notification');
   }
