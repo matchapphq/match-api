@@ -20,6 +20,7 @@ export enum EmailType {
     ACCOUNT_DELETION = 'account-deletion',
     BUG_REPORT = 'bug-report',
     DATA_EXPORT_REQUEST = 'data-export-request',
+    SUPPORT_CONTACT_REQUEST = 'support-contact-request',
 }
 
 export const mailEnvVars: MailEnvVars = {
