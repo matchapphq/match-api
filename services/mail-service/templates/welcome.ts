@@ -15,7 +15,7 @@ export const getWelcomeTemplate = (data: WelcomeData) => {
     <div class="text-center my-32">
       <a href="${data.actionLink}" class="button">Trouver un match</a>
     </div>
-    <p>Si vous avez des questions, n'hésitez pas à répondre à cet email.</p>
+    <p>Si vous avez des questions, contactez-nous à support@matchapp.fr.</p>
   `;
   
   return getBaseLayout(content, 'Bienvenue sur Match !');

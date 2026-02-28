@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { db } from "../config/config.db";
 import { userDeleteReasonsTable, userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
 import type { userRegisterData } from "../utils/userData";
@@ -14,6 +14,38 @@ export interface SavePreferencesData {
     fav_team_ids?: string[];
 }
 
+export interface NotificationPreferences {
+    email_reservations: boolean;
+    email_marketing: boolean;
+    email_updates: boolean;
+    push_reservations: boolean;
+    push_marketing: boolean;
+    push_updates: boolean;
+    sms_reservations: boolean;
+}
+
+export interface UpdateNotificationPreferencesData {
+    email_reservations?: boolean;
+    email_marketing?: boolean;
+    email_updates?: boolean;
+    push_reservations?: boolean;
+    push_marketing?: boolean;
+    push_updates?: boolean;
+    sms_reservations?: boolean;
+}
+
+export interface PrivacyPreferences {
+    analytics_consent: boolean;
+    marketing_consent: boolean;
+    legal_updates_email: boolean;
+}
+
+export interface UpdatePrivacyPreferencesData {
+    analytics_consent?: boolean;
+    marketing_consent?: boolean;
+    legal_updates_email?: boolean;
+}
+
 type AuthUser = {
     id: string;
     email: string;
@@ -21,6 +53,8 @@ type AuthUser = {
     role: 'user' | 'venue_owner' | 'admin';
     first_name: string | null;
     last_name: string | null;
+    deleted_at: Date | null;
+    is_active: boolean;
 };
 
 const toAuthUser = (user: typeof usersTable.$inferSelect): AuthUser => ({
@@ -30,9 +64,106 @@ const toAuthUser = (user: typeof usersTable.$inferSelect): AuthUser => ({
     role: user.role,
     first_name: user.first_name,
     last_name: user.last_name,
+    deleted_at: user.deleted_at,
+    is_active: Boolean(user.is_active),
+});
+
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+    email_reservations: true,
+    email_marketing: false,
+    email_updates: true,
+    push_reservations: true,
+    push_marketing: false,
+    push_updates: true,
+    sms_reservations: false,
+};
+
+const DEFAULT_PRIVACY_PREFERENCES: PrivacyPreferences = {
+    analytics_consent: false,
+    marketing_consent: false,
+    legal_updates_email: true,
+};
+
+const asRecord = (value: unknown): Record<string, unknown> => {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return value as Record<string, unknown>;
+};
+
+const asBoolean = (value: unknown, fallback: boolean): boolean =>
+    typeof value === "boolean" ? value : fallback;
+
+const normalizeNotificationPreferences = (settings: unknown): NotificationPreferences => {
+    const raw = asRecord(settings);
+    const legacyEmail = asBoolean(raw.email, DEFAULT_NOTIFICATION_PREFERENCES.email_updates);
+    const legacyPush = asBoolean(raw.push, DEFAULT_NOTIFICATION_PREFERENCES.push_updates);
+    const legacySms = asBoolean(raw.sms, DEFAULT_NOTIFICATION_PREFERENCES.sms_reservations);
+    const legacyMarketing = asBoolean(raw.marketing, DEFAULT_NOTIFICATION_PREFERENCES.email_marketing);
+
+    return {
+        email_reservations: asBoolean(raw.email_reservations, legacyEmail),
+        email_marketing: asBoolean(raw.email_marketing, legacyMarketing),
+        email_updates: asBoolean(raw.email_updates, legacyEmail),
+        push_reservations: asBoolean(raw.push_reservations, legacyPush),
+        push_marketing: asBoolean(raw.push_marketing, legacyMarketing),
+        push_updates: asBoolean(raw.push_updates, legacyPush),
+        sms_reservations: asBoolean(raw.sms_reservations, legacySms),
+    };
+};
+
+const normalizePrivacyPreferences = (settings: unknown): PrivacyPreferences => {
+    const raw = asRecord(settings);
+
+    return {
+        analytics_consent: asBoolean(raw.analytics_consent, DEFAULT_PRIVACY_PREFERENCES.analytics_consent),
+        marketing_consent: asBoolean(raw.marketing_consent, DEFAULT_PRIVACY_PREFERENCES.marketing_consent),
+        legal_updates_email: asBoolean(raw.legal_updates_email, DEFAULT_PRIVACY_PREFERENCES.legal_updates_email),
+    };
+};
+
+const mergePreferenceSettings = (
+    existingSettings: Record<string, unknown>,
+    notifications: NotificationPreferences,
+    privacy: PrivacyPreferences
+): Record<string, unknown> => ({
+    ...existingSettings,
+    ...notifications,
+    ...privacy,
+    // Legacy keys kept for backward compatibility with old payloads/readers.
+    email: notifications.email_reservations || notifications.email_updates,
+    push: notifications.push_reservations || notifications.push_updates,
+    sms: notifications.sms_reservations,
+    marketing: notifications.email_marketing || notifications.push_marketing || privacy.marketing_consent,
 });
 
 class UserRepository {
+    private async getUserPreferenceRow(userId: string) {
+        const [preferences] = await db.select({
+            id: userPreferencesTable.id,
+            notification_settings: userPreferencesTable.notification_settings,
+        }).from(userPreferencesTable).where(eq(userPreferencesTable.user_id, userId));
+
+        return preferences ?? null;
+    }
+
+    private async upsertPreferenceSettings(userId: string, settings: Record<string, unknown>) {
+        const existing = await this.getUserPreferenceRow(userId);
+        const payload: Partial<NewUserPreferences> = {
+            notification_settings: settings,
+            updated_at: new Date(),
+        };
+
+        if (existing) {
+            await db.update(userPreferencesTable)
+                .set(payload)
+                .where(eq(userPreferencesTable.id, existing.id));
+            return;
+        }
+
+        await db.insert(userPreferencesTable).values({
+            user_id: userId,
+            ...payload,
+        } as NewUserPreferences);
+    }
     
     public async getMe(user: { id: string }) {
         return await db.select({
@@ -64,9 +195,15 @@ class UserRepository {
             password_hash: usersTable.password_hash,
             role: usersTable.role,
             first_name: usersTable.first_name,
-            last_name: usersTable.last_name
+            last_name: usersTable.last_name,
+            deleted_at: usersTable.deleted_at,
+            is_active: usersTable.is_active,
         }).from(usersTable).where(eq(usersTable.email, email));
-        return user;
+        if (!user) return undefined;
+        return {
+            ...user,
+            is_active: Boolean(user.is_active),
+        };
     }
 
     public async getUserByAppleId(appleId: string): Promise<AuthUser | undefined> {
@@ -77,8 +214,14 @@ class UserRepository {
             role: usersTable.role,
             first_name: usersTable.first_name,
             last_name: usersTable.last_name,
+            deleted_at: usersTable.deleted_at,
+            is_active: usersTable.is_active,
         }).from(usersTable).where(eq(usersTable.apple_id, appleId));
-        return user;
+        if (!user) return undefined;
+        return {
+            ...user,
+            is_active: Boolean(user.is_active),
+        };
     }
 
     public async getUserById(id: string) {
@@ -278,6 +421,54 @@ class UserRepository {
             } as NewUserPreferences).returning())[0];
         }
     }
+
+    public async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+        const existing = await this.getUserPreferenceRow(userId);
+        return normalizeNotificationPreferences(existing?.notification_settings);
+    }
+
+    public async updateNotificationPreferences(
+        userId: string,
+        updates: UpdateNotificationPreferencesData
+    ): Promise<NotificationPreferences> {
+        const existing = await this.getUserPreferenceRow(userId);
+        const existingSettings = asRecord(existing?.notification_settings);
+
+        const nextNotifications: NotificationPreferences = {
+            ...normalizeNotificationPreferences(existingSettings),
+            ...updates,
+        };
+
+        const nextPrivacy = normalizePrivacyPreferences(existingSettings);
+        const mergedSettings = mergePreferenceSettings(existingSettings, nextNotifications, nextPrivacy);
+        await this.upsertPreferenceSettings(userId, mergedSettings);
+
+        return nextNotifications;
+    }
+
+    public async getPrivacyPreferences(userId: string): Promise<PrivacyPreferences> {
+        const existing = await this.getUserPreferenceRow(userId);
+        return normalizePrivacyPreferences(existing?.notification_settings);
+    }
+
+    public async updatePrivacyPreferences(
+        userId: string,
+        updates: UpdatePrivacyPreferencesData
+    ): Promise<PrivacyPreferences> {
+        const existing = await this.getUserPreferenceRow(userId);
+        const existingSettings = asRecord(existing?.notification_settings);
+
+        const nextNotifications = normalizeNotificationPreferences(existingSettings);
+        const nextPrivacy: PrivacyPreferences = {
+            ...normalizePrivacyPreferences(existingSettings),
+            ...updates,
+        };
+
+        const mergedSettings = mergePreferenceSettings(existingSettings, nextNotifications, nextPrivacy);
+        await this.upsertPreferenceSettings(userId, mergedSettings);
+
+        return nextPrivacy;
+    }
     
     public async doesUserExist(email: string): Promise<boolean> {
         const user = await this.getUserByEmail(email);
@@ -285,13 +476,60 @@ class UserRepository {
     }
     
     public async deleteUser(userId: string, reason: string, details?: string): Promise<void> {
-        await Promise.all([
-            db.delete(usersTable).where(eq(usersTable.id, userId)),
-            db.insert(userDeleteReasonsTable).values({
+        const softDeletedUsers = await db
+            .update(usersTable)
+            .set({
+                deleted_at: new Date(),
+                is_active: false,
+                updated_at: new Date(),
+            })
+            .where(eq(usersTable.id, userId))
+            .returning();
+
+        if (softDeletedUsers.length === 0) {
+            throw new Error("USER_NOT_FOUND");
+        }
+
+        try {
+            await db.insert(userDeleteReasonsTable).values({
                 reason: reason,
                 details: details ?? null,
+            });
+        } catch (error) {
+            console.error("[USER_REPOSITORY] Failed to store deletion reason:", error);
+        }
+    }
+
+    public async reactivateUser(userId: string): Promise<boolean> {
+        const reactivatedUsers = await db
+            .update(usersTable)
+            .set({
+                deleted_at: null,
+                is_active: true,
+                updated_at: new Date(),
             })
-        ]);
+            .where(eq(usersTable.id, userId))
+            .returning();
+
+        return reactivatedUsers.length > 0;
+    }
+
+    public async deleteUserPermanentlyById(userId: string): Promise<boolean> {
+        const deletedUsers = await db
+            .delete(usersTable)
+            .where(eq(usersTable.id, userId))
+            .returning();
+
+        return deletedUsers.length > 0;
+    }
+
+    public async purgeDeletedUsersBefore(cutoffDate: Date): Promise<number> {
+        const deletedUsers = await db
+            .delete(usersTable)
+            .where(and(isNotNull(usersTable.deleted_at), lte(usersTable.deleted_at, cutoffDate)))
+            .returning();
+
+        return deletedUsers.length;
     }
 }
 

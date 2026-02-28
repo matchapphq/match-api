@@ -5,6 +5,7 @@ import type { HonoEnv } from "../../types/hono.types";
 import { UserLogic } from "./user.logic";
 import UserRepository from "../../repository/user.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
+import TokenRepository from "../../repository/token.repository";
 import { StorageService } from "../../services/storage.service";
 
 /**
@@ -23,8 +24,9 @@ class UserService {
         // 1. Manual Dependency Injection (NestJS Module style)
         const userRepository = new UserRepository();
         const favoritesRepository = new FavoritesRepository();
+        const tokenRepository = new TokenRepository();
         const storageService = new StorageService();
-        const userLogic = new UserLogic(userRepository, favoritesRepository, storageService);
+        const userLogic = new UserLogic(userRepository, favoritesRepository, tokenRepository, storageService);
         
         this.controller = new UserController(userLogic);
 
@@ -37,10 +39,17 @@ class UserService {
         this.router.get("/me", authMiddleware, ...this.controller.getMe);
         this.router.put("/me", authMiddleware, ...this.controller.updateMe);
         this.router.put("/me/password", authMiddleware, ...this.controller.updatePassword);
+        this.router.post("/me/session-heartbeat", authMiddleware, ...this.controller.touchSessionHeartbeat);
+        this.router.get("/me/sessions", authMiddleware, ...this.controller.getSessions);
+        this.router.delete("/me/sessions/others", authMiddleware, ...this.controller.revokeOtherSessions);
+        this.router.delete("/me/sessions/:sessionId", authMiddleware, ...this.controller.revokeSession);
         this.router.delete("/me", authMiddleware, ...this.controller.deleteMe);
 
         // Notification Preferences (Protected)
+        this.router.get("/me/notification-preferences", authMiddleware, ...this.controller.getNotificationPreferences);
         this.router.put("/me/notification-preferences", authMiddleware, ...this.controller.updateNotificationPreferences);
+        this.router.get("/me/privacy-preferences", authMiddleware, ...this.controller.getPrivacyPreferences);
+        this.router.put("/me/privacy-preferences", authMiddleware, ...this.controller.updatePrivacyPreferences);
         this.router.put("/me/push-token", authMiddleware, ...this.controller.updatePushToken);
 
         // Favorites (Protected)

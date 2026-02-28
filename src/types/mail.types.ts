@@ -10,11 +10,16 @@ export interface MailEnvVars {
 
 export enum EmailType {
     WELCOME = 'welcome',
+    WELCOME_BACK = 'welcome-back',
     WELCOME_PARTNER = 'welcome-partner',
     VENUE_PAYMENT_SUCCESS = 'venue-payment-success',
     FORGOT_PASSWORD = 'forgot-password',
     RESET_PASSWORD = 'reset-password',
+    PASSWORD_CHANGED = 'password-changed',
     RESERVATION_CONFIRMATION = 'reservation-confirmation',
+    ACCOUNT_DELETION = 'account-deletion',
+    BUG_REPORT = 'bug-report',
+    DATA_EXPORT_REQUEST = 'data-export-request',
 }
 
 export const mailEnvVars: MailEnvVars = {
