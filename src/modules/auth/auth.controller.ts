@@ -199,6 +199,109 @@ class AuthController {
         },
     );
 
+    public readonly googleLogin = this.factory.createHandlers(
+        zValidator("json", GoogleLoginRequestSchema),
+        async (ctx) => {
+            const { id_token } = ctx.req.valid("json");
+            const deviceId = ctx.req.header("User-Agent") || "Unknown";
+
+            try {
+                const { user, accessToken, refreshToken, isNewUser } = await this.authLogic.googleLogin(
+                    id_token,
+                    deviceId
+                );
+
+                await this.setAuthCookies(ctx, accessToken, refreshToken);
+
+                return ctx.json({
+                    user,
+                    token: accessToken,
+                    refresh_token: refreshToken,
+                    is_new_user: isNewUser,
+                });
+            } catch (error: any) {
+                if (error.message === "GOOGLE_OAUTH_NOT_CONFIGURED") {
+                    return ctx.json({ error: "Google OAuth is not configured on server" }, 500);
+                }
+
+                if (
+                    [
+                        "GOOGLE_TOKEN_INVALID",
+                        "GOOGLE_INVALID_AUDIENCE",
+                        "GOOGLE_INVALID_ISSUER",
+                        "GOOGLE_EMAIL_NOT_VERIFIED",
+                        "GOOGLE_TOKEN_EXPIRED",
+                    ].includes(error.message)
+                ) {
+                    return ctx.json({ error: "Invalid Google token" }, 401);
+                }
+
+                if (error.message === "GOOGLE_USER_NOT_FOUND") {
+                    return ctx.json({ error: "No account found for this Google email" }, 404);
+                }
+
+                console.error("Google login error:", error);
+                return ctx.json({ error: "Google login failed" }, 500);
+            }
+        }
+    );
+
+    public readonly appleLogin = this.factory.createHandlers(
+        zValidator("json", AppleLoginRequestSchema),
+        async (ctx) => {
+            const { id_token, first_name, last_name } = ctx.req.valid("json");
+            const deviceId = ctx.req.header("User-Agent") || "Unknown";
+
+            try {
+                const { user, accessToken, refreshToken, isNewUser } = await this.authLogic.appleLogin(
+                    id_token,
+                    deviceId,
+                    {
+                        firstName: first_name,
+                        lastName: last_name,
+                    }
+                );
+
+                await this.setAuthCookies(ctx, accessToken, refreshToken);
+
+                return ctx.json({
+                    user,
+                    token: accessToken,
+                    refresh_token: refreshToken,
+                    is_new_user: isNewUser,
+                });
+            } catch (error: any) {
+                if (
+                    ["APPLE_OAUTH_NOT_CONFIGURED", "APPLE_KEYS_FETCH_FAILED"].includes(error.message)
+                ) {
+                    return ctx.json({ error: "Apple OAuth is not configured on server" }, 500);
+                }
+
+                if (
+                    [
+                        "APPLE_TOKEN_INVALID",
+                        "APPLE_INVALID_SIGNATURE",
+                        "APPLE_SIGNING_KEY_NOT_FOUND",
+                        "APPLE_INVALID_ISSUER",
+                        "APPLE_INVALID_AUDIENCE",
+                        "APPLE_TOKEN_EXPIRED",
+                        "APPLE_SUB_MISSING",
+                        "APPLE_EMAIL_NOT_VERIFIED",
+                    ].includes(error.message)
+                ) {
+                    return ctx.json({ error: "Invalid Apple token" }, 401);
+                }
+
+                if (error.message === "APPLE_EMAIL_REQUIRED_FOR_SIGNUP") {
+                    return ctx.json({ error: "Apple email is required on first login" }, 400);
+                }
+
+                console.error("Apple login error:", error);
+                return ctx.json({ error: "Apple login failed" }, 500);
+            }
+        }
+    );
+
     public readonly refreshToken = this.factory.createHandlers(async (ctx) => {
         let oldToken = await getSignedCookie(ctx, JwtUtils.REFRESH_JWT_SIGN_KEY, "refresh_token");
 

@@ -96,5 +96,16 @@ This document lists all environment variables required to run the Match API.
 | `S3_ENDPOINT` | Optional custom endpoint (for R2/Minio) | `https://<id>.r2.cloudflarestorage.com` |
 | `S3_PUBLIC_URL` | Optional custom public URL / CDN | `https://cdn.matchapp.fr` |
 
+## 📁 Media Storage (S3 / Cloudflare R2)
+
+| Variable | Description | Example |
+| :--- | :--- | :--- |
+| `S3_ACCESS_KEY_ID` | S3 Access Key | `AKIA...` |
+| `S3_SECRET_ACCESS_KEY` | S3 Secret Key | `secret...` |
+| `S3_BUCKET` | S3 Bucket Name | `match-media` |
+| `S3_REGION` | S3 Region (default: us-east-1) | `eu-west-3` |
+| `S3_ENDPOINT` | Optional custom endpoint (for R2/Minio) | `https://<id>.r2.cloudflarestorage.com` |
+| `S3_PUBLIC_URL` | Optional custom public URL / CDN | `https://cdn.matchapp.fr` |
+
 ---
 [« Back to Documentation Index](./index.md)
