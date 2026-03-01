@@ -323,6 +323,8 @@ export class PartnerLogic {
             phone: venueData.phone || '',
             email: venueData.email || '',
             capacity: venueData.capacity || 0,
+            type: venueData.type || 'sports_bar',
+            description: venueData.description || null,
         });
 
         return { 
