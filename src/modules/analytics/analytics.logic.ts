@@ -15,7 +15,7 @@ export class AnalyticsLogic {
     async getVenueOverview(venueId: string, startDate?: Date, endDate?: Date) {
         return await this.analyticsRepo.getOverview(venueId, {
             startDate,
-            endDate
+            endDate,
         });
     }
 
@@ -23,7 +23,7 @@ export class AnalyticsLogic {
         return await this.analyticsRepo.getReservationTrends(venueId, {
             startDate,
             endDate,
-            groupBy
+            groupBy,
         });
     }
 
@@ -31,7 +31,7 @@ export class AnalyticsLogic {
         return await this.analyticsRepo.getRevenueTrends(venueId, {
             startDate,
             endDate,
-            groupBy
+            groupBy,
         });
     }
 }

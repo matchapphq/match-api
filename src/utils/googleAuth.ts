@@ -45,7 +45,7 @@ export async function verifyGoogleIdToken(idToken: string): Promise<GoogleProfil
     }
 
     const response = await fetch(
-        `${GOOGLE_TOKEN_INFO_ENDPOINT}?id_token=${encodeURIComponent(idToken)}`
+        `${GOOGLE_TOKEN_INFO_ENDPOINT}?id_token=${encodeURIComponent(idToken)}`,
     );
 
     if (!response.ok) {

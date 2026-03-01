@@ -13,6 +13,6 @@ export const tokenTable = pgTable("tokens", {
     foreignKey({
         columns: [table.userId],
         foreignColumns: [usersTable.id],
-        name: "fk_token_users_id"
-    }).onDelete('cascade')
+        name: "fk_token_users_id",
+    }).onDelete('cascade'),
 ])

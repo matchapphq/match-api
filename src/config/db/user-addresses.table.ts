@@ -29,7 +29,7 @@ export const userAddressesTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_user_addresses_user_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type UserAddress = typeof userAddressesTable.$inferSelect;

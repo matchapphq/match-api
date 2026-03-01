@@ -216,7 +216,7 @@ export class BoostLogic {
                         purchaseId,
                         userId,
                         purchase.quantity,
-                        'stripe_payment'
+                        'stripe_payment',
                     );
 
                     console.log(`Created ${boostIds.length} boosts for user ${userId} from purchase ${purchaseId} (via verify fallback)`);

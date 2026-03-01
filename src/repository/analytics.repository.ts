@@ -97,12 +97,12 @@ export class AnalyticsRepository {
         if (venueIds.length === 0) return 0;
 
         const result = await db.select({
-            count: count()
+            count: count(),
         })
         .from(analyticsTable)
         .where(and(
             inArray(analyticsTable.venue_id, venueIds),
-            eq(analyticsTable.event_type, 'venue_view')
+            eq(analyticsTable.event_type, 'venue_view'),
         ));
 
         return Number(result[0]?.count) || 0;
@@ -114,7 +114,7 @@ export class AnalyticsRepository {
     async isVenueOwner(venueId: string, userId: string): Promise<boolean> {
         const venue = await db.query.venuesTable.findFirst({
             where: eq(venuesTable.id, venueId),
-            columns: { owner_id: true }
+            columns: { owner_id: true },
         });
 
         return venue?.owner_id === userId;
@@ -146,7 +146,7 @@ export class AnalyticsRepository {
                 checkedInReservations: 0,
                 averagePartySize: 0,
                 averageOccupancy: 0,
-                topMatches: []
+                topMatches: [],
             };
         }
 
@@ -205,7 +205,7 @@ export class AnalyticsRepository {
             checkedInReservations: periodStats?.checkedIn ?? 0,
             averagePartySize: Math.round((allTimeStats?.avgPartySize ?? 0) * 10) / 10,
             averageOccupancy,
-            topMatches
+            topMatches,
         };
     }
 
@@ -249,7 +249,7 @@ export class AnalyticsRepository {
             awayTeam: teamMap.get(r.awayTeamId) ?? 'Unknown',
             scheduledAt: r.scheduledAt,
             reservationCount: r.reservationCount,
-            totalGuests: r.totalGuests
+            totalGuests: r.totalGuests,
         }));
     }
 
@@ -294,7 +294,7 @@ export class AnalyticsRepository {
             confirmedReservations: r.confirmedReservations,
             canceledReservations: r.canceledReservations,
             checkedInReservations: r.checkedInReservations,
-            totalGuests: r.totalGuests
+            totalGuests: r.totalGuests,
         }));
     }
 
@@ -337,7 +337,7 @@ export class AnalyticsRepository {
             totalGuests: r.totalGuests ?? 0,
             occupancyRate: r.totalCapacity > 0 
                 ? Math.round((r.reservedCapacity / r.totalCapacity) * 100)
-                : 0
+                : 0,
         }));
     }
 
@@ -368,7 +368,7 @@ export class AnalyticsRepository {
                 name: true,
                 city: true,
                 total_reservations: true,
-            }
+            },
         });
     }
 }

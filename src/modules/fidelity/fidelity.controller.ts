@@ -44,7 +44,7 @@ class FidelityController {
             const transactions = await this.fidelityLogic.getPointsHistory(
                 user.id,
                 parseInt(limit),
-                parseInt(offset)
+                parseInt(offset),
             );
 
             const history = transactions.map((t) => ({

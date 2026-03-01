@@ -63,7 +63,7 @@ export const reservationsTable = pgTable(
             foreignColumns: [tablesTable.id],
             name: 'fk_reservations_table_id',
         }).onDelete('set null'),
-    ]
+    ],
 );
 
 export type Reservation = typeof reservationsTable.$inferSelect;

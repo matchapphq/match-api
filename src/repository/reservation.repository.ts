@@ -16,7 +16,7 @@ export class ReservationRepository {
         venueMatchId: string,
         partySize: number,
         specialRequests: string,
-        qrCode: string
+        qrCode: string,
     ) {
         const [reservation] = await db.insert(reservationsTable).values({
             id: reservationId,
@@ -28,7 +28,7 @@ export class ReservationRepository {
             seat_ids: [], // Legacy field
             quantity: partySize,
             special_requests: specialRequests || null,
-            qr_code: qrCode
+            qr_code: qrCode,
         }).returning();
 
         return reservation;
@@ -44,7 +44,7 @@ export class ReservationRepository {
         venueMatchId: string,
         partySize: number,
         specialRequests: string,
-        requiresAccessibility: boolean
+        requiresAccessibility: boolean,
     ) {
         const [reservation] = await db.insert(reservationsTable).values({
             id: reservationId,
@@ -56,7 +56,7 @@ export class ReservationRepository {
             seat_ids: [],
             quantity: partySize,
             special_requests: specialRequests || null,
-            qr_code: null // No QR until confirmed by venue
+            qr_code: null, // No QR until confirmed by venue
         }).returning();
 
         return reservation;
@@ -71,7 +71,7 @@ export class ReservationRepository {
         tableId: string | null,
         venueMatchId: string,
         partySize: number,
-        specialRequests: string = ""
+        specialRequests: string = "",
     ) {
         const [reservation] = await db.insert(reservationsTable).values({
             user_id: userId,
@@ -82,7 +82,7 @@ export class ReservationRepository {
             seat_ids: [], // Legacy field
             quantity: partySize,
             special_requests: specialRequests || null,
-            qr_code: crypto.randomUUID() // Unique placeholder
+            qr_code: crypto.randomUUID(), // Unique placeholder
         }).returning();
 
         return reservation;
@@ -106,17 +106,17 @@ export class ReservationRepository {
                                 city: true,
                                 street_address: true,
                                 phone: true,
-                            }
+                            },
                         },
                         match: {
                             with: {
                                 homeTeam: true,
                                 awayTeam: true,
-                            }
-                        }
-                    }
-                }
-            }
+                            },
+                        },
+                    },
+                },
+            },
         });
     }
 
@@ -136,17 +136,17 @@ export class ReservationRepository {
                                 name: true,
                                 city: true,
                                 street_address: true,
-                            }
+                            },
                         },
                         match: {
                             with: {
                                 homeTeam: true,
                                 awayTeam: true,
-                            }
-                        }
-                    }
-                }
-            }
+                            },
+                        },
+                    },
+                },
+            },
         });
     }
 
@@ -166,18 +166,18 @@ export class ReservationRepository {
                                 name: true,
                                 city: true,
                                 street_address: true,
-                            }
+                            },
                         },
                         match: {
                             with: {
                                 homeTeam: true,
                                 awayTeam: true,
-                            }
-                        }
-                    }
-                }
+                            },
+                        },
+                    },
+                },
             },
-            orderBy: (reservations, { desc }) => [desc(reservations.created_at)]
+            orderBy: (reservations, { desc }) => [desc(reservations.created_at)],
         });
     }
 
@@ -188,12 +188,12 @@ export class ReservationRepository {
         return await db.query.reservationsTable.findMany({
             where: and(
                 eq(reservationsTable.venue_match_id, venueMatchId),
-                inArray(reservationsTable.status, ['confirmed', 'checked_in'])
+                inArray(reservationsTable.status, ['confirmed', 'checked_in']),
             ),
             with: {
-                table: true
+                table: true,
             },
-            orderBy: (reservations, { asc }) => [asc(reservations.created_at)]
+            orderBy: (reservations, { asc }) => [asc(reservations.created_at)],
         });
     }
 
@@ -205,11 +205,11 @@ export class ReservationRepository {
             .set({
                 status: 'checked_in',
                 checked_in_at: new Date(),
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(and(
                 eq(reservationsTable.id, reservationId),
-                eq(reservationsTable.status, 'confirmed')
+                eq(reservationsTable.status, 'confirmed'),
             ))
             .returning();
 
@@ -225,12 +225,12 @@ export class ReservationRepository {
                 status: 'canceled',
                 canceled_at: new Date(),
                 canceled_reason: reason,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(and(
                 eq(reservationsTable.id, reservationId),
                 eq(reservationsTable.user_id, userId),
-                inArray(reservationsTable.status, ['pending', 'confirmed'])
+                inArray(reservationsTable.status, ['pending', 'confirmed']),
             ))
             .returning();
 
@@ -245,7 +245,7 @@ export class ReservationRepository {
             .set({
                 status: 'completed',
                 completed_at: new Date(),
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(reservationsTable.id, reservationId))
             .returning();
@@ -260,7 +260,7 @@ export class ReservationRepository {
         const [updated] = await db.update(reservationsTable)
             .set({
                 status,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(reservationsTable.id, reservationId))
             .returning();
@@ -272,7 +272,7 @@ export class ReservationRepository {
         const [updated] = await db.update(reservationsTable)
             .set({
                 qr_code: qrCodeContent,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(reservationsTable.id, reservationId))
             .returning();

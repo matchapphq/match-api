@@ -27,6 +27,7 @@ import ReviewsService from "./modules/reviews/reviews.routes";
 import SubscriptionsService from "./modules/subscriptions/subscriptions.routes";
 import SupportService from "./modules/support/support.routes";
 import WebhooksService from "./modules/webhooks/webhooks.routes";
+import UserRepository from "./repository/user.repository";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -51,6 +52,33 @@ const boostRouter = new BoostService();
 const healthRouter = new HealthService();
 const fidelityRouter = new FidelityService();
 const supportRouter = new SupportService();
+const userRepository = new UserRepository();
+
+const parsePositiveNumber = (envValue: string | undefined, fallback: number): number => {
+    const parsed = Number(envValue);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const accountDeletionGraceDays = parsePositiveNumber(process.env.ACCOUNT_DELETION_GRACE_DAYS, 30);
+const accountDeletionCleanupIntervalMs =
+    parsePositiveNumber(process.env.ACCOUNT_DELETION_CLEANUP_INTERVAL_HOURS, 6) * 60 * 60 * 1000;
+
+const runDeletedUsersCleanup = async () => {
+    const cutoffDate = new Date(Date.now() - accountDeletionGraceDays * 24 * 60 * 60 * 1000);
+    try {
+        const purgedCount = await userRepository.purgeDeletedUsersBefore(cutoffDate);
+        if (purgedCount > 0) {
+            console.log(`[ACCOUNT_CLEANUP] Purged ${purgedCount} account(s) deleted before ${cutoffDate.toISOString()}`);
+        }
+    } catch (error) {
+        console.error("[ACCOUNT_CLEANUP] Failed to purge deleted users:", error);
+    }
+};
+
+void runDeletedUsersCleanup();
+setInterval(() => {
+    void runDeletedUsersCleanup();
+}, accountDeletionCleanupIntervalMs);
 
 const app = new Hono().basePath("/api");
 
@@ -62,7 +90,7 @@ app.use('*', cors({
         'http://matchapp.fr',
         'http://localhost:5173',
         'matchapp.fr',
-        process.env.FRONTEND_URL as string
+        process.env.FRONTEND_URL as string,
     ],
     credentials: true,
 }));

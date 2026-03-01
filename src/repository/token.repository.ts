@@ -1,25 +1,19 @@
 import { tokenTable } from "../config/db/token.table";
 import { db } from "../config/config.db";
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, ne } from "drizzle-orm";
 import { password } from "bun";
 
 class TokenRepository {
-    async createToken(token: string, userId: string, device: string): Promise<{ user_id: string }[]> {   
-        let _tokenReturn
+    async createToken(token: string, userId: string, device: string, sessionId?: string): Promise<void> {
         const hashedToken = await password.hash(token, 'bcrypt');
 
         try {
-            _tokenReturn = await db.insert(tokenTable).values({
+            await db.insert(tokenTable).values({
+                ...(sessionId ? { id: sessionId } : {}),
                 hash_token: hashedToken,
                 userId: userId,
                 device: device,
-            }).returning({
-                user_id: tokenTable.userId,
             });
-            if (!_tokenReturn) {
-                throw new Error("Token not created");
-            }
-            return _tokenReturn;
         } catch (error) {
             throw new Error("Failed to create token");
         }
@@ -33,32 +27,111 @@ class TokenRepository {
         return (await db.select().from(tokenTable).where(eq(tokenTable.userId, userId)))[0];
     }
 
+    async getTokenById(sessionId: string) {
+        return (
+            await db
+                .select({
+                    id: tokenTable.id,
+                    userId: tokenTable.userId,
+                    device: tokenTable.device,
+                    updated_at: tokenTable.updated_at,
+                })
+                .from(tokenTable)
+                .where(eq(tokenTable.id, sessionId))
+        )[0] ?? null;
+    }
+
     async getAllTokensByUserId(userId: string) {
         return await db.select().from(tokenTable).where(eq(tokenTable.userId, userId));
     }
 
-    async updateToken(token: string, userId: string, device: string, sessionId: string) {
+    async updateToken(token: string, userId: string, device: string, sessionId: string): Promise<void> {
         const hashedToken = await password.hash(token, 'bcrypt');
+        const existingSession = await this.getTokenById(sessionId);
+        if (!existingSession) {
+            throw new Error("Token not found");
+        }
 
-        const updatedToken = await db.update(tokenTable).set({
+        // Refresh-token rotation should not count as user activity.
+        // Preserve `updated_at`; real activity is tracked by explicit heartbeat touches.
+        await db.update(tokenTable).set({
             hash_token: hashedToken,
             userId: userId,
             device: device,
-        }).where(eq(tokenTable.id, sessionId)).returning({
-            id: tokenTable.id,
-        });
-        if (!updatedToken) {
-            throw new Error("Token not found");
-        }
-        return updatedToken;
+            updated_at: existingSession.updated_at,
+        }).where(eq(tokenTable.id, sessionId));
     }
 
     async deleteToken(sessionId: string): Promise<void> {
         await db.delete(tokenTable).where(eq(tokenTable.id, sessionId));
     }
 
-    async deleteTokensByUserId(userId: string): Promise<void> {
-        await db.delete(tokenTable).where(eq(tokenTable.userId, userId));
+    async deleteTokensByIds(sessionIds: string[]): Promise<number> {
+        if (sessionIds.length === 0) {
+            return 0;
+        }
+
+        const deletedTokens = await db
+            .delete(tokenTable)
+            .where(inArray(tokenTable.id, sessionIds))
+            .returning();
+
+        return deletedTokens.length;
+    }
+
+    async touchSessionById(
+        userId: string,
+        sessionId: string,
+        updates?: { device?: string },
+    ): Promise<boolean> {
+        const session = await this.getTokenById(sessionId);
+        if (!session || session.userId !== userId) {
+            return false;
+        }
+
+        await db
+            .update(tokenTable)
+            .set({
+                updated_at: new Date(),
+                ...(updates?.device ? { device: updates.device } : {}),
+            })
+            .where(eq(tokenTable.id, session.id));
+
+        return true;
+    }
+
+    async deleteTokensByUserId(userId: string): Promise<number> {
+        const existingTokens = await db
+            .select({ id: tokenTable.id })
+            .from(tokenTable)
+            .where(eq(tokenTable.userId, userId));
+
+        if (existingTokens.length === 0) {
+            return 0;
+        }
+
+        await db
+            .delete(tokenTable)
+            .where(eq(tokenTable.userId, userId));
+
+        return existingTokens.length;
+    }
+
+    async deleteTokensByUserIdExcept(userId: string, sessionId: string): Promise<number> {
+        const existingTokens = await db
+            .select({ id: tokenTable.id })
+            .from(tokenTable)
+            .where(and(eq(tokenTable.userId, userId), ne(tokenTable.id, sessionId)));
+
+        if (existingTokens.length === 0) {
+            return 0;
+        }
+
+        await db
+            .delete(tokenTable)
+            .where(and(eq(tokenTable.userId, userId), ne(tokenTable.id, sessionId)));
+
+        return existingTokens.length;
     }
 
     async verifyToken(userID: string, token: string): Promise<boolean> {

@@ -58,7 +58,7 @@ export const matchesTable = pgTable(
             foreignColumns: [teamsTable.id],
             name: 'fk_matches_away_team_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Match = typeof matchesTable.$inferSelect;
@@ -124,7 +124,7 @@ export const venueMatchesTable = pgTable(
             foreignColumns: [matchesTable.id],
             name: 'fk_venue_matches_match_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type VenueMatch = typeof venueMatchesTable.$inferSelect;

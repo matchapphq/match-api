@@ -9,7 +9,7 @@ export class NotificationsLogic {
         const notifications = await this.repository.findByUserId(userId, {
             limit,
             offset,
-            unreadOnly
+            unreadOnly,
         });
 
         const unreadCount = await this.repository.getUnreadCount(userId);
@@ -17,7 +17,7 @@ export class NotificationsLogic {
         return { 
             notifications,
             unreadCount,
-            pagination: { limit, offset }
+            pagination: { limit, offset },
         };
     }
 
@@ -33,7 +33,7 @@ export class NotificationsLogic {
         return { 
             notifications,
             unreadCount,
-            hasNew: notifications.length > 0
+            hasNew: notifications.length > 0,
         };
     }
 
@@ -45,7 +45,7 @@ export class NotificationsLogic {
 
         return { 
             message: "Notification marked as read",
-            notification: updated
+            notification: updated,
         };
     }
 
@@ -54,7 +54,7 @@ export class NotificationsLogic {
 
         return { 
             message: "All notifications marked as read",
-            count
+            count,
         };
     }
 
@@ -78,7 +78,7 @@ export class NotificationsLogic {
             backoff: {
                 type: 'exponential',
                 delay: 1000,
-            }
+            },
         });
         return { success: true, message: "Notification queued" };
     }

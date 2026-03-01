@@ -44,7 +44,7 @@ export const seatHoldsTable = pgTable(
             foreignColumns: [venueMatchesTable.id],
             name: 'fk_seat_holds_venue_match_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type SeatHold = typeof seatHoldsTable.$inferSelect;
@@ -96,7 +96,7 @@ export const seatsTable = pgTable(
             foreignColumns: [venueMatchesTable.id],
             name: 'fk_seats_venue_match_id',
         }).onDelete('set null'),
-    ]
+    ],
 );
 
 export type Seat = typeof seatsTable.$inferSelect;

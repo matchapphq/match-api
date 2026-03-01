@@ -36,7 +36,7 @@ export function createQRPayload(
     userId: string,
     venueMatchId: string,
     tableId: string,
-    matchStartTime: Date
+    matchStartTime: Date,
 ): SignedQRPayload {
     // QR valid until 2 hours after match start
     const expiryBuffer = 2 * 60 * 60 * 1000; // 2 hours
@@ -47,12 +47,12 @@ export function createQRPayload(
         uid: userId,
         mid: venueMatchId,
         tid: tableId,
-        exp
+        exp,
     };
 
     return {
         ...payload,
-        sig: generateSignature(payload)
+        sig: generateSignature(payload),
     };
 }
 
@@ -71,7 +71,7 @@ export function verifyQRPayload(payload: SignedQRPayload): { valid: boolean; err
         uid: payload.uid,
         mid: payload.mid,
         tid: payload.tid,
-        exp: payload.exp
+        exp: payload.exp,
     };
 
     const expectedSig = generateSignature(expectedPayload);
@@ -90,7 +90,7 @@ export async function generateQRCodeImage(payload: SignedQRPayload): Promise<str
     return await QRCode.toDataURL(jsonPayload, {
         errorCorrectionLevel: "M",
         margin: 2,
-        width: 300
+        width: 300,
     });
 }
 

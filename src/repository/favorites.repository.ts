@@ -31,9 +31,9 @@ export class FavoritesRepository {
         const venue = await db.query.venuesTable.findFirst({
             where: and(
                 eq(venuesTable.id, venueId),
-                isNull(venuesTable.deleted_at)
+                isNull(venuesTable.deleted_at),
             ),
-            columns: { id: true, name: true }
+            columns: { id: true, name: true },
         });
 
         if (!venue) {
@@ -44,8 +44,8 @@ export class FavoritesRepository {
         const existing = await db.query.userFavoriteVenuesTable.findFirst({
             where: and(
                 eq(userFavoriteVenuesTable.user_id, userId),
-                eq(userFavoriteVenuesTable.venue_id, venueId)
-            )
+                eq(userFavoriteVenuesTable.venue_id, venueId),
+            ),
         });
 
         if (existing) {
@@ -55,7 +55,7 @@ export class FavoritesRepository {
                     .set({
                         deleted_at: null,
                         note: note ?? existing.note,
-                        updated_at: new Date()
+                        updated_at: new Date(),
                     })
                     .where(eq(userFavoriteVenuesTable.id, existing.id))
                     .returning();
@@ -70,7 +70,7 @@ export class FavoritesRepository {
             .values({
                 user_id: userId,
                 venue_id: venueId,
-                note: note ?? null
+                note: note ?? null,
             })
             .returning();
 
@@ -84,12 +84,12 @@ export class FavoritesRepository {
         const [deleted] = await db.update(userFavoriteVenuesTable)
             .set({
                 deleted_at: new Date(),
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(and(
                 eq(userFavoriteVenuesTable.user_id, userId),
                 eq(userFavoriteVenuesTable.venue_id, venueId),
-                isNull(userFavoriteVenuesTable.deleted_at)
+                isNull(userFavoriteVenuesTable.deleted_at),
             ))
             .returning();
 
@@ -103,12 +103,12 @@ export class FavoritesRepository {
         const [updated] = await db.update(userFavoriteVenuesTable)
             .set({
                 note,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(and(
                 eq(userFavoriteVenuesTable.user_id, userId),
                 eq(userFavoriteVenuesTable.venue_id, venueId),
-                isNull(userFavoriteVenuesTable.deleted_at)
+                isNull(userFavoriteVenuesTable.deleted_at),
             ))
             .returning();
 
@@ -131,7 +131,7 @@ export class FavoritesRepository {
             .where(and(
                 eq(userFavoriteVenuesTable.user_id, userId),
                 isNull(userFavoriteVenuesTable.deleted_at),
-                isNull(venuesTable.deleted_at)
+                isNull(venuesTable.deleted_at),
             ));
 
         const total = countResult[0]?.count ?? 0;
@@ -156,14 +156,14 @@ export class FavoritesRepository {
                 cover_image_url: venuesTable.cover_image_url,
                 average_rating: venuesTable.average_rating,
                 total_reviews: venuesTable.total_reviews,
-            }
+            },
         })
             .from(userFavoriteVenuesTable)
             .innerJoin(venuesTable, eq(userFavoriteVenuesTable.venue_id, venuesTable.id))
             .where(and(
                 eq(userFavoriteVenuesTable.user_id, userId),
                 isNull(userFavoriteVenuesTable.deleted_at),
-                isNull(venuesTable.deleted_at)
+                isNull(venuesTable.deleted_at),
             ))
             .orderBy(desc(userFavoriteVenuesTable.created_at))
             .limit(limit)
@@ -178,8 +178,8 @@ export class FavoritesRepository {
                 limit,
                 total,
                 totalPages,
-                hasMore: page < totalPages
-            }
+                hasMore: page < totalPages,
+            },
         };
     }
 
@@ -191,9 +191,9 @@ export class FavoritesRepository {
             where: and(
                 eq(userFavoriteVenuesTable.user_id, userId),
                 eq(userFavoriteVenuesTable.venue_id, venueId),
-                isNull(userFavoriteVenuesTable.deleted_at)
+                isNull(userFavoriteVenuesTable.deleted_at),
             ),
-            columns: { id: true }
+            columns: { id: true },
         });
 
         return !!favorite;
@@ -207,8 +207,8 @@ export class FavoritesRepository {
             where: and(
                 eq(userFavoriteVenuesTable.user_id, userId),
                 eq(userFavoriteVenuesTable.venue_id, venueId),
-                isNull(userFavoriteVenuesTable.deleted_at)
-            )
+                isNull(userFavoriteVenuesTable.deleted_at),
+            ),
         });
     }
 }

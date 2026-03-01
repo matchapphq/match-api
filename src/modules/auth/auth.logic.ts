@@ -11,24 +11,38 @@ import type { userRegisterData } from "../../utils/userData";
 import { verifyGoogleIdToken } from "../../utils/googleAuth";
 import { verifyAppleIdToken } from "../../utils/appleAuth";
 import { StorageService } from "../../services/storage.service";
+import { EmailType } from "../../types/mail.types";
+
+const parsePositiveDays = (envValue: string | undefined, defaultDays: number): number => {
+    const parsed = Number(envValue);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : defaultDays;
+};
 
 /**
  * Service handling Pure Business Logic for Authentication.
  */
 export class AuthLogic {
+    private readonly sessionInactivityMs =
+        parsePositiveDays(process.env.SESSION_INACTIVITY_DAYS, 7) * 24 * 60 * 60 * 1000;
+    private readonly accountDeletionGraceDays =
+        parsePositiveDays(process.env.ACCOUNT_DELETION_GRACE_DAYS, 30);
+    private readonly accountDeletionGraceMs = this.accountDeletionGraceDays * 24 * 60 * 60 * 1000;
+
     constructor(
         private readonly userRepository: UserRepository,
         private readonly tokenRepository: TokenRepository,
         private readonly authRepository: AuthRepository,
         private readonly referralRepo: typeof referralRepository,
         private readonly redis: Redis,
-        private readonly storageService: StorageService
+        private readonly storageService: StorageService,
     ) {}
 
     /**
      * Register a new user and return user data + tokens.
      */
-    public async register(body: any, deviceId: string) {
+    public async register(body: any, sessionDevice: string) {
+        await this.purgeExpiredDeletedAccounts();
+
         // Check if user already exists
         const existingUser = await this.userRepository.getUserByEmail(body.email);
         if (existingUser) {
@@ -61,7 +75,7 @@ export class AuthLogic {
             await this.enqueueWelcomeEmail(user, "welcome", "/discovery");
         }
 
-        const tokens = await this.generateAndStoreTokens(user, deviceId);
+        const tokens = await this.generateAndStoreTokens(user, sessionDevice);
 
         return { user, ...tokens };
     }
@@ -69,21 +83,33 @@ export class AuthLogic {
     /**
      * Authenticate user and return data + tokens.
      */
-    async login(body: any, deviceId: string) {
+    async login(body: any, sessionDevice: string) {
+        await this.purgeExpiredDeletedAccounts();
+
         const user = await this.userRepository.getUserByEmail(body.email);
         if (!user) throw new Error("INVALID_CREDENTIALS");
+
+        if (this.isDeletionExpired(user.deleted_at)) {
+            await this.userRepository.deleteUserPermanentlyById(user.id).catch(() => undefined);
+            throw new Error("INVALID_CREDENTIALS");
+        }
 
         const passwordMatch = await password.verify(body.password, user.password_hash);
         if (!passwordMatch) throw new Error("INVALID_CREDENTIALS");
 
-        // Fetch full user to get avatar_url
-        const fullUser = await this.userRepository.getUserById(user.id);
+        let wasReactivated = false;
+        if (user.deleted_at) {
+            wasReactivated = await this.userRepository.reactivateUser(user.id);
+        }
 
-        const tokens = await this.generateAndStoreTokens(user, deviceId);
+        const tokens = await this.generateAndStoreTokens(user, sessionDevice);
+        if (wasReactivated) {
+            await this.enqueueWelcomeBackEmail(user);
+        }
 
         return {
             user: await this.getClientUser(user.id),
-            ...tokens
+            ...tokens,
         };
     }
 
@@ -91,12 +117,19 @@ export class AuthLogic {
      * Authenticate user with Google ID token.
      * Creates a user record if no account exists for the Google email.
      */
-    async googleLogin(idToken: string, deviceId: string) {
+    async googleLogin(idToken: string, sessionDevice: string) {
+        await this.purgeExpiredDeletedAccounts();
+
         const googleProfile = await verifyGoogleIdToken(idToken);
 
         // Only keep fields that map to existing user attributes for now.
         let user = await this.userRepository.getUserByEmail(googleProfile.email);
         let isNewUser = false;
+
+        if (user && this.isDeletionExpired(user.deleted_at)) {
+            await this.userRepository.deleteUserPermanentlyById(user.id).catch(() => undefined);
+            user = undefined;
+        }
 
         if (!user) {
             isNewUser = true;
@@ -126,6 +159,11 @@ export class AuthLogic {
 
         if (!user) throw new Error("USER_CREATION_FAILED");
 
+        let wasReactivated = false;
+        if (user.deleted_at) {
+            wasReactivated = await this.userRepository.reactivateUser(user.id);
+        }
+
         await this.userRepository.syncGoogleUserData(user.id, {
             firstName: googleProfile.givenName,
             lastName: googleProfile.familyName,
@@ -138,7 +176,15 @@ export class AuthLogic {
         const fullUser = await this.userRepository.getUserById(user.id);
         if (!fullUser) throw new Error("USER_CREATION_FAILED");
 
-        const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
+        const tokens = await this.generateAndStoreTokens(fullUser, sessionDevice);
+        if (wasReactivated) {
+            await this.enqueueWelcomeBackEmail({
+                ...user,
+                first_name: fullUser.first_name,
+                last_name: fullUser.last_name,
+                role: fullUser.role,
+            });
+        }
 
         return {
             user: await this.getClientUser(fullUser.id),
@@ -153,12 +199,14 @@ export class AuthLogic {
      */
     async appleLogin(
         idToken: string,
-        deviceId: string,
+        sessionDevice: string,
         profileHints?: {
             firstName?: string;
             lastName?: string;
-        }
+        },
     ) {
+        await this.purgeExpiredDeletedAccounts();
+
         const appleProfile = await verifyAppleIdToken(idToken);
 
         const firstName = profileHints?.firstName?.trim() || undefined;
@@ -167,8 +215,17 @@ export class AuthLogic {
         let user = await this.userRepository.getUserByAppleId(appleProfile.sub);
         let isNewUser = false;
 
+        if (user && this.isDeletionExpired(user.deleted_at)) {
+            await this.userRepository.deleteUserPermanentlyById(user.id).catch(() => undefined);
+            user = undefined;
+        }
+
         if (!user && appleProfile.email) {
             user = await this.userRepository.getUserByEmail(appleProfile.email);
+            if (user && this.isDeletionExpired(user.deleted_at)) {
+                await this.userRepository.deleteUserPermanentlyById(user.id).catch(() => undefined);
+                user = undefined;
+            }
         }
 
         if (!user) {
@@ -197,6 +254,11 @@ export class AuthLogic {
             }
         }
 
+        let wasReactivated = false;
+        if (user.deleted_at) {
+            wasReactivated = await this.userRepository.reactivateUser(user.id);
+        }
+
         await this.userRepository.syncAppleUserData(user.id, {
             firstName,
             lastName,
@@ -206,7 +268,15 @@ export class AuthLogic {
         const fullUser = await this.userRepository.getUserById(user.id);
         if (!fullUser) throw new Error("USER_CREATION_FAILED");
 
-        const tokens = await this.generateAndStoreTokens(fullUser, deviceId);
+        const tokens = await this.generateAndStoreTokens(fullUser, sessionDevice);
+        if (wasReactivated) {
+            await this.enqueueWelcomeBackEmail({
+                ...user,
+                first_name: fullUser.first_name,
+                last_name: fullUser.last_name,
+                role: fullUser.role,
+            });
+        }
 
         return {
             user: await this.getClientUser(fullUser.id),
@@ -218,29 +288,110 @@ export class AuthLogic {
     /**
      * Refresh access token using a valid refresh token.
      */
-    async refreshToken(oldRefreshToken: string, deviceId: string) {
+    async refreshToken(oldRefreshToken: string, sessionDevice: string) {
         const payload = await JwtUtils.verifyRefreshToken(oldRefreshToken);
         if (!payload) throw new Error("INVALID_REFRESH_TOKEN");
 
         const dbTokens = await this.tokenRepository.getAllTokensByUserId(payload.id);
         if (!dbTokens || dbTokens.length === 0) throw new Error("INVALID_SESSION");
 
-        let matchedToken = null;
-        for (const t of dbTokens) {
-            const isValid = await password.verify(oldRefreshToken, t.hash_token);
-            if (isValid) {
-                matchedToken = t;
-                break;
+        const activeSessions = await this.filterActiveSessions(payload.id, dbTokens);
+        if (activeSessions.length === 0) {
+            throw new Error("SESSION_EXPIRED_INACTIVE");
+        }
+
+        let matchedToken = null as (typeof activeSessions)[number] | null;
+
+        if (payload.sid) {
+            const sidSession = dbTokens.find((session) => session.id === payload.sid);
+            if (!sidSession) {
+                throw new Error("INVALID_SESSION");
+            }
+
+            const activeSidSession = activeSessions.find((session) => session.id === payload.sid);
+            if (!activeSidSession) {
+                throw new Error("SESSION_EXPIRED_INACTIVE");
+            }
+
+            const isValid = await password.verify(oldRefreshToken, sidSession.hash_token);
+            if (!isValid) {
+                await this.tokenRepository.deleteToken(sidSession.id).catch(() => undefined);
+                throw new Error("SESSION_HIJACK_DETECTED");
+            }
+
+            matchedToken = activeSidSession;
+        } else {
+            for (const t of activeSessions) {
+                const isValid = await password.verify(oldRefreshToken, t.hash_token);
+                if (isValid) {
+                    matchedToken = t;
+                    break;
+                }
+            }
+
+            if (!matchedToken) {
+                for (const t of dbTokens) {
+                    const isValid = await password.verify(oldRefreshToken, t.hash_token);
+                    if (isValid) {
+                        throw new Error("SESSION_EXPIRED_INACTIVE");
+                    }
+                }
+
+                await this.tokenRepository.deleteTokensByUserId(payload.id).catch(() => undefined);
+                throw new Error("SESSION_HIJACK_DETECTED");
             }
         }
 
-        if (!matchedToken) {
-            await this.tokenRepository.deleteTokensByUserId(payload.id);
-            throw new Error("SESSION_HIJACK_DETECTED");
+        const tokens = await this.generateAndStoreTokens(payload, sessionDevice, matchedToken.id);
+        return tokens;
+    }
+
+    /**
+     * Logout current session by revoking the matching refresh token row.
+     * Falls back to nearest session inferred from access token issue time.
+     */
+    async logout(params: {
+        userId?: string;
+        refreshToken?: string | null;
+        tokenIssuedAt?: number;
+        tokenSessionId?: string;
+    }) {
+        const { userId, refreshToken, tokenIssuedAt, tokenSessionId } = params;
+        if (!userId) {
+            return { revoked: false };
         }
 
-        const tokens = await this.generateAndStoreTokens(payload, deviceId, matchedToken.id);
-        return tokens;
+        const dbSessions = await this.tokenRepository.getAllTokensByUserId(userId);
+        const sessions = await this.filterActiveSessions(userId, dbSessions);
+        if (!sessions || sessions.length === 0) {
+            return { revoked: false };
+        }
+
+        if (tokenSessionId) {
+            const session = sessions.find((candidate) => candidate.id === tokenSessionId);
+            if (session) {
+                await this.tokenRepository.deleteToken(session.id);
+                return { revoked: true };
+            }
+        }
+
+        if (refreshToken) {
+            for (const session of sessions) {
+                const isMatch = await password.verify(refreshToken, session.hash_token);
+                if (isMatch) {
+                    await this.tokenRepository.deleteToken(session.id);
+                    return { revoked: true };
+                }
+            }
+        }
+
+        const inferredSessionId = this.resolveCurrentSessionId(sessions, tokenIssuedAt, tokenSessionId);
+        if (!inferredSessionId) {
+            return { revoked: false };
+        }
+
+        await this.tokenRepository.deleteToken(inferredSessionId);
+        return { revoked: true };
     }
 
     /**
@@ -260,7 +411,7 @@ export class AuthLogic {
                 lastName: user.last_name,
                 subject: "Reset Password",
                 code,
-            }
+            },
         }, {
             attempts: 3,
             backoff: { type: "exponential", delay: 5000 },
@@ -292,7 +443,7 @@ export class AuthLogic {
         const passwordHash = await password.hash(newPassword);
         await Promise.all([
             this.userRepository.updateUserPassword(user.id, passwordHash),
-            this.redis.del(`RESET_CODE:${email}`)
+            this.redis.del(`RESET_CODE:${email}`),
         ]);
     }
 
@@ -307,12 +458,14 @@ export class AuthLogic {
 
     // --- Helpers ---
 
-    private async generateAndStoreTokens(user: any, deviceId: string, tokenIdToUpdate?: string) {
+    private async generateAndStoreTokens(user: any, sessionDevice: string, tokenIdToUpdate?: string) {
+        const sessionId = tokenIdToUpdate ?? (randomUUIDv7() as string);
         const tokenPayload: TokenPayload = {
             id: user.id,
             email: user.email,
             role: user.role,
             firstName: user.first_name || user.firstName || null,
+            sid: sessionId,
         };
 
         const [accessToken, refreshToken] = await Promise.all([
@@ -321,9 +474,9 @@ export class AuthLogic {
         ]);
 
         if (tokenIdToUpdate) {
-            await this.tokenRepository.updateToken(refreshToken, user.id, deviceId, tokenIdToUpdate);
+            await this.tokenRepository.updateToken(refreshToken, user.id, sessionDevice, tokenIdToUpdate);
         } else {
-            await this.tokenRepository.createToken(refreshToken, user.id, deviceId);
+            await this.tokenRepository.createToken(refreshToken, user.id, sessionDevice, sessionId);
         }
 
         return { accessToken, refreshToken };
@@ -337,21 +490,126 @@ export class AuthLogic {
                 subject: template === "welcome" ? "Welcome to Match!" : "Welcome to Match Partner!",
                 data: {
                     userName: user.first_name,
-                    actionLink: `${frontendUrl}${path}`
-                }
+                    actionLink: `${frontendUrl}${path}`,
+                },
             }, {
                 attempts: 3,
                 backoff: { type: "exponential", delay: 5000 },
                 priority: 2,
-                jobId: `welcome-${user.id}`
+                jobId: `welcome-${user.id}`,
             });
         } catch (error) {
             console.error(`Failed to enqueue welcome email (${template}):`, error);
         }
     }
 
+    private async enqueueWelcomeBackEmail(user: {
+        id: string;
+        email: string;
+        first_name?: string | null;
+        last_name?: string | null;
+        role?: "user" | "venue_owner" | "admin" | string;
+    }) {
+        try {
+            const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+            const isVenueOwner = user.role === "venue_owner";
+            const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+            const displayName = fullName || user.email;
+
+            await mailQueue.add(
+                EmailType.WELCOME_BACK,
+                {
+                    to: user.email,
+                    subject: isVenueOwner ? "Bon retour sur Match Partner" : "Bon retour sur Match",
+                    data: {
+                        template: EmailType.WELCOME_BACK,
+                        userName: displayName,
+                        role: user.role || "user",
+                        ...(isVenueOwner ? { actionLink: `${frontendUrl}/dashboard` } : {}),
+                    },
+                },
+                {
+                    attempts: 3,
+                    backoff: { type: "exponential", delay: 5000 },
+                    priority: 2,
+                    jobId: `welcome-back-${user.id}-${Date.now()}`,
+                },
+            );
+        } catch (error) {
+            console.error("Failed to enqueue welcome-back email:", error);
+        }
+    }
+
     private normalizeStringArray(value: unknown): string[] {
         return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    }
+
+    private resolveCurrentSessionId(
+        sessions: Array<{ id: string; updated_at: Date | string }>,
+        tokenIssuedAt?: number,
+        tokenSessionId?: string,
+    ): string | null {
+        if (sessions.length === 0) return null;
+
+        if (tokenSessionId && sessions.some((session) => session.id === tokenSessionId)) {
+            return tokenSessionId;
+        }
+
+        if (!tokenIssuedAt) {
+            return sessions
+                .slice()
+                .sort((a, b) => this.toMs(b.updated_at) - this.toMs(a.updated_at))[0]
+                ?.id ?? null;
+        }
+
+        const issuedAtMs = tokenIssuedAt * 1000;
+        return sessions
+            .slice()
+            .sort((a, b) =>
+                Math.abs(this.toMs(a.updated_at) - issuedAtMs) -
+                Math.abs(this.toMs(b.updated_at) - issuedAtMs),
+            )[0]
+            ?.id ?? null;
+    }
+
+    private toMs(value: Date | string | null | undefined) {
+        if (!value) return 0;
+        return value instanceof Date ? value.getTime() : new Date(value).getTime();
+    }
+
+    private async filterActiveSessions<T extends { id: string; updated_at: Date | string }>(
+        userId: string,
+        sessions: T[],
+    ): Promise<T[]> {
+        if (sessions.length === 0) {
+            return sessions;
+        }
+
+        const cutoffMs = Date.now() - this.sessionInactivityMs;
+        const staleSessionIds = sessions
+            .filter((session) => this.toMs(session.updated_at) <= cutoffMs)
+            .map((session) => session.id);
+
+        if (staleSessionIds.length > 0) {
+            await this.tokenRepository.deleteTokensByIds(staleSessionIds);
+        }
+
+        const staleSet = new Set(staleSessionIds);
+        return sessions.filter((session) => !staleSet.has(session.id));
+    }
+
+    private async purgeExpiredDeletedAccounts() {
+        const cutoffDate = new Date(Date.now() - this.accountDeletionGraceMs);
+        try {
+            await this.userRepository.purgeDeletedUsersBefore(cutoffDate);
+        } catch (error) {
+            console.error("[AUTH] Unable to purge expired deleted accounts:", error);
+        }
+    }
+
+    private isDeletionExpired(deletedAt: Date | string | null | undefined) {
+        if (!deletedAt) return false;
+        return this.toMs(deletedAt) <= Date.now() - this.accountDeletionGraceMs;
     }
 
     private async getClientUser(userId: string) {

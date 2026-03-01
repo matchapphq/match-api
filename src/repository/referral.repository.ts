@@ -8,7 +8,7 @@ import {
     type NewReferralCode,
     type NewReferral,
     type NewReferralStats,
-    type NewBoost
+    type NewBoost,
 } from "../config/db/referral.table";
 import { usersTable } from "../config/db/user.table";
 import { eq, and, sql, desc } from "drizzle-orm";
@@ -221,7 +221,7 @@ export class ReferralRepository {
             .from(referralsTable)
             .where(and(
                 eq(referralsTable.referred_user_id, referredUserId),
-                eq(referralsTable.status, 'signed_up')
+                eq(referralsTable.status, 'signed_up'),
             ))
             .limit(1);
 
@@ -281,7 +281,7 @@ export class ReferralRepository {
      */
     async getReferralHistory(
         userId: string,
-        options: { page?: number; limit?: number; status?: string } = {}
+        options: { page?: number; limit?: number; status?: string } = {},
     ) {
         const page = options.page || 1;
         const limit = options.limit || 20;
@@ -347,7 +347,7 @@ export class ReferralRepository {
             .from(boostsTable)
             .where(and(
                 eq(boostsTable.user_id, userId),
-                eq(boostsTable.status, 'available')
+                eq(boostsTable.status, 'available'),
             ));
     }
 
@@ -360,7 +360,7 @@ export class ReferralRepository {
             .where(and(
                 eq(boostsTable.id, boostId),
                 eq(boostsTable.user_id, userId),
-                eq(boostsTable.status, 'available')
+                eq(boostsTable.status, 'available'),
             ))
             .limit(1);
 

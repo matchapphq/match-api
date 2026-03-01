@@ -8,7 +8,7 @@ import {
     type NewBoostPurchase,
     type BoostPrice,
     type BoostAnalytics,
-    type NewBoostAnalytics
+    type NewBoostAnalytics,
 } from "../config/db/boost.table";
 import { venueMatchesTable } from "../config/db/matches.table";
 import { matchesTable } from "../config/db/matches.table";
@@ -33,7 +33,7 @@ export class BoostRepository {
             .from(boostPricesTable)
             .where(and(
                 eq(boostPricesTable.pack_type, packType),
-                eq(boostPricesTable.active, true)
+                eq(boostPricesTable.active, true),
             ))
             .limit(1);
         return result[0] ?? null;
@@ -105,7 +105,7 @@ export class BoostRepository {
             .from(boostsTable)
             .where(and(
                 eq(boostsTable.user_id, userId),
-                eq(boostsTable.status, 'available')
+                eq(boostsTable.status, 'available'),
             ))
             .orderBy(desc(boostsTable.created_at));
     }
@@ -115,7 +115,7 @@ export class BoostRepository {
             .from(boostsTable)
             .where(and(
                 eq(boostsTable.user_id, userId),
-                eq(boostsTable.status, 'available')
+                eq(boostsTable.status, 'available'),
             ));
         return Number(result[0]?.count) || 0;
     }
@@ -132,7 +132,7 @@ export class BoostRepository {
         purchaseId: string,
         userId: string,
         quantity: number,
-        source: string = 'stripe_payment'
+        source: string = 'stripe_payment',
     ): Promise<string[]> {
         const boostIds: string[] = [];
 
@@ -160,7 +160,7 @@ export class BoostRepository {
     async activateBoost(
         boostId: string,
         venueMatchId: string,
-        userId: string
+        userId: string,
     ): Promise<{ success: boolean; error?: string; expires_at?: Date }> {
         // Verify boost exists and is available
         const boost = await db.select()
@@ -168,7 +168,7 @@ export class BoostRepository {
             .where(and(
                 eq(boostsTable.id, boostId),
                 eq(boostsTable.user_id, userId),
-                eq(boostsTable.status, 'available')
+                eq(boostsTable.status, 'available'),
             ))
             .limit(1);
 
@@ -245,7 +245,7 @@ export class BoostRepository {
 
     async deactivateBoost(
         boostId: string,
-        userId: string
+        userId: string,
     ): Promise<{ success: boolean; error?: string }> {
         // Get the boost
         const boost = await db.select()
@@ -253,7 +253,7 @@ export class BoostRepository {
             .where(and(
                 eq(boostsTable.id, boostId),
                 eq(boostsTable.user_id, userId),
-                eq(boostsTable.status, 'used')
+                eq(boostsTable.status, 'used'),
             ))
             .limit(1);
 
@@ -300,7 +300,7 @@ export class BoostRepository {
 
     async getBoostHistory(
         userId: string,
-        options: { page?: number; limit?: number; status?: string } = {}
+        options: { page?: number; limit?: number; status?: string } = {},
     ) {
         const page = options.page || 1;
         const limit = options.limit || 20;
@@ -348,7 +348,7 @@ export class BoostRepository {
             .from(boostAnalyticsTable)
             .where(and(
                 eq(boostAnalyticsTable.boost_id, boostId),
-                eq(boostAnalyticsTable.user_id, userId)
+                eq(boostAnalyticsTable.user_id, userId),
             ))
             .limit(1);
         return result[0] ?? null;
@@ -372,7 +372,7 @@ export class BoostRepository {
             .from(boostsTable)
             .where(and(
                 eq(boostsTable.status, 'used'),
-                lt(boostsTable.expires_at, now)
+                lt(boostsTable.expires_at, now),
             ));
 
         if (expiredBoosts.length === 0) {
@@ -427,7 +427,7 @@ export class BoostRepository {
             })
             .where(and(
                 eq(boostsTable.purchase_id, purchaseId),
-                eq(boostsTable.status, 'available')
+                eq(boostsTable.status, 'available'),
             ))
             .returning({ id: boostsTable.id });
 
@@ -471,7 +471,7 @@ export class BoostRepository {
             .from(boostPurchasesTable)
             .where(and(
                 eq(boostPurchasesTable.user_id, userId),
-                eq(boostPurchasesTable.payment_status, 'paid')
+                eq(boostPurchasesTable.payment_status, 'paid'),
             ));
 
         // Get analytics summary
@@ -506,7 +506,7 @@ export class BoostRepository {
             .from(boostsTable)
             .where(and(
                 eq(boostsTable.user_id, userId),
-                eq(boostsTable.status, 'used')
+                eq(boostsTable.status, 'used'),
             ));
 
         // Get total used boosts count (used + expired)
@@ -516,8 +516,8 @@ export class BoostRepository {
                 eq(boostsTable.user_id, userId),
                 or(
                     eq(boostsTable.status, 'used'),
-                    eq(boostsTable.status, 'expired')
-                )
+                    eq(boostsTable.status, 'expired'),
+                ),
             ));
 
         // Get analytics summary for views and reservations
@@ -533,7 +533,7 @@ export class BoostRepository {
             .from(boostPurchasesTable)
             .where(and(
                 eq(boostPurchasesTable.user_id, userId),
-                eq(boostPurchasesTable.payment_status, 'paid')
+                eq(boostPurchasesTable.payment_status, 'paid'),
             ))
             .orderBy(desc(boostPurchasesTable.paid_at))
             .limit(1);
@@ -571,7 +571,7 @@ export class BoostRepository {
             .where(and(
                 eq(venueMatchesTable.venue_id, venueId),
                 eq(venueMatchesTable.is_boosted, false),
-                eq(matchesTable.status, 'scheduled')
+                eq(matchesTable.status, 'scheduled'),
             ))
             .orderBy(matchesTable.scheduled_at);
 
@@ -584,7 +584,7 @@ export class BoostRepository {
             .from(boostPurchasesTable)
             .where(and(
                 eq(boostPurchasesTable.stripe_session_id, sessionId),
-                eq(boostPurchasesTable.user_id, userId)
+                eq(boostPurchasesTable.user_id, userId),
             ))
             .limit(1);
 

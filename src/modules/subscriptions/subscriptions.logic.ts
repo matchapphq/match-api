@@ -1,5 +1,6 @@
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import UserRepository from "../../repository/user.repository";
+import { PartnerRepository } from "../../repository/partner/partner.repository";
 import stripe, {
     SUBSCRIPTION_PLANS,
     CHECKOUT_URLS,
@@ -10,6 +11,7 @@ import Stripe from "stripe";
 
 export class SubscriptionsLogic {
     private readonly userRepository = new UserRepository();
+    private readonly partnerRepository = new PartnerRepository();
 
     getPlans() {
         return Object.values(SUBSCRIPTION_PLANS).map((plan) => ({
@@ -38,6 +40,7 @@ export class SubscriptionsLogic {
         }
 
         let stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
+        let venueName = "";
 
         if (!stripeCustomerId) {
             const userResult = await this.userRepository.getUserById(userId);
@@ -55,7 +58,19 @@ export class SubscriptionsLogic {
             await subscriptionsRepository.setStripeCustomerId(userId, stripeCustomerId);
         }
 
+        if (venue_id) {
+            const venue = await this.partnerRepository.getVenueByIdAndOwner(venue_id, userId);
+            venueName = venue?.name?.trim() || "";
+        }
+
         const isPriceId = plan.stripePriceId && plan.stripePriceId.startsWith("price_");
+        const stripeProductName = venueName ? `Match - ${venueName}` : `Match - Abonnement ${plan.name}`;
+        const stripeProductDescription = venueName
+            ? `Abonnement ${plan.name} pour ${venueName}`
+            : plan.description;
+        const stripeSubscriptionDescription = venueName
+            ? `Abonnement ${plan.name} - ${venueName}`
+            : `Match - Abonnement ${plan.name}`;
 
         const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = isPriceId
             ? [{ price: plan.stripePriceId, quantity: 1 }]
@@ -64,8 +79,8 @@ export class SubscriptionsLogic {
                       price_data: {
                           currency: plan.currency.toLowerCase(),
                           product_data: {
-                              name: `Match - Abonnement ${plan.name}`,
-                              description: plan.description,
+                              name: stripeProductName,
+                              description: stripeProductDescription,
                           },
                           unit_amount: plan.price * 100,
                           recurring: {
@@ -88,7 +103,7 @@ export class SubscriptionsLogic {
             payment_method_types: [
                 "card",
                 "sepa_debit",
-                "klarna"
+                "klarna",
             ],
             mode: "subscription",
             line_items: lineItems,
@@ -98,12 +113,15 @@ export class SubscriptionsLogic {
                 user_id: userId,
                 plan_id: plan_id,
                 venue_id: venue_id || "",
+                venue_name: venueName,
             },
             subscription_data: {
+                description: stripeSubscriptionDescription,
                 metadata: {
                     user_id: userId,
                     plan_id: plan_id,
                     venue_id: venue_id || "",
+                    venue_name: venueName,
                 },
             },
             allow_promotion_codes: true,
@@ -274,7 +292,92 @@ export class SubscriptionsLogic {
     }
 
     async getMyInvoices(userId: string) {
-        return await subscriptionsRepository.getInvoicesByUserId(userId);
+        const localInvoices = await subscriptionsRepository.getInvoicesByUserId(userId);
+
+        if (!isStripeConfigured()) {
+            return localInvoices;
+        }
+
+        const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
+        if (!stripeCustomerId) {
+            return localInvoices;
+        }
+
+        try {
+            const stripeInvoices = await stripe.invoices.list({
+                customer: stripeCustomerId,
+                limit: 20,
+            });
+            const venueIdByStripeSubscriptionId = new Map<string, string>();
+
+            const stripeMapped = await Promise.all((stripeInvoices.data as any[]).map(async (invoice: any) => {
+                const createdDate = new Date((invoice.created || Date.now() / 1000) * 1000);
+                const issueDate = createdDate.toISOString().split("T")[0]!;
+                const dueDate = invoice.due_date
+                    ? new Date(invoice.due_date * 1000).toISOString().split("T")[0]!
+                    : issueDate;
+                const stripeSubscriptionId = typeof invoice.subscription === "string" ? invoice.subscription : null;
+                let venueId: string | undefined;
+                let subscriptionId: string | undefined;
+
+                let status: "draft" | "pending" | "paid" | "overdue" | "canceled" = "pending";
+                if (invoice.status === "paid") status = "paid";
+                else if (invoice.status === "draft") status = "draft";
+                else if (invoice.status === "void") status = "canceled";
+                else if (invoice.status === "uncollectible") status = "overdue";
+
+                if (stripeSubscriptionId) {
+                    if (venueIdByStripeSubscriptionId.has(stripeSubscriptionId)) {
+                        venueId = venueIdByStripeSubscriptionId.get(stripeSubscriptionId);
+                    } else {
+                        const localSubscription = await subscriptionsRepository.getSubscriptionByStripeId(stripeSubscriptionId);
+                        if (localSubscription) {
+                            subscriptionId = localSubscription.id;
+                            const venue = await this.partnerRepository.getVenueBySubscriptionId(localSubscription.id);
+                            venueId = venue?.id;
+                            if (venueId) {
+                                venueIdByStripeSubscriptionId.set(stripeSubscriptionId, venueId);
+                            }
+                        }
+                    }
+                }
+
+                return {
+                    id: invoice.id,
+                    user_id: userId,
+                    invoice_number: invoice.number || invoice.id,
+                    subscription_id: subscriptionId,
+                    stripe_subscription_id: typeof invoice.subscription === "string" ? invoice.subscription : null,
+                    venue_id: venueId,
+                    status,
+                    issue_date: issueDate,
+                    due_date: dueDate,
+                    paid_date: invoice.status_transitions?.paid_at
+                        ? new Date(invoice.status_transitions.paid_at * 1000).toISOString().split("T")[0]!
+                        : null,
+                    subtotal: String((invoice.subtotal || 0) / 100),
+                    tax: String((invoice.tax || 0) / 100),
+                    total: String((invoice.total || 0) / 100),
+                    description: invoice.lines?.data?.[0]?.description || invoice.description || "Match subscription",
+                    pdf_url: invoice.invoice_pdf || null,
+                    created_at: createdDate,
+                    updated_at: createdDate,
+                };
+            }));
+
+            if (stripeMapped.length > 0) {
+                return stripeMapped.sort((a, b) => {
+                    const left = new Date(a.issue_date || a.created_at).getTime();
+                    const right = new Date(b.issue_date || b.created_at).getTime();
+                    return right - left;
+                });
+            }
+
+            return localInvoices;
+        } catch (error) {
+            console.error("Error fetching invoices from Stripe:", error);
+            return localInvoices;
+        }
     }
 
     async mockSubscription(userId: string, status: string) {

@@ -19,25 +19,25 @@ export class TableRepository {
             .from(reservationsTable)
             .where(and(
                 eq(reservationsTable.venue_match_id, matchId),
-                eq(reservationsTable.status, 'confirmed')
+                eq(reservationsTable.status, 'confirmed'),
             ));
 
         const heldTableIds = await db.select({ id: tableHoldsTable.table_id })
             .from(tableHoldsTable)
             .where(and(
                 eq(tableHoldsTable.venue_match_id, matchId),
-                gte(tableHoldsTable.expires_at, new Date())
+                gte(tableHoldsTable.expires_at, new Date()),
             ));
 
         const busyIds = [
             ...reservedTableIds.map(r => r.id),
-            ...heldTableIds.map(h => h.id)
+            ...heldTableIds.map(h => h.id),
         ].filter(id => id !== null) as string[];
 
         // 2. Fetch Match to get VenueId
         const match = await db.query.venueMatchesTable.findFirst({
             where: eq(venueMatchesTable.id, matchId),
-            columns: { venue_id: true }
+            columns: { venue_id: true },
         });
 
         if (!match) return null; // Match not found
@@ -45,7 +45,7 @@ export class TableRepository {
         // 3. Query Tables
         const baseConditions = [
             eq(tablesTable.venue_id, match.venue_id),
-            gte(tablesTable.capacity, partySize)
+            gte(tablesTable.capacity, partySize),
         ];
 
         if (accessible) {
@@ -74,7 +74,7 @@ export class TableRepository {
             venue_match_id: matchId,
             table_id: tableId,
             party_size: partySize,
-            expires_at: expiresAt
+            expires_at: expiresAt,
         }).returning();
 
         return hold;
@@ -85,8 +85,8 @@ export class TableRepository {
             where: eq(tableHoldsTable.id, holdId),
             with: {
                 table: true,
-                venueMatch: true
-            }
+                venueMatch: true,
+            },
         });
     }
 
@@ -100,7 +100,7 @@ export class TableRepository {
             // 1. Get Match (Venue ID)
             const match = await tx.query.venueMatchesTable.findFirst({
                 where: eq(venueMatchesTable.id, venueMatchId),
-                columns: { venue_id: true }
+                columns: { venue_id: true },
             });
 
             if (!match) return null;
@@ -118,19 +118,19 @@ export class TableRepository {
                 .from(reservationsTable)
                 .where(and(
                     eq(reservationsTable.venue_match_id, venueMatchId),
-                    eq(reservationsTable.status, 'confirmed')
+                    eq(reservationsTable.status, 'confirmed'),
                 ));
 
             const heldIds = await tx.select({ id: tableHoldsTable.table_id })
                 .from(tableHoldsTable)
                 .where(and(
                     eq(tableHoldsTable.venue_match_id, venueMatchId),
-                    gte(tableHoldsTable.expires_at, new Date())
+                    gte(tableHoldsTable.expires_at, new Date()),
                 ));
 
             const busyIds = [
                 ...reservedIds.map(r => r.id),
-                ...heldIds.map(h => h.id)
+                ...heldIds.map(h => h.id),
             ].filter(id => id !== null) as string[];
 
             // 3. Find Candidate with SKIP LOCKED
@@ -138,7 +138,7 @@ export class TableRepository {
 
             const baseConditions = [
                 eq(tablesTable.venue_id, match.venue_id),
-                gte(tablesTable.capacity, partySize)
+                gte(tablesTable.capacity, partySize),
             ];
 
             if (accessible) {
@@ -168,7 +168,7 @@ export class TableRepository {
                 venue_match_id: venueMatchId,
                 table_id: table.id,
                 party_size: partySize,
-                expires_at: new Date(Date.now() + 15 * 60 * 1000)
+                expires_at: new Date(Date.now() + 15 * 60 * 1000),
             }).returning();
 
             return { hold, table };

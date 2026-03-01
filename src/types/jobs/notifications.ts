@@ -14,7 +14,9 @@ export enum EmailTemplate {
   BOOKING_CONFIRMATION = 'booking_confirmation',
   BOOKING_CANCELLED = 'booking_cancelled',
   BOOKING_REMINDER = 'booking_reminder',
-  BUG_REPORT = 'bug-report'
+  BUG_REPORT = 'bug-report',
+  DATA_EXPORT_REQUEST = 'data-export-request',
+  SUPPORT_CONTACT_REQUEST = 'support-contact-request'
 }
 
 export interface NotificationJobBase {

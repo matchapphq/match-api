@@ -23,7 +23,7 @@ class AuthRepository {
             ambiances: preferences.ambiances ?? undefined,
             venue_types: preferences.venue_types ?? undefined,
             budget: preferences.budget ?? undefined,
-            updated_at: new Date()
+            updated_at: new Date(),
         }
         
         if (existing.length > 0 && existing[0]) {

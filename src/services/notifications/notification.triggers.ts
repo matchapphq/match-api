@@ -69,7 +69,7 @@ export async function notifyNewReservation(payload: ReservationNotificationPaylo
     if (user?.push_token) {
         await pushNotificationService.sendToUser(user.push_token, title, message, {
             type: 'reservation_confirmed',
-            reservationId: payload.reservationId
+            reservationId: payload.reservationId,
         });
     }
 
@@ -89,7 +89,7 @@ export async function notifyNewReservation(payload: ReservationNotificationPaylo
         if (owner?.push_token) {
             await pushNotificationService.sendToUser(owner.push_token, 'Nouvelle réservation', `Nouvelle réservation de ${payload.partySize} personne(s) pour ${venueInfo.venueName}.`, {
                 type: 'reservation_new',
-                reservationId: payload.reservationId
+                reservationId: payload.reservationId,
             });
         }
     }
@@ -118,7 +118,7 @@ export async function notifyReservationCancelled(payload: CancellationNotificati
     if (user?.push_token) {
         await pushNotificationService.sendToUser(user.push_token, title, message, {
             type: 'reservation_canceled',
-            reservationId: payload.reservationId
+            reservationId: payload.reservationId,
         });
     }
 
@@ -138,7 +138,7 @@ export async function notifyReservationCancelled(payload: CancellationNotificati
         if (owner?.push_token) {
             await pushNotificationService.sendToUser(owner.push_token, 'Réservation annulée', `Une réservation de ${payload.partySize} personne(s) pour ${venueInfo.venueName} a été annulée.`, {
                 type: 'reservation_canceled',
-                reservationId: payload.reservationId
+                reservationId: payload.reservationId,
             });
         }
     }

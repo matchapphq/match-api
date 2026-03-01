@@ -16,7 +16,7 @@ export class SportsLogic {
         return await this.sportsRepo.findAllSports({
             page,
             limit,
-            isActive
+            isActive,
         });
     }
 
@@ -50,7 +50,7 @@ export class SportsLogic {
             page,
             limit,
             isActive,
-            country
+            country,
         });
     }
 
@@ -97,7 +97,7 @@ export class SportsLogic {
         return await this.sportsRepo.findTeamsByLeagueId(leagueId, {
             page,
             limit,
-            isActive
+            isActive,
         });
     }
 

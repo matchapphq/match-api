@@ -74,16 +74,16 @@ export class SportsRepository {
             offset,
             with: {
                 leagues: {
-                    columns: { id: true }
-                }
-            }
+                    columns: { id: true },
+                },
+            },
         });
 
         // Transform to include league count
         const data = sports.map(sport => ({
             ...sport,
             leagueCount: sport.leagues?.length ?? 0,
-            leagues: undefined // Remove the leagues array
+            leagues: undefined, // Remove the leagues array
         }));
 
         const totalPages = Math.ceil(total / limit);
@@ -95,8 +95,8 @@ export class SportsRepository {
                 limit,
                 total,
                 totalPages,
-                hasMore: page < totalPages
-            }
+                hasMore: page < totalPages,
+            },
         };
     }
 
@@ -109,16 +109,16 @@ export class SportsRepository {
             with: {
                 leagues: {
                     where: eq(leaguesTable.is_active, true),
-                    orderBy: [asc(leaguesTable.display_order), asc(leaguesTable.name)]
-                }
-            }
+                    orderBy: [asc(leaguesTable.display_order), asc(leaguesTable.name)],
+                },
+            },
         });
 
         if (!sport) return null;
 
         return {
             ...sport,
-            leagueCount: sport.leagues?.length ?? 0
+            leagueCount: sport.leagues?.length ?? 0,
         };
     }
 
@@ -130,9 +130,9 @@ export class SportsRepository {
             where: eq(sportsTable.slug, slug),
             with: {
                 leagues: {
-                    where: eq(leaguesTable.is_active, true)
-                }
-            }
+                    where: eq(leaguesTable.is_active, true),
+                },
+            },
         });
     }
 
@@ -173,16 +173,16 @@ export class SportsRepository {
             offset,
             with: {
                 teams: {
-                    columns: { id: true }
-                }
-            }
+                    columns: { id: true },
+                },
+            },
         });
 
         // Transform to include team count
         const data = leagues.map(league => ({
             ...league,
             teamCount: league.teams?.length ?? 0,
-            teams: undefined
+            teams: undefined,
         }));
 
         const totalPages = Math.ceil(total / limit);
@@ -194,8 +194,8 @@ export class SportsRepository {
                 limit,
                 total,
                 totalPages,
-                hasMore: page < totalPages
-            }
+                hasMore: page < totalPages,
+            },
         };
     }
 
@@ -209,16 +209,16 @@ export class SportsRepository {
                 sport: true,
                 teams: {
                     where: eq(teamsTable.is_active, true),
-                    orderBy: [asc(teamsTable.name)]
-                }
-            }
+                    orderBy: [asc(teamsTable.name)],
+                },
+            },
         });
 
         if (!league) return null;
 
         return {
             ...league,
-            teamCount: league.teams?.length ?? 0
+            teamCount: league.teams?.length ?? 0,
         };
     }
 
@@ -231,9 +231,9 @@ export class SportsRepository {
             with: {
                 sport: true,
                 teams: {
-                    where: eq(teamsTable.is_active, true)
-                }
-            }
+                    where: eq(teamsTable.is_active, true),
+                },
+            },
         });
     }
 
@@ -268,7 +268,7 @@ export class SportsRepository {
             where: whereClause,
             orderBy: [asc(teamsTable.name)],
             limit,
-            offset
+            offset,
         });
 
         const totalPages = Math.ceil(total / limit);
@@ -280,8 +280,8 @@ export class SportsRepository {
                 limit,
                 total,
                 totalPages,
-                hasMore: page < totalPages
-            }
+                hasMore: page < totalPages,
+            },
         };
     }
 
@@ -294,10 +294,10 @@ export class SportsRepository {
             with: {
                 league: {
                     with: {
-                        sport: true
-                    }
-                }
-            }
+                        sport: true,
+                    },
+                },
+            },
         });
     }
 
@@ -310,10 +310,10 @@ export class SportsRepository {
             with: {
                 league: {
                     with: {
-                        sport: true
-                    }
-                }
-            }
+                        sport: true,
+                    },
+                },
+            },
         });
     }
 
@@ -340,7 +340,7 @@ export class SportsRepository {
         return {
             sports: sportsCount?.count ?? 0,
             leagues: leaguesCount?.count ?? 0,
-            teams: teamsCount?.count ?? 0
+            teams: teamsCount?.count ?? 0,
         };
     }
 

@@ -11,7 +11,7 @@ export async function userOnaboarding(body: RegisterRequestSchemaType, _authRepo
         ambiances: body.ambiances || [],
         venue_types: body.venue_types || [],
         fav_sports: body.fav_sports || [],
-        fav_team_ids: body.fav_team_ids || []
+        fav_team_ids: body.fav_team_ids || [],
     }
     await _authRepository.savePreferences(userId, userPreferences);
     return;

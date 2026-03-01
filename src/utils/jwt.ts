@@ -12,6 +12,9 @@ export type TokenPayload = {
     email: string;
     firstName: string | null;
     role: "user" | "venue_owner" | "admin";
+    sid?: string;
+    iat?: number;
+    exp?: number;
 }
 
 export class JwtUtils {
@@ -28,7 +31,7 @@ export class JwtUtils {
             return await sign({
                 ...payload,
                 exp: Math.floor(Date.now() / 1000) + this.ACCESS_TOKEN_EXP,
-                iat: Math.floor(Date.now() / 1000)
+                iat: Math.floor(Date.now() / 1000),
             }, Bun.env.SECRET_KEY, "HS256");
         } catch (error) {
             console.error("Error generating access token:", error);
@@ -44,7 +47,7 @@ export class JwtUtils {
             return await sign({
                 ...payload,
                 exp: Math.floor(Date.now() / 1000) + this.REFRESH_TOKEN_EXP,
-                iat: Math.floor(Date.now() / 1000)
+                iat: Math.floor(Date.now() / 1000),
             }, Bun.env.REFRESH_SECRET_KEY, "HS256");
         } catch (error) {
             console.error("Error generating refresh token:", error);

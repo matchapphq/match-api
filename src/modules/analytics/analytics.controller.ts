@@ -87,13 +87,13 @@ class AnalyticsController {
                     venue: {
                         id: venue.id,
                         name: venue.name,
-                        city: venue.city
+                        city: venue.city,
                     },
                     period: {
                         startDate: start_date?.toISOString() ?? null,
-                        endDate: end_date?.toISOString() ?? null
+                        endDate: end_date?.toISOString() ?? null,
                     },
-                    overview
+                    overview,
                 });
             } catch (error: any) {
                 if (error.message === "Unauthorized") {
@@ -102,7 +102,7 @@ class AnalyticsController {
                 console.error("Analytics overview error:", error);
                 return ctx.json({ error: "Failed to fetch analytics" }, 500);
             }
-        }
+        },
     );
 
     /**
@@ -144,14 +144,14 @@ class AnalyticsController {
                 return ctx.json({
                     venue: {
                         id: venue.id,
-                        name: venue.name
+                        name: venue.name,
                     },
                     period: {
                         startDate: start_date?.toISOString() ?? null,
                         endDate: end_date?.toISOString() ?? null,
-                        groupBy: group_by
+                        groupBy: group_by,
                     },
-                    trends
+                    trends,
                 });
             } catch (error: any) {
                 if (error.message === "Unauthorized") {
@@ -160,7 +160,7 @@ class AnalyticsController {
                 console.error("Reservation analytics error:", error);
                 return ctx.json({ error: "Failed to fetch reservation analytics" }, 500);
             }
-        }
+        },
     );
 
     /**
@@ -202,15 +202,15 @@ class AnalyticsController {
                 return ctx.json({
                     venue: {
                         id: venue.id,
-                        name: venue.name
+                        name: venue.name,
                     },
                     period: {
                         startDate: start_date?.toISOString() ?? null,
                         endDate: end_date?.toISOString() ?? null,
-                        groupBy: group_by
+                        groupBy: group_by,
                     },
                     note: "Since reservations are free for users, this shows capacity utilization trends",
-                    trends
+                    trends,
                 });
             } catch (error: any) {
                 if (error.message === "Unauthorized") {
@@ -219,7 +219,7 @@ class AnalyticsController {
                 console.error("Revenue analytics error:", error);
                 return ctx.json({ error: "Failed to fetch revenue analytics" }, 500);
             }
-        }
+        },
     );
 }
 

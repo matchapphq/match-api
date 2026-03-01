@@ -157,7 +157,7 @@ export class MatchesLogic {
         // 3. Freshness check: Check when the last match was created/updated
         const lastMatch = await db.query.matchesTable.findFirst({
             where: isNotNull(matchesTable.external_id),
-            orderBy: [desc(matchesTable.updated_at)]
+            orderBy: [desc(matchesTable.updated_at)],
         });
 
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -180,7 +180,7 @@ export class MatchesLogic {
      */
     async syncFixturesForLeagues(
         leagueApiIds: number[] = DEFAULT_SYNC_LEAGUES,
-        options: { season?: string; from?: string; to?: string; days?: number } = {}
+        options: { season?: string; from?: string; to?: string; days?: number } = {},
     ): Promise<{ synced: number; errors: number; leagues: number }> {
         if (this.syncInProgress) {
             return { synced: 0, errors: 0, leagues: 0 };
@@ -297,7 +297,7 @@ export class MatchesLogic {
             endOfDay.setHours(23, 59, 59, 999);
             conditions.push(and(
                 gte(matchesTable.scheduled_at, startOfDay),
-                sql`${matchesTable.scheduled_at} <= ${endOfDay}`
+                sql`${matchesTable.scheduled_at} <= ${endOfDay}`,
             ));
         }
 
@@ -317,9 +317,9 @@ export class MatchesLogic {
                 awayTeam: true, 
                 league: {
                     with: {
-                        sport: true
-                    }
-                }
+                        sport: true,
+                    },
+                },
             },
             orderBy: [asc(matchesTable.scheduled_at)],
             limit,
@@ -355,7 +355,7 @@ export class MatchesLogic {
             where: and(
                 eq(venueMatchesTable.match_id, matchId),
                 eq(venueMatchesTable.is_active, true),
-                eq(venueMatchesTable.allows_reservations, true)
+                eq(venueMatchesTable.allows_reservations, true),
             ),
             with: {
                 venue: {
@@ -369,7 +369,7 @@ export class MatchesLogic {
                         longitude: true,
                         average_rating: true,
                         cover_image_url: true,
-                    }
+                    },
                 },
             },
         });
@@ -384,7 +384,7 @@ export class MatchesLogic {
                     lat,
                     lng,
                     vm.venue.latitude,
-                    vm.venue.longitude
+                    vm.venue.longitude,
                 );
             }
             
@@ -407,7 +407,7 @@ export class MatchesLogic {
         // Filter by max distance if user location provided
         if (lat !== undefined && lng !== undefined) {
             venues = venues.filter(v => 
-                v.venue.distance === null || v.venue.distance <= maxDistanceKm
+                v.venue.distance === null || v.venue.distance <= maxDistanceKm,
             );
             
             // Sort by distance (closest first)
@@ -434,7 +434,7 @@ export class MatchesLogic {
             endOfDay.setHours(23, 59, 59, 999);
             conditions.push(and(
                 gte(matchesTable.scheduled_at, startOfDay),
-                sql`${matchesTable.scheduled_at} <= ${endOfDay}`
+                sql`${matchesTable.scheduled_at} <= ${endOfDay}`,
             ));
         }
 
@@ -450,9 +450,9 @@ export class MatchesLogic {
                 awayTeam: true, 
                 league: {
                     with: {
-                        sport: true
-                    }
-                } 
+                        sport: true,
+                    },
+                }, 
             },
             orderBy: [asc(matchesTable.scheduled_at)],
             limit,
@@ -469,7 +469,7 @@ export class MatchesLogic {
                 filtered = filtered.filter(m => 
                     m.homeTeam?.name?.toLowerCase().includes(s) || 
                     m.awayTeam?.name?.toLowerCase().includes(s) ||
-                    m.league?.name?.toLowerCase().includes(s)
+                    m.league?.name?.toLowerCase().includes(s),
                 );
             }
 
@@ -490,7 +490,7 @@ export class MatchesLogic {
         const venueMatches = await db.query.venueMatchesTable.findMany({
             where: and(
                 eq(venueMatchesTable.is_active, true),
-                eq(venueMatchesTable.allows_reservations, true)
+                eq(venueMatchesTable.allows_reservations, true),
             ),
             with: {
                 venue: {
@@ -500,14 +500,14 @@ export class MatchesLogic {
                         city: true,
                         latitude: true,
                         longitude: true,
-                    }
+                    },
                 },
                 match: {
                     with: {
                         homeTeam: true,
                         awayTeam: true,
                         league: true,
-                    }
+                    },
                 },
             },
             limit,
@@ -529,7 +529,7 @@ export class MatchesLogic {
                 isFeatured: vm.is_featured,
             }))
             .sort((a, b) => 
-                new Date(a.match!.scheduled_at).getTime() - new Date(b.match!.scheduled_at).getTime()
+                new Date(a.match!.scheduled_at).getTime() - new Date(b.match!.scheduled_at).getTime(),
             );
 
         return upcoming;
