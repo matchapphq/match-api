@@ -4,7 +4,7 @@ import UserRepository from "../../repository/user.repository";
 export class MediaLogic {
     constructor(
         private readonly storageService: StorageService,
-        private readonly userRepo: UserRepository
+        private readonly userRepo: UserRepository,
     ) {}
 
     /**
@@ -46,7 +46,7 @@ export class MediaLogic {
         return {
             success: true,
             url, // Return full URL to the client for immediate display
-            message: "Profile picture updated successfully"
+            message: "Profile picture updated successfully",
         };
     }
 

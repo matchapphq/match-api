@@ -435,7 +435,7 @@ class PartnerController {
                 console.error("Error updating reservation:", error);
                 return ctx.json({ error: error.message || "Failed to update reservation" }, 500);
             }
-        }
+        },
     );
 
     // Mark reservation as no-show
@@ -467,7 +467,7 @@ class PartnerController {
                 console.error("Error marking reservation as no-show:", error);
                 return ctx.json({ error: error.message || "Failed to mark reservation as no-show" }, 500);
             }
-        }
+        },
     );
 
     // =============================================
@@ -528,7 +528,7 @@ class PartnerController {
                 console.error("Error notifying waitlist customer:", error);
                 return ctx.json({ error: "Failed to notify customer", details: error.message }, 500);
             }
-        }
+        },
     );
 
 }

@@ -131,13 +131,13 @@ export class WebhooksLogic {
                                 amount: `${(amount / 100).toFixed(2)}€`,
                                 planName: plan === 'pro' ? 'Annuel (Pro)' : 'Mensuel (Basic)',
                                 date: new Date().toLocaleDateString('fr-FR'),
-                                invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf
-                            }
+                                invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf,
+                            },
                         }, {
                             attempts: 3,
                             backoff: { type: "exponential", delay: 5000 },
                             priority: 2,
-                            jobId: `payment-${subscriptionId}`
+                            jobId: `payment-${subscriptionId}`,
                         });
                     } catch (err) {
                         console.error("Failed to send payment success email:", err);
@@ -201,7 +201,7 @@ export class WebhooksLogic {
                     email: venueData.email,
                     capacity: venueData.capacity,
                     type: venueData.type || 'sports_bar',
-                    coords
+                    coords,
                 });
                 
                 if (newVenue && user) {
@@ -215,13 +215,13 @@ export class WebhooksLogic {
                                 amount: `${(amount / 100).toFixed(2)}€`,
                                 planName: plan === 'pro' ? 'Annuel (Pro)' : 'Mensuel (Basic)',
                                 date: new Date().toLocaleDateString('fr-FR'),
-                                invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf
-                            }
+                                invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf,
+                            },
                         }, {
                             attempts: 3,
                             backoff: { type: "exponential", delay: 5000 },
                             priority: 2,
-                            jobId: `payment-${subscriptionId}`
+                            jobId: `payment-${subscriptionId}`,
                         });
                     } catch (err) {
                         console.error("Failed to send payment success email:", err);
@@ -378,7 +378,7 @@ export class WebhooksLogic {
             purchaseId,
             userId,
             purchase.quantity,
-            'stripe_payment'
+            'stripe_payment',
         );
     }
 }

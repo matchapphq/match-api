@@ -37,7 +37,7 @@ export const analyticsTable = pgTable(
         index('idx_analytics_user_id').on(table.user_id),
         index('idx_analytics_event_type').on(table.event_type),
         index('idx_analytics_created_at').on(table.created_at),
-    ]
+    ],
 );
 
 export type Analytics = typeof analyticsTable.$inferSelect;
@@ -80,7 +80,7 @@ export const couponsTable = pgTable(
         index('idx_coupons_is_active').on(table.is_active),
         index('idx_coupons_valid_from').on(table.valid_from),
         index('idx_coupons_valid_until').on(table.valid_until),
-    ]
+    ],
 );
 
 export type Coupon = typeof couponsTable.$inferSelect;
@@ -115,7 +115,7 @@ export const auditLogsTable = pgTable(
         index('idx_audit_logs_action').on(table.action),
         index('idx_audit_logs_entity_type').on(table.entity_type),
         index('idx_audit_logs_created_at').on(table.created_at),
-    ]
+    ],
 );
 
 export type AuditLog = typeof auditLogsTable.$inferSelect;
@@ -149,7 +149,7 @@ export const bannedUsersTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_banned_users_user_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type BannedUser = typeof bannedUsersTable.$inferSelect;

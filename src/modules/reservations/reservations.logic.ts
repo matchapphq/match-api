@@ -9,7 +9,7 @@ export class ReservationsLogic {
     constructor(
         private readonly capacityRepo: CapacityRepository,
         private readonly reservationRepo: ReservationRepository,
-        private readonly waitlistRepo: WaitlistRepository
+        private readonly waitlistRepo: WaitlistRepository,
     ) {}
 
     async create(userId: string, userEmail: string, userName: string, data: any) {
@@ -54,7 +54,7 @@ export class ReservationsLogic {
                 venueMatchId, 
                 partySize, 
                 specialRequests || "",
-                qrPayloadString
+                qrPayloadString,
             );
 
             if (!reservation) {
@@ -69,7 +69,7 @@ export class ReservationsLogic {
                 reservationId: reservation.id,
                 userId: userId,
                 partySize,
-                status: 'confirmed'
+                status: 'confirmed',
             }).catch(err => console.error('[Reservations] Failed to send notification:', err));
 
             await mailQueue.add("reservation-confirmation", {
@@ -82,11 +82,11 @@ export class ReservationsLogic {
                     time: venueMatch.match?.scheduled_at ? new Date(venueMatch.match.scheduled_at).toLocaleTimeString() : '',
                     guests: partySize,
                     bookingId: reservation.id,
-                    address: venueMatch.venue?.street_address
-                }
+                    address: venueMatch.venue?.street_address,
+                },
             }, {
                 attempts: 3,
-                backoff: { type: 'exponential', delay: 5000 }
+                backoff: { type: 'exponential', delay: 5000 },
             });
             
             return {
@@ -101,10 +101,10 @@ export class ReservationsLogic {
                         scheduledAt: venueMatch.match.scheduled_at,
                         homeTeam: venueMatch.match.homeTeam,
                         awayTeam: venueMatch.match.awayTeam,
-                        league: venueMatch.match.league
-                    } : null
+                        league: venueMatch.match.league,
+                    } : null,
                 },
-                qr_code: qrCodeImage
+                qr_code: qrCodeImage,
             };
         } else {
             const reservation = await this.reservationRepo.createPending(
@@ -113,7 +113,7 @@ export class ReservationsLogic {
                 venueMatchId,
                 partySize,
                 specialRequests || "",
-                requiresAccessibility ?? false
+                requiresAccessibility ?? false,
             );
 
             if (!reservation) throw new Error("RESERVATION_CREATION_FAILED");
@@ -123,7 +123,7 @@ export class ReservationsLogic {
                 reservationId: reservation.id,
                 userId: userId,
                 partySize,
-                status: 'pending'
+                status: 'pending',
             }).catch(err => console.error('[Reservations] Failed to send notification:', err));
 
             return {
@@ -138,9 +138,9 @@ export class ReservationsLogic {
                         scheduledAt: venueMatch.match.scheduled_at,
                         homeTeam: venueMatch.match.homeTeam,
                         awayTeam: venueMatch.match.awayTeam,
-                        league: venueMatch.match.league
-                    } : null
-                }
+                        league: venueMatch.match.league,
+                    } : null,
+                },
             };
         }
     }
@@ -178,7 +178,7 @@ export class ReservationsLogic {
                 reservationId: canceled.id,
                 userId: userId,
                 partySize: canceled.party_size,
-                reason
+                reason,
             }).catch(err => console.error('Failed to send cancellation notification:', err));
         }
 
@@ -197,7 +197,7 @@ export class ReservationsLogic {
             message: result.alreadyInQueue ? "You're already on the waitlist" : "Added to waitlist",
             waitlistId: result.entry.id,
             position,
-            alreadyInQueue: result.alreadyInQueue
+            alreadyInQueue: result.alreadyInQueue,
         };
     }
 
@@ -211,7 +211,7 @@ export class ReservationsLogic {
         const entries = await this.waitlistRepo.findByUserId(userId);
         return await Promise.all(entries.map(async (entry) => ({
             ...entry,
-            position: await this.waitlistRepo.getPosition(entry.id)
+            position: await this.waitlistRepo.getPosition(entry.id),
         })));
     }
 
@@ -235,8 +235,8 @@ export class ReservationsLogic {
                     id: reservation.id,
                     partySize: reservation.party_size,
                     table: reservation.table,
-                    checkedInAt: reservation.checked_in_at
-                }
+                    checkedInAt: reservation.checked_in_at,
+                },
             };
         }
 
@@ -250,8 +250,8 @@ export class ReservationsLogic {
             reservation: {
                 id: reservation.id,
                 partySize: reservation.party_size,
-                userName: reservation.user_id 
-            }
+                userName: reservation.user_id, 
+            },
         };
     }
 
@@ -270,7 +270,7 @@ export class ReservationsLogic {
             total: reservations.length,
             checkedIn: reservations.filter(r => r.status === 'checked_in').length,
             pending: reservations.filter(r => r.status === 'confirmed').length,
-            totalGuests: reservations.reduce((sum, r) => sum + (r.party_size || 0), 0)
+            totalGuests: reservations.reduce((sum, r) => sum + (r.party_size || 0), 0),
         };
 
         return { reservations, stats };

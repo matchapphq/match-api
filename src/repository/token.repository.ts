@@ -82,7 +82,7 @@ class TokenRepository {
     async touchSessionById(
         userId: string,
         sessionId: string,
-        updates?: { device?: string }
+        updates?: { device?: string },
     ): Promise<boolean> {
         const session = await this.getTokenById(sessionId);
         if (!session || session.userId !== userId) {

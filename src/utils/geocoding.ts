@@ -24,7 +24,7 @@ export async function geocodeAddress(fullAddress: AddressOptions): Promise<Geoco
             fullAddress.street,
             fullAddress.city,
             fullAddress.postal_code,
-            fullAddress.country
+            fullAddress.country,
         ].filter(Boolean);
         console.log("Geocoding address:", addressParts.join(","));
         const response = await axios.get(
@@ -56,7 +56,7 @@ export async function geocodeAddress(fullAddress: AddressOptions): Promise<Geoco
             fullAddress.city,
             fullAddress.state,
             fullAddress.postal_code,
-            fullAddress.country
+            fullAddress.country,
         ].filter(Boolean).join(",");
         
         console.error("Geocoding failed:", error);

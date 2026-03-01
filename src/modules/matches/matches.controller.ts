@@ -22,12 +22,12 @@ class MatchesController {
                 parseInt(limit), 
                 parseInt(offset),
                 date,
-                sport_id
+                sport_id,
             );
 
             return c.json({ 
                 data: matches,
-                count: matches.length
+                count: matches.length,
             });
         } catch (error: any) {
             console.error("Error fetching matches:", error);
@@ -69,7 +69,7 @@ class MatchesController {
 
             return c.json({ 
                 data: venues,
-                count: venues.length
+                count: venues.length,
             });
         } catch (error: any) {
             console.error("Error fetching match venues:", error);
@@ -89,12 +89,12 @@ class MatchesController {
                 parseInt(offset),
                 sport_id,
                 date,
-                search
+                search,
             );
             
             return c.json({ 
                 data: matches,
-                count: matches.length
+                count: matches.length,
             });
         } catch (error: any) {
             console.error("Error fetching upcoming matches:", error);
@@ -117,12 +117,12 @@ class MatchesController {
                 parseFloat(lat), 
                 parseFloat(lng), 
                 parseFloat(distance_km), 
-                parseInt(limit)
+                parseInt(limit),
             );
 
             return c.json({ 
                 data: upcoming,
-                count: upcoming.length
+                count: upcoming.length,
             });
         } catch (error: any) {
             console.error("Error fetching upcoming matches:", error);
@@ -152,7 +152,7 @@ class MatchesController {
 
             const result = await this.matchesLogic.syncFixturesForLeagues(
                 leagues,
-                { season, from, to, days }
+                { season, from, to, days },
             );
 
             return c.json({

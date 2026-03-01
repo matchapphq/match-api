@@ -11,7 +11,7 @@ import {
     text,
     jsonb,
     doublePrecision,
-    geometry
+    geometry,
 } from 'drizzle-orm/pg-core';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { usersTable } from './user.table';
@@ -147,7 +147,7 @@ export const venuesTable = pgTable('venues', {
             name: 'fk_venues_subscription_id',
             // .onDelete('restrict') might be cleaner, keeping original logic
         }).onDelete('restrict'),
-    ]
+    ],
 );
 
 export type Venue = typeof venuesTable.$inferSelect;

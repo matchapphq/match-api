@@ -49,7 +49,7 @@ export const reviewsTable = pgTable(
             foreignColumns: [venuesTable.id],
             name: 'fk_reviews_venue_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Review = typeof reviewsTable.$inferSelect;
@@ -84,7 +84,7 @@ export const reviewHelpfulTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_review_helpful_user_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type ReviewHelpful = typeof reviewHelpfulTable.$inferSelect;

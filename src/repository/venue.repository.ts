@@ -18,7 +18,7 @@ export class VenueRepository {
                         city: input.city,
                         postal_code: input.postalCode,
                         country: input.country,
-                        street: input.address
+                        street: input.address,
                     });
                     input.lat = lat;
                     input.lng = lng;
@@ -61,8 +61,8 @@ export class VenueRepository {
                         photo_url: p.url,
                         alt_text: p.altText,
                         is_primary: p.isPrimary ?? false,
-                        uploaded_by: userId
-                    }))
+                        uploaded_by: userId,
+                    })),
                 );
             }
 
@@ -76,8 +76,8 @@ export class VenueRepository {
             where: and(eq(venuesTable.id, venueId), isNull(venuesTable.deleted_at)),
             with: {
                 // @ts-ignore - Relation definition might be missing in relations.ts or strictly typed differently, but standard for Drizzle
-                photos: true
-            }
+                photos: true,
+            },
         });
         return venue;
     }
@@ -128,14 +128,14 @@ export class VenueRepository {
             lat,
             lng,
             distance_km = 10,
-            sort = 'newest'
+            sort = 'newest',
         } = query;
 
         const offset = (page - 1) * limit;
 
         const conditions = [
             isNull(venuesTable.deleted_at),
-            eq(venuesTable.is_active, true)
+            eq(venuesTable.is_active, true),
         ];
 
         if (city) conditions.push(ilike(venuesTable.city, `%${city}%`));
@@ -145,7 +145,7 @@ export class VenueRepository {
         if (search) {
             conditions.push(or(
                 ilike(venuesTable.name, `%${search}%`),
-                ilike(venuesTable.description ?? sql`''`, `%${search}%`)
+                ilike(venuesTable.description ?? sql`''`, `%${search}%`),
             )!);
         }
 
@@ -191,8 +191,8 @@ export class VenueRepository {
             offset: offset,
             orderBy: orderByClause,
             with: {
-                photos: true
-            }
+                photos: true,
+            },
         });
 
         return {
@@ -201,14 +201,14 @@ export class VenueRepository {
                 total,
                 page,
                 limit,
-                totalPages
-            }
+                totalPages,
+            },
         };
     }
 
     async findByOwnerId(ownerId: string) {
         return await db.query.venuesTable.findMany({
-            where: and(eq(venuesTable.owner_id, ownerId), isNull(venuesTable.deleted_at))
+            where: and(eq(venuesTable.owner_id, ownerId), isNull(venuesTable.deleted_at)),
         });
     }
 
@@ -246,7 +246,7 @@ export class VenueRepository {
         const result = await db.delete(venuePhotosTable)
             .where(and(
                 eq(venuePhotosTable.id, photoId),
-                eq(venuePhotosTable.venue_id, venueId)
+                eq(venuePhotosTable.venue_id, venueId),
             ))
             .returning();
         return result.length > 0;
@@ -263,8 +263,8 @@ export class VenueRepository {
         return await db.query.venuePhotosTable.findFirst({
             where: and(
                 eq(venuePhotosTable.id, photoId),
-                eq(venuePhotosTable.venue_id, venueId)
-            )
+                eq(venuePhotosTable.venue_id, venueId),
+            ),
         });
     }
 
@@ -279,7 +279,7 @@ export class VenueRepository {
             .set({ is_primary: true, updated_at: new Date() })
             .where(and(
                 eq(venuePhotosTable.id, photoId),
-                eq(venuePhotosTable.venue_id, venueId)
+                eq(venuePhotosTable.venue_id, venueId),
             ))
             .returning();
 
@@ -350,8 +350,8 @@ export class VenueRepository {
         return await db.query.openingHoursExceptionsTable.findFirst({
             where: and(
                 eq(openingHoursExceptionsTable.venue_id, venueId),
-                eq(openingHoursExceptionsTable.date, date)
-            )
+                eq(openingHoursExceptionsTable.date, date),
+            ),
         });
     }
 
@@ -359,7 +359,7 @@ export class VenueRepository {
         const result = await db.delete(openingHoursExceptionsTable)
             .where(and(
                 eq(openingHoursExceptionsTable.id, exceptionId),
-                eq(openingHoursExceptionsTable.venue_id, venueId)
+                eq(openingHoursExceptionsTable.venue_id, venueId),
             ))
             .returning();
         return result.length > 0;
@@ -416,7 +416,7 @@ export class VenueRepository {
             validIds.map(amenityId => ({
                 venue_id: venueId,
                 amenity_id: amenityId,
-            }))
+            })),
         );
 
         return await this.getVenueAmenities(venueId);
@@ -445,8 +445,8 @@ export class VenueRepository {
                         homeTeam: true,
                         awayTeam: true,
                         league: true,
-                    }
-                }
+                    },
+                },
             },
         });
 
@@ -455,7 +455,7 @@ export class VenueRepository {
         if (options?.upcomingOnly) {
             const now = new Date();
             filteredMatches = venueMatches.filter((vm: any) => 
-                vm.match?.scheduled_at && new Date(vm.match.scheduled_at) >= now
+                vm.match?.scheduled_at && new Date(vm.match.scheduled_at) >= now,
             );
         }
 

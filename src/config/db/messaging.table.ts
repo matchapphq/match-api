@@ -33,7 +33,7 @@ export const conversationsTable = pgTable(
             foreignColumns: [venuesTable.id],
             name: 'fk_conversations_venue_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Conversation = typeof conversationsTable.$inferSelect;
@@ -73,7 +73,7 @@ export const messagesTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_messaging_sender_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Message = typeof messagesTable.$inferSelect;

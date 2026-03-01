@@ -10,14 +10,14 @@ export const challengeStatusEnum = pgEnum('challenge_status', [
     'NOT_STARTED',
     'IN_PROGRESS',
     'COMPLETED',
-    'EXPIRED'
+    'EXPIRED',
 ]);
 
 export const challengeRecurrenceEnum = pgEnum('challenge_recurrence', [
     'NONE',
     'DAILY',
     'WEEKLY',
-    'MONTHLY'
+    'MONTHLY',
 ]);
 
 export const badgeCategoryEnum = pgEnum('badge_category', [
@@ -25,7 +25,7 @@ export const badgeCategoryEnum = pgEnum('badge_category', [
     'ACTIVITY',
     'REVIEWS',
     'SOCIAL',
-    'SPECIAL'
+    'SPECIAL',
 ]);
 
 // ============================================
@@ -64,7 +64,7 @@ export const fidelityLevelsTable = pgTable(
     (table) => [
         index('idx_fidelity_levels_min_points').on(table.min_points),
         index('idx_fidelity_levels_rank').on(table.rank),
-    ]
+    ],
 );
 
 export type FidelityLevel = typeof fidelityLevelsTable.$inferSelect;
@@ -106,7 +106,7 @@ export const fidelityPointRulesTable = pgTable(
     },
     (table) => [
         index('idx_fidelity_point_rules_action_key').on(table.action_key),
-    ]
+    ],
 );
 
 export type FidelityPointRule = typeof fidelityPointRulesTable.$inferSelect;
@@ -150,7 +150,7 @@ export const fidelityPointTransactionsTable = pgTable(
         index('idx_fidelity_transactions_created_at').on(table.created_at),
         // Idempotency: prevent duplicate awards for same action on same reference
         uniqueIndex('idx_fidelity_transactions_idempotency').on(table.user_id, table.action_key, table.reference_id),
-    ]
+    ],
 );
 
 export type FidelityPointTransaction = typeof fidelityPointTransactionsTable.$inferSelect;
@@ -189,7 +189,7 @@ export const fidelityUserStatsTable = pgTable(
     (table) => [
         index('idx_fidelity_user_stats_user_id').on(table.user_id),
         index('idx_fidelity_user_stats_total_points').on(table.total_points),
-    ]
+    ],
 );
 
 export type FidelityUserStats = typeof fidelityUserStatsTable.$inferSelect;
@@ -238,7 +238,7 @@ export const fidelityBadgesTable = pgTable(
     (table) => [
         index('idx_fidelity_badges_category').on(table.category),
         index('idx_fidelity_badges_rank').on(table.rank),
-    ]
+    ],
 );
 
 export type FidelityBadge = typeof fidelityBadgesTable.$inferSelect;
@@ -270,7 +270,7 @@ export const fidelityUserBadgesTable = pgTable(
         index('idx_fidelity_user_badges_user_id').on(table.user_id),
         index('idx_fidelity_user_badges_badge_id').on(table.badge_id),
         uniqueIndex('idx_fidelity_user_badges_unique').on(table.user_id, table.badge_id),
-    ]
+    ],
 );
 
 export type FidelityUserBadge = typeof fidelityUserBadgesTable.$inferSelect;
@@ -327,7 +327,7 @@ export const fidelityChallengesTable = pgTable(
         index('idx_fidelity_challenges_action_key').on(table.action_key),
         index('idx_fidelity_challenges_start_at').on(table.start_at),
         index('idx_fidelity_challenges_end_at').on(table.end_at),
-    ]
+    ],
 );
 
 export type FidelityChallenge = typeof fidelityChallengesTable.$inferSelect;
@@ -371,7 +371,7 @@ export const fidelityUserChallengesTable = pgTable(
         index('idx_fidelity_user_challenges_expires_at').on(table.expires_at),
         // Unique per user per challenge instance (for non-recurring) or per period (for recurring)
         uniqueIndex('idx_fidelity_user_challenges_unique').on(table.user_id, table.challenge_id, table.started_at),
-    ]
+    ],
 );
 
 export type FidelityUserChallenge = typeof fidelityUserChallengesTable.$inferSelect;
@@ -407,7 +407,7 @@ export const fidelityEventsLogTable = pgTable(
         index('idx_fidelity_events_log_user_id').on(table.user_id),
         index('idx_fidelity_events_log_event_type').on(table.event_type),
         index('idx_fidelity_events_log_created_at').on(table.created_at),
-    ]
+    ],
 );
 
 export type FidelityEventLog = typeof fidelityEventsLogTable.$inferSelect;

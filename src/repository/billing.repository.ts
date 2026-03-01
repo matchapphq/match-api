@@ -19,7 +19,7 @@ export class BillingRepository {
 
         return {
             data,
-            total: countRes?.count ?? 0
+            total: countRes?.count ?? 0,
         };
     }
 
@@ -27,7 +27,7 @@ export class BillingRepository {
         return await db.query.invoicesTable.findFirst({
             where: and(
                 eq(invoicesTable.id, invoiceId),
-                eq(invoicesTable.user_id, userId)
+                eq(invoicesTable.user_id, userId),
             ),
         });
     }
@@ -48,7 +48,7 @@ export class BillingRepository {
 
         return {
             data,
-            total: countRes?.count ?? 0
+            total: countRes?.count ?? 0,
         };
     }
 
@@ -56,7 +56,7 @@ export class BillingRepository {
         return await db.query.transactionsTable.findFirst({
             where: and(
                 eq(transactionsTable.id, transactionId),
-                eq(transactionsTable.user_id, userId)
+                eq(transactionsTable.user_id, userId),
             ),
         });
     }

@@ -29,7 +29,7 @@ export const venuePhotosTable = pgTable(
             foreignColumns: [venuesTable.id],
             name: 'fk_venue_photos_venue_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type VenuePhoto = typeof venuePhotosTable.$inferSelect;

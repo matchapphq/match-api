@@ -34,7 +34,7 @@ export class AuthLogic {
         private readonly authRepository: AuthRepository,
         private readonly referralRepo: typeof referralRepository,
         private readonly redis: Redis,
-        private readonly storageService: StorageService
+        private readonly storageService: StorageService,
     ) {}
 
     /**
@@ -109,7 +109,7 @@ export class AuthLogic {
 
         return {
             user: await this.getClientUser(user.id),
-            ...tokens
+            ...tokens,
         };
     }
 
@@ -203,7 +203,7 @@ export class AuthLogic {
         profileHints?: {
             firstName?: string;
             lastName?: string;
-        }
+        },
     ) {
         await this.purgeExpiredDeletedAccounts();
 
@@ -411,7 +411,7 @@ export class AuthLogic {
                 lastName: user.last_name,
                 subject: "Reset Password",
                 code,
-            }
+            },
         }, {
             attempts: 3,
             backoff: { type: "exponential", delay: 5000 },
@@ -443,7 +443,7 @@ export class AuthLogic {
         const passwordHash = await password.hash(newPassword);
         await Promise.all([
             this.userRepository.updateUserPassword(user.id, passwordHash),
-            this.redis.del(`RESET_CODE:${email}`)
+            this.redis.del(`RESET_CODE:${email}`),
         ]);
     }
 
@@ -490,13 +490,13 @@ export class AuthLogic {
                 subject: template === "welcome" ? "Welcome to Match!" : "Welcome to Match Partner!",
                 data: {
                     userName: user.first_name,
-                    actionLink: `${frontendUrl}${path}`
-                }
+                    actionLink: `${frontendUrl}${path}`,
+                },
             }, {
                 attempts: 3,
                 backoff: { type: "exponential", delay: 5000 },
                 priority: 2,
-                jobId: `welcome-${user.id}`
+                jobId: `welcome-${user.id}`,
             });
         } catch (error) {
             console.error(`Failed to enqueue welcome email (${template}):`, error);
@@ -533,7 +533,7 @@ export class AuthLogic {
                     backoff: { type: "exponential", delay: 5000 },
                     priority: 2,
                     jobId: `welcome-back-${user.id}-${Date.now()}`,
-                }
+                },
             );
         } catch (error) {
             console.error("Failed to enqueue welcome-back email:", error);
@@ -547,7 +547,7 @@ export class AuthLogic {
     private resolveCurrentSessionId(
         sessions: Array<{ id: string; updated_at: Date | string }>,
         tokenIssuedAt?: number,
-        tokenSessionId?: string
+        tokenSessionId?: string,
     ): string | null {
         if (sessions.length === 0) return null;
 
@@ -567,7 +567,7 @@ export class AuthLogic {
             .slice()
             .sort((a, b) =>
                 Math.abs(this.toMs(a.updated_at) - issuedAtMs) -
-                Math.abs(this.toMs(b.updated_at) - issuedAtMs)
+                Math.abs(this.toMs(b.updated_at) - issuedAtMs),
             )[0]
             ?.id ?? null;
     }
@@ -579,7 +579,7 @@ export class AuthLogic {
 
     private async filterActiveSessions<T extends { id: string; updated_at: Date | string }>(
         userId: string,
-        sessions: T[]
+        sessions: T[],
     ): Promise<T[]> {
         if (sessions.length === 0) {
             return sessions;

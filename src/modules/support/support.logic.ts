@@ -167,9 +167,9 @@ export class SupportLogic {
                     userName: data.userName,
                     userEmail: data.userEmail,
                     description: data.description,
-                    metadata: data.metadata || {}
-                }
-            }
+                    metadata: data.metadata || {},
+                },
+            },
         }, {
             removeOnComplete: true,
             attempts: 3,
@@ -177,7 +177,7 @@ export class SupportLogic {
                 type: 'exponential',
                 delay: 1000,
             },
-            jobId: `${traceId}-bug-report`
+            jobId: `${traceId}-bug-report`,
         });
 
         return { 

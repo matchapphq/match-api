@@ -269,7 +269,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
                 email: venueData.email,
                 capacity: venueData.capacity,
                 type: venueData.type || 'sports_bar',
-                coords: { lat, lng }
+                coords: { lat, lng },
             });
             
             if (newVenue) {
@@ -565,7 +565,7 @@ async function handleBoostPurchaseCompleted(session: Stripe.Checkout.Session) {
         purchaseId,
         userId,
         purchase.quantity,
-        'stripe_payment'
+        'stripe_payment',
     );
 
     console.log(`Created ${boostIds.length} boosts for user ${userId} from purchase ${purchaseId}`);

@@ -41,7 +41,7 @@ export const notificationsTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_notifications_user_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Notification = typeof notificationsTable.$inferSelect;
@@ -80,7 +80,7 @@ export const conversationsTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_conversations_participant_2_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Conversation = typeof conversationsTable.$inferSelect;
@@ -128,7 +128,7 @@ export const messagesTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_messages_sender_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Message = typeof messagesTable.$inferSelect;

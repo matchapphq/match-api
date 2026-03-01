@@ -50,3 +50,4 @@ INTE_PLAN.md
 API_VERIFICATION_REPORT.md
 seeds/
 *.test.ts
+certs/

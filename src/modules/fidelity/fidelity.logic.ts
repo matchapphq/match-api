@@ -147,7 +147,7 @@ export class FidelityLogic {
     async checkAndUnlockBadges(
         userId: string,
         actionKey: string,
-        metadata?: Record<string, any>
+        metadata?: Record<string, any>,
     ): Promise<BadgeUnlockResult[]> {
         const unlockedBadges: BadgeUnlockResult[] = [];
         const allBadges = await fidelityRepository.getAllBadges();
@@ -232,7 +232,7 @@ export class FidelityLogic {
     async updateChallenges(
         userId: string,
         actionKey: string,
-        metadata?: Record<string, any>
+        metadata?: Record<string, any>,
     ): Promise<ChallengeUpdateResult[]> {
         const results: ChallengeUpdateResult[] = [];
         const challenges = await fidelityRepository.getChallengesByActionKey(actionKey);
@@ -351,12 +351,12 @@ export class FidelityLogic {
                     iconKey: badge?.icon_key ?? undefined,
                     unlockedAt: ub.unlocked_at,
                 };
-            })
+            }),
         );
 
         const userChallenges = await fidelityRepository.getUserChallenges(userId);
         const activeChallenges = userChallenges.filter(
-            (c) => c.status === "IN_PROGRESS" || c.status === "NOT_STARTED"
+            (c) => c.status === "IN_PROGRESS" || c.status === "NOT_STARTED",
         ).length;
 
         const pointRules = await fidelityRepository.getAllPointRules();
@@ -574,7 +574,7 @@ export class FidelityLogic {
     private async updateUserStatsForAction(
         userId: string,
         actionKey: string,
-        payload: Record<string, any>
+        payload: Record<string, any>,
     ): Promise<void> {
         const field = this.getStatFieldForAction(actionKey);
         if (field) {

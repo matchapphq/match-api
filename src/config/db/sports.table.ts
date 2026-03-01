@@ -18,7 +18,7 @@ export const countriesTable = pgTable(
     },
     (table) => [
         index('idx_countries_name').on(table.name),
-    ]
+    ],
 );
 
 export type Country = typeof countriesTable.$inferSelect;
@@ -48,7 +48,7 @@ export const sportsTable = pgTable(
     (table) => [
         index('idx_sports_slug').on(table.slug),
         index('idx_sports_is_active').on(table.is_active),
-    ]
+    ],
 );
 
 export type Sport = typeof sportsTable.$inferSelect;
@@ -94,7 +94,7 @@ export const leaguesTable = pgTable(
             foreignColumns: [countriesTable.id],
             name: 'fk_leagues_country_id',
         }).onDelete('set null'),
-    ]
+    ],
 );
 
 export type League = typeof leaguesTable.$inferSelect;
@@ -141,7 +141,7 @@ export const teamsTable = pgTable(
             foreignColumns: [countriesTable.id],
             name: 'fk_teams_country_id',
         }).onDelete('set null'),
-    ]
+    ],
 );
 
 export type Team = typeof teamsTable.$inferSelect;

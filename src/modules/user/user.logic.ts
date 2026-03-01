@@ -27,7 +27,7 @@ export class UserLogic {
         private readonly userRepository: UserRepository,
         private readonly favoritesRepository: FavoritesRepository,
         private readonly tokenRepository: TokenRepository,
-        private readonly storageService: StorageService
+        private readonly storageService: StorageService,
     ) {}
 
     /**
@@ -100,7 +100,7 @@ export class UserLogic {
             budget?: string;
             home_lat?: number;
             home_lng?: number;
-        }
+        },
     ) {
         const {
             fav_sports,
@@ -163,7 +163,7 @@ export class UserLogic {
             push_marketing?: boolean;
             push_updates?: boolean;
             sms_reservations?: boolean;
-        }
+        },
     ) {
         return await this.userRepository.updateNotificationPreferences(userId, updates);
     }
@@ -182,7 +182,7 @@ export class UserLogic {
             analytics_consent?: boolean;
             marketing_consent?: boolean;
             legal_updates_email?: boolean;
-        }
+        },
     ) {
         const preferences = await this.userRepository.updatePrivacyPreferences(userId, updates);
         return {
@@ -228,7 +228,7 @@ export class UserLogic {
                     role: user.role,
                     graceDays: this.accountDeletionGraceDays,
                     reactivationDeadline,
-                }
+                },
             });
         } catch (error) {
             console.error("[USER] Account deletion email enqueue failed:", error);
@@ -342,7 +342,7 @@ export class UserLogic {
         userId: string,
         tokenIssuedAt?: number,
         tokenSessionId?: string,
-        sessionDevice?: string
+        sessionDevice?: string,
     ) {
         if (tokenSessionId) {
             let nextSessionDevice = sessionDevice;
@@ -369,7 +369,7 @@ export class UserLogic {
     private resolveCurrentSessionId(
         sessions: Array<{ id: string; updated_at: Date | string }>,
         tokenIssuedAt?: number,
-        tokenSessionId?: string
+        tokenSessionId?: string,
     ): string | null {
         if (sessions.length === 0) return null;
 
@@ -388,7 +388,7 @@ export class UserLogic {
             .slice()
             .sort((a, b) =>
                 Math.abs(this.toMs(a.updated_at) - issuedAtMs) -
-                Math.abs(this.toMs(b.updated_at) - issuedAtMs)
+                Math.abs(this.toMs(b.updated_at) - issuedAtMs),
             )[0]
             ?.id ?? null;
     }

@@ -7,7 +7,7 @@ import { redisConnection } from "../config/redis";
 export const redisCli = new IORedis(process.env.REDIS_URL!);
 
 const redisStore = new RedisStore({
-    sendCommand: (...args: string[]) => redis.sendCommand(args as any)
+    sendCommand: (...args: string[]) => redis.sendCommand(args as any),
 });
 
 const authLimiter = rateLimiter<HonoEnv>({

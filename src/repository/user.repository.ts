@@ -123,7 +123,7 @@ const normalizePrivacyPreferences = (settings: unknown): PrivacyPreferences => {
 const mergePreferenceSettings = (
     existingSettings: Record<string, unknown>,
     notifications: NotificationPreferences,
-    privacy: PrivacyPreferences
+    privacy: PrivacyPreferences,
 ): Record<string, unknown> => ({
     ...existingSettings,
     ...notifications,
@@ -310,7 +310,7 @@ class UserRepository {
             phone?: string;
             avatarUrl?: string;
             googleId?: string;
-        }
+        },
     ) {
         const now = new Date();
 
@@ -344,7 +344,7 @@ class UserRepository {
             firstName?: string;
             lastName?: string;
             appleId: string;
-        }
+        },
     ) {
         const now = new Date();
 
@@ -374,7 +374,7 @@ class UserRepository {
             ...rest,
             ...(avatar ? { avatar_url: avatar } : {}),
             ...(push_token !== undefined ? { push_token } : {}),
-            updated_at: new Date()
+            updated_at: new Date(),
         };
 
         const [updatedUser] = await db.update(usersTable)
@@ -406,7 +406,7 @@ class UserRepository {
             ambiances: preferences.ambiances ?? undefined,
             venue_types: preferences.venue_types ?? undefined,
             budget: preferences.budget ?? undefined,
-            updated_at: new Date()
+            updated_at: new Date(),
         };
 
         if (existing) {
@@ -429,7 +429,7 @@ class UserRepository {
 
     public async updateNotificationPreferences(
         userId: string,
-        updates: UpdateNotificationPreferencesData
+        updates: UpdateNotificationPreferencesData,
     ): Promise<NotificationPreferences> {
         const existing = await this.getUserPreferenceRow(userId);
         const existingSettings = asRecord(existing?.notification_settings);
@@ -453,7 +453,7 @@ class UserRepository {
 
     public async updatePrivacyPreferences(
         userId: string,
-        updates: UpdatePrivacyPreferencesData
+        updates: UpdatePrivacyPreferencesData,
     ): Promise<PrivacyPreferences> {
         const existing = await this.getUserPreferenceRow(userId);
         const existingSettings = asRecord(existing?.notification_settings);

@@ -64,7 +64,7 @@ export class StorageService {
         }
         return {
             key,
-            url: `${this.publicUrl}/${key}`
+            url: `${this.publicUrl}/${key}`,
         };
     }
 

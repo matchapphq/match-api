@@ -208,7 +208,7 @@ class AuthController {
             try {
                 const { user, accessToken, refreshToken, isNewUser } = await this.authLogic.googleLogin(
                     id_token,
-                    deviceId
+                    deviceId,
                 );
 
                 await this.setAuthCookies(ctx, accessToken, refreshToken);
@@ -243,7 +243,7 @@ class AuthController {
                 console.error("Google login error:", error);
                 return ctx.json({ error: "Google login failed" }, 500);
             }
-        }
+        },
     );
 
     public readonly appleLogin = this.factory.createHandlers(
@@ -259,7 +259,7 @@ class AuthController {
                     {
                         firstName: first_name,
                         lastName: last_name,
-                    }
+                    },
                 );
 
                 await this.setAuthCookies(ctx, accessToken, refreshToken);
@@ -299,7 +299,7 @@ class AuthController {
                 console.error("Apple login error:", error);
                 return ctx.json({ error: "Apple login failed" }, 500);
             }
-        }
+        },
     );
 
     public readonly refreshToken = this.factory.createHandlers(async (ctx) => {

@@ -16,7 +16,7 @@ export const requireRole = (...allowedRoles: Array<"user" | "venue_owner" | "adm
         if (!allowedRoles.includes(user.role)) {
             return c.json({ 
                 error: "Forbidden", 
-                message: `This action requires one of the following roles: ${allowedRoles.join(', ')}` 
+                message: `This action requires one of the following roles: ${allowedRoles.join(', ')}`, 
             }, 403);
         }
 
