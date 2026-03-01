@@ -514,6 +514,12 @@ async function handleSubscriptionDeleted(subscription: any) {
         },
     );
 
+    await new PartnerRepository().updateVenueSubscriptionState(existingSubscription.id, {
+        subscription_status: "canceled",
+        is_active: false,
+        status: "suspended",
+    });
+
     console.log("Subscription canceled:", subscription.id);
 }
 

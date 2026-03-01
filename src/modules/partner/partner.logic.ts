@@ -335,10 +335,29 @@ export class PartnerLogic {
     }
 
     async scheduleMatch(userId: string, venueId: string, data: any) {
-        // Verify ownership
-        const isOwner = await this.partnerRepo.verifyVenueOwnership(venueId, userId);
-        if (!isOwner) {
+        const venue = await this.partnerRepo.getVenueByIdAndOwner(venueId, userId);
+        if (!venue) {
             throw new Error("FORBIDDEN");
+        }
+
+        if (!venue.is_active || venue.subscription_status === "canceled" || venue.status === "suspended") {
+            throw new Error("VENUE_SUBSCRIPTION_INACTIVE");
+        }
+
+        if (venue.subscription_id) {
+            const subscription = await subscriptionsRepository.getSubscriptionById(venue.subscription_id);
+            if (
+                !subscription ||
+                subscription.status === "canceled" ||
+                (!subscription.auto_renew && subscription.current_period_end && new Date(subscription.current_period_end) <= new Date())
+            ) {
+                await this.partnerRepo.updateVenueSubscriptionState(venue.subscription_id, {
+                    subscription_status: "canceled",
+                    is_active: false,
+                    status: "suspended",
+                });
+                throw new Error("VENUE_SUBSCRIPTION_INACTIVE");
+            }
         }
 
         const { match_id, total_capacity, capacity } = data;
