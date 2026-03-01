@@ -209,6 +209,25 @@ class PartnerController {
         }
     });
 
+    // GET /partners/venues/:venueId/invoices
+    readonly getVenueInvoices = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
+        }
+
+        try {
+            const invoices = await this.partnerLogic.getVenueInvoices(userId, venueId);
+            return ctx.json({ invoices });
+        } catch (error: any) {
+            if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 404);
+            console.error("Error fetching venue invoices:", error);
+            return ctx.json({ error: "Failed to fetch invoices", details: error.message }, 500);
+        }
+    });
+
     // POST /partners/venues/:venueId/payment-portal
     readonly getVenuePaymentPortal = this.factory.createHandlers(async (ctx) => {
         const userId = ctx.get('user').id;

@@ -243,6 +243,17 @@ export class PartnerRepository {
     }
 
     /**
+     * Get venue by subscription ID
+     */
+    async getVenueBySubscriptionId(subscriptionId: string) {
+        const venues = await db.select()
+            .from(venuesTable)
+            .where(eq(venuesTable.subscription_id, subscriptionId))
+            .limit(1);
+        return venues[0] || null;
+    }
+
+    /**
      * Schedule a match at a venue
      */
     async scheduleMatch(venueId: string, matchId: string, totalCapacity: number) {
