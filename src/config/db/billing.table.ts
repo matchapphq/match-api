@@ -65,7 +65,7 @@ export const paymentMethodsTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_payment_methods_user_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type PaymentMethod = typeof paymentMethodsTable.$inferSelect;
@@ -113,7 +113,7 @@ export const invoicesTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_invoices_user_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Invoice = typeof invoicesTable.$inferSelect;
@@ -164,7 +164,7 @@ export const transactionsTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_transactions_user_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Transaction = typeof transactionsTable.$inferSelect;

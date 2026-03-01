@@ -411,7 +411,7 @@ class VenueController {
                 console.error("Add opening hours exception error:", error);
                 return ctx.json({ error: "Failed to add opening hours exception" }, 500);
             }
-        }
+        },
     );
 
     readonly getOpeningHoursExceptions = this.factory.createHandlers(async (ctx) => {
@@ -534,7 +534,7 @@ class VenueController {
                 console.error("Set venue amenities error:", error);
                 return ctx.json({ error: "Failed to update venue amenities" }, 500);
             }
-        }
+        },
     );
 
     readonly addFavorite = this.factory.createHandlers(

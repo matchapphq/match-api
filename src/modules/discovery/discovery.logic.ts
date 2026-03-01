@@ -12,8 +12,8 @@ export class DiscoveryLogic {
             limit = "15",
             lat,
             lng,
-            radius_km = "50",
-            date
+            radius_km = "500000",
+            date,
         } = params;
 
         const pageNum = Math.max(1, parseInt(page));
@@ -32,14 +32,14 @@ export class DiscoveryLogic {
         if (type === "all" || type === "venues") {
             const venueConditions = [
                 isNull(venuesTable.deleted_at),
-                eq(venuesTable.is_active, true)
+                eq(venuesTable.is_active, true),
             ];
 
             if (searchQuery) {
                 venueConditions.push(or(
                     ilike(venuesTable.name, `%${searchQuery}%`),
                     ilike(venuesTable.city, `%${searchQuery}%`),
-                    ilike(venuesTable.type, `%${searchQuery}%`)
+                    ilike(venuesTable.type, `%${searchQuery}%`),
                 )!);
             }
 
@@ -72,7 +72,7 @@ export class DiscoveryLogic {
                 limit: limitNum,
                 offset: offset,
                 orderBy: orderBy,
-                with: { photos: true }
+                with: { photos: true },
             });
 
             if (userLat && userLng) {
@@ -80,7 +80,7 @@ export class DiscoveryLogic {
                     ...v,
                     distance: v.latitude && v.longitude
                         ? this.calculateDistance(userLat, userLng, v.latitude, v.longitude)
-                        : null
+                        : null,
                 }));
             }
         }
@@ -162,7 +162,7 @@ export class DiscoveryLogic {
                 totalMatches,
                 hasMoreVenues: offset + venues.length < totalVenues,
                 hasMoreMatches: offset + matches.length < totalMatches,
-            }
+            },
         };
     }
 
@@ -176,7 +176,7 @@ export class DiscoveryLogic {
                 ${venuesTable.location}::geography, 
                 ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography, 
                 ${distanceMeters}
-            )`
+            )`,
         ];
 
         const venues = await db.query.venuesTable.findMany({
@@ -188,16 +188,16 @@ export class DiscoveryLogic {
             with: {
                 photos: {
                     where: eq(sql`is_primary`, true),
-                    limit: 1
-                }
-            }
+                    limit: 1,
+                },
+            },
         });
 
         return venues.map(v => ({
             ...v,
             distance: v.latitude && v.longitude
                 ? this.calculateDistance(lat, lng, v.latitude, v.longitude)
-                : null
+                : null,
         }));
     }
 
@@ -205,11 +205,11 @@ export class DiscoveryLogic {
         const venue = await db.query.venuesTable.findFirst({
             where: and(
                 eq(venuesTable.id, venueId),
-                isNull(venuesTable.deleted_at)
+                isNull(venuesTable.deleted_at),
             ),
             with: {
                 photos: true,
-            }
+            },
         });
 
         if (!venue) {
@@ -220,18 +220,18 @@ export class DiscoveryLogic {
         const venueMatches = await db.query.venueMatchesTable.findMany({
             where: and(
                 eq(venueMatchesTable.venue_id, venueId),
-                eq(venueMatchesTable.is_active, true)
+                eq(venueMatchesTable.is_active, true),
             ),
             with: {
                 match: {
                     with: {
                         homeTeam: true,
                         awayTeam: true,
-                        league: true
-                    }
-                }
+                        league: true,
+                    },
+                },
             },
-            orderBy: (vm, { asc }) => [asc(sql`created_at`)] // Using sql because match.scheduled_at is nested
+            orderBy: (vm, { asc }) => [asc(sql`created_at`)], // Using sql because match.scheduled_at is nested
         });
 
         return {
@@ -240,8 +240,8 @@ export class DiscoveryLogic {
                 ...vm.match,
                 venueMatchId: vm.id,
                 availableCapacity: vm.available_capacity,
-                totalCapacity: vm.total_capacity
-            }))
+                totalCapacity: vm.total_capacity,
+            })),
         };
     }
 
@@ -249,8 +249,8 @@ export class DiscoveryLogic {
         const venue = await db.query.venuesTable.findFirst({
             where: eq(venuesTable.id, venueId),
             columns: {
-                menu: true
-            }
+                menu: true,
+            },
         });
 
         return venue?.menu || [];
@@ -260,18 +260,18 @@ export class DiscoveryLogic {
         const venue = await db.query.venuesTable.findFirst({
             where: eq(venuesTable.id, venueId),
             columns: {
-                opening_hours: true
-            }
+                opening_hours: true,
+            },
         });
 
         const exceptions = await db.query.openingHoursExceptionsTable.findMany({
             where: eq(openingHoursExceptionsTable.venue_id, venueId),
-            orderBy: [asc(openingHoursExceptionsTable.date)]
+            orderBy: [asc(openingHoursExceptionsTable.date)],
         });
 
         return {
             regular_hours: venue?.opening_hours || [],
-            exceptions
+            exceptions,
         };
     }
 
@@ -298,7 +298,7 @@ export class DiscoveryLogic {
                 ${venuesTable.location}::geography, 
                 ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography, 
                 ${distanceMeters}
-            )`
+            )`,
         ))
         .orderBy(asc(matchesTable.scheduled_at));
 
@@ -315,10 +315,10 @@ export class DiscoveryLogic {
                 longitude: item.venue.longitude,
                 distance: item.venue.latitude && item.venue.longitude
                     ? this.calculateDistance(lat, lng, item.venue.latitude, item.venue.longitude)
-                    : null
+                    : null,
             },
             venueMatchId: item.venueMatch.id,
-            availableCapacity: item.venueMatch.available_capacity
+            availableCapacity: item.venueMatch.available_capacity,
         }));
     }
 

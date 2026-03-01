@@ -43,7 +43,7 @@ export const usersTable = pgTable(
         index('idx_users_email').on(table.email),
         index('idx_users_role').on(table.role),
         index('idx_users_stripe_customer_id').on(table.stripe_customer_id),
-    ]
+    ],
 );
 
 export type User = typeof usersTable.$inferSelect;
@@ -82,7 +82,7 @@ export const userPreferencesTable = pgTable(
             email: true,
             push: true,
             sms: false,
-            marketing: false
+            marketing: false,
         }),
 
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -90,7 +90,7 @@ export const userPreferencesTable = pgTable(
     },
     (table) => [
         index('idx_user_preferences_user_id').on(table.user_id),
-    ]
+    ],
 );
 
 export type UserPreferences = typeof userPreferencesTable.$inferSelect;
@@ -105,7 +105,7 @@ export const userDeleteReasonsTable = pgTable('user_delete_reasons', {
     },
     (table) => [
         index('idx_delete_reasons_id').on(table.id),
-    ]
+    ],
 );
 
 export type UserDeleteReason = typeof userDeleteReasonsTable.$inferSelect;

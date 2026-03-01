@@ -49,7 +49,7 @@ export class FidelityRepository {
         const levels = await db.query.fidelityLevelsTable.findMany({
             where: and(
                 eq(fidelityLevelsTable.is_active, true),
-                lte(fidelityLevelsTable.min_points, points)
+                lte(fidelityLevelsTable.min_points, points),
             ),
             orderBy: [desc(fidelityLevelsTable.min_points)],
             limit: 1,
@@ -61,7 +61,7 @@ export class FidelityRepository {
         const levels = await db.query.fidelityLevelsTable.findMany({
             where: and(
                 eq(fidelityLevelsTable.is_active, true),
-                sql`${fidelityLevelsTable.min_points} > ${currentPoints}`
+                sql`${fidelityLevelsTable.min_points} > ${currentPoints}`,
             ),
             orderBy: [fidelityLevelsTable.min_points],
             limit: 1,
@@ -77,7 +77,7 @@ export class FidelityRepository {
         return db.query.fidelityPointRulesTable.findFirst({
             where: and(
                 eq(fidelityPointRulesTable.action_key, actionKey),
-                eq(fidelityPointRulesTable.is_active, true)
+                eq(fidelityPointRulesTable.is_active, true),
             ),
         });
     }
@@ -104,7 +104,7 @@ export class FidelityRepository {
             where: and(
                 eq(fidelityPointTransactionsTable.user_id, userId),
                 eq(fidelityPointTransactionsTable.action_key, actionKey),
-                eq(fidelityPointTransactionsTable.reference_id, referenceId)
+                eq(fidelityPointTransactionsTable.reference_id, referenceId),
             ),
         });
     }
@@ -135,7 +135,7 @@ export class FidelityRepository {
             .where(and(
                 eq(fidelityPointTransactionsTable.user_id, userId),
                 gte(fidelityPointTransactionsTable.created_at, startDate),
-                lte(fidelityPointTransactionsTable.created_at, endDate)
+                lte(fidelityPointTransactionsTable.created_at, endDate),
             ));
         return result[0]?.total ?? 0;
     }
@@ -154,7 +154,7 @@ export class FidelityRepository {
                 eq(fidelityPointTransactionsTable.user_id, userId),
                 eq(fidelityPointTransactionsTable.action_key, actionKey),
                 gte(fidelityPointTransactionsTable.created_at, today),
-                lte(fidelityPointTransactionsTable.created_at, tomorrow)
+                lte(fidelityPointTransactionsTable.created_at, tomorrow),
             ));
         return result[0]?.count ?? 0;
     }
@@ -218,7 +218,7 @@ export class FidelityRepository {
         return db.query.fidelityBadgesTable.findMany({
             where: and(
                 eq(fidelityBadgesTable.category, category as any),
-                eq(fidelityBadgesTable.is_active, true)
+                eq(fidelityBadgesTable.is_active, true),
             ),
             orderBy: [fidelityBadgesTable.rank],
         });
@@ -239,7 +239,7 @@ export class FidelityRepository {
         const badge = await db.query.fidelityUserBadgesTable.findFirst({
             where: and(
                 eq(fidelityUserBadgesTable.user_id, userId),
-                eq(fidelityUserBadgesTable.badge_id, badgeId)
+                eq(fidelityUserBadgesTable.badge_id, badgeId),
             ),
         });
         return !!badge;
@@ -262,7 +262,7 @@ export class FidelityRepository {
             where: and(
                 eq(fidelityChallengesTable.is_active, true),
                 sql`(${fidelityChallengesTable.start_at} IS NULL OR ${fidelityChallengesTable.start_at} <= ${now})`,
-                sql`(${fidelityChallengesTable.end_at} IS NULL OR ${fidelityChallengesTable.end_at} >= ${now})`
+                sql`(${fidelityChallengesTable.end_at} IS NULL OR ${fidelityChallengesTable.end_at} >= ${now})`,
             ),
             orderBy: [fidelityChallengesTable.rank],
         });
@@ -281,7 +281,7 @@ export class FidelityRepository {
                 eq(fidelityChallengesTable.action_key, actionKey),
                 eq(fidelityChallengesTable.is_active, true),
                 sql`(${fidelityChallengesTable.start_at} IS NULL OR ${fidelityChallengesTable.start_at} <= ${now})`,
-                sql`(${fidelityChallengesTable.end_at} IS NULL OR ${fidelityChallengesTable.end_at} >= ${now})`
+                sql`(${fidelityChallengesTable.end_at} IS NULL OR ${fidelityChallengesTable.end_at} >= ${now})`,
             ),
         });
     }
@@ -302,7 +302,7 @@ export class FidelityRepository {
             where: and(
                 eq(fidelityUserChallengesTable.user_id, userId),
                 eq(fidelityUserChallengesTable.challenge_id, challengeId),
-                sql`${fidelityUserChallengesTable.status} IN ('NOT_STARTED', 'IN_PROGRESS')`
+                sql`${fidelityUserChallengesTable.status} IN ('NOT_STARTED', 'IN_PROGRESS')`,
             ),
         });
     }
@@ -328,7 +328,7 @@ export class FidelityRepository {
             .set({ status: 'EXPIRED', updated_at: now })
             .where(and(
                 sql`${fidelityUserChallengesTable.status} IN ('NOT_STARTED', 'IN_PROGRESS')`,
-                lte(fidelityUserChallengesTable.expires_at, now)
+                lte(fidelityUserChallengesTable.expires_at, now),
             ));
         return result.rowCount ?? 0;
     }

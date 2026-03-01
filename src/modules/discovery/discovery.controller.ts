@@ -28,7 +28,7 @@ class DiscoveryController {
             const result = await this.discoveryLogic.getNearby(
                 parseFloat(lat), 
                 parseFloat(lng), 
-                radiusKm
+                radiusKm,
             );
             return ctx.json(result);
         } catch (error: any) {
@@ -89,7 +89,7 @@ class DiscoveryController {
             const result = await this.discoveryLogic.getMatchesNearby(
                 parseFloat(lat), 
                 parseFloat(lng), 
-                radiusKm
+                radiusKm,
             );
             return ctx.json(result);
         } catch (error: any) {

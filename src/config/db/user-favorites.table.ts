@@ -37,7 +37,7 @@ export const userFavoriteVenuesTable = pgTable(
             foreignColumns: [venuesTable.id],
             name: 'fk_favorite_venues_venue_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type UserFavoriteVenue = typeof userFavoriteVenuesTable.$inferSelect;

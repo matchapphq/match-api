@@ -12,5 +12,5 @@ export const stripeQueue = new Queue<StripeJobPayload>("stripe", {
         },
         removeOnComplete: 100,
         removeOnFail: 1000,
-    }
+    },
 });

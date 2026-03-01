@@ -24,14 +24,14 @@ export class PartnerRepository {
             where: inArray(reservationsTable.venue_match_id, 
                 db.select({ id: venueMatchesTable.id })
                   .from(venueMatchesTable)
-                  .where(inArray(venueMatchesTable.venue_id, venueIds))
+                  .where(inArray(venueMatchesTable.venue_id, venueIds)),
             ),
             with: {
                 user: {
                     columns: {
                         first_name: true,
                         last_name: true,
-                    }
+                    },
                 },
                 venueMatch: {
                     with: {
@@ -39,19 +39,19 @@ export class PartnerRepository {
                             columns: {
                                 id: true,
                                 name: true,
-                            }
+                            },
                         },
                         match: {
                            columns: {
-                               id: true
+                               id: true,
                            },
                            with: {
                                homeTeam: true,
-                               awayTeam: true
-                           }
-                        }
-                    }
-                }
+                               awayTeam: true,
+                           },
+                        },
+                    },
+                },
             },
             orderBy: (reservations, { desc }) => [desc(reservations.created_at)],
             limit: limit,
@@ -65,14 +65,14 @@ export class PartnerRepository {
                     columns: {
                         first_name: true,
                         last_name: true,
-                    }
+                    },
                 },
                 venue: {
                     columns: {
                         id: true,
                         name: true,
-                    }
-                }
+                    },
+                },
             },
             orderBy: (reviews, { desc }) => [desc(reviews.created_at)],
             limit: limit,
@@ -90,8 +90,8 @@ export class PartnerRepository {
                 details: {
                     status: r.status,
                     party_size: r.party_size,
-                    match: r.venueMatch?.match ? `${r.venueMatch.match.homeTeam?.name} vs ${r.venueMatch.match.awayTeam?.name}` : null
-                }
+                    match: r.venueMatch?.match ? `${r.venueMatch.match.homeTeam?.name} vs ${r.venueMatch.match.awayTeam?.name}` : null,
+                },
             })),
             ...reviews.map(r => ({
                 type: 'review',
@@ -103,9 +103,9 @@ export class PartnerRepository {
                 details: {
                     rating: r.rating,
                     content: r.content,
-                    title: r.title
-                }
-            }))
+                    title: r.title,
+                },
+            })),
         ].sort((a, b) => {
             const dateA = new Date(a.created_at).getTime();
             const dateB = new Date(b.created_at).getTime();
@@ -219,7 +219,7 @@ export class PartnerRepository {
             longitude: finalLng,
             type: data.type || 'sports_bar',
             status: 'pending',
-            is_active: true
+            is_active: true,
         }).returning();
 
         return newVenue;
@@ -278,7 +278,7 @@ export class PartnerRepository {
             match_id: matchId,
             total_capacity: totalCapacity,
             available_capacity: totalCapacity,
-            is_active: true
+            is_active: true,
         }).returning();
 
         return venueMatch;
@@ -295,7 +295,7 @@ export class PartnerRepository {
                 .from(venueMatchesTable)
                 .where(and(
                     eq(venueMatchesTable.venue_id, venueId),
-                    eq(venueMatchesTable.match_id, matchId)
+                    eq(venueMatchesTable.match_id, matchId),
                 ))
                 .limit(1);
 
@@ -308,7 +308,7 @@ export class PartnerRepository {
                 .set({ 
                     status: 'canceled',
                     canceled_at: new Date(),
-                    canceled_reason: 'Match canceled by venue'
+                    canceled_reason: 'Match canceled by venue',
                 })
                 .where(eq(reservationsTable.venue_match_id, venueMatch.id));
 
@@ -333,14 +333,14 @@ export class PartnerRepository {
                     columns: {
                         id: true,
                         name: true,
-                    }
+                    },
                 },
                 match: {
                     with: {
                         homeTeam: true,
                         awayTeam: true,
                         league: true,
-                    }
+                    },
                 },
                 reservations: true,
             },
@@ -372,7 +372,7 @@ export class PartnerRepository {
                         first_name: true,
                         last_name: true,
                         email: true,
-                    }
+                    },
                 },
                 venueMatch: {
                     with: {
@@ -380,10 +380,10 @@ export class PartnerRepository {
                             with: {
                                 homeTeam: true,
                                 awayTeam: true,
-                            }
-                        }
-                    }
-                }
+                            },
+                        },
+                    },
+                },
             },
             orderBy: (reservations, { desc }) => [desc(reservations.created_at)],
         });
@@ -456,8 +456,8 @@ export class PartnerRepository {
                     clients: 0,
                     reservations: 0,
                     matches: 0,
-                    views: 0
-                }
+                    views: 0,
+                },
             };
         }
 
@@ -494,7 +494,7 @@ export class PartnerRepository {
                 totalReservations: count(reservationsTable.id),
             }).from(reservationsTable).where(and(
                 inArray(reservationsTable.venue_match_id, vmIds),
-                gte(reservationsTable.created_at, currentPeriodStart)
+                gte(reservationsTable.created_at, currentPeriodStart),
             ));
 
             clientStats = {
@@ -509,7 +509,7 @@ export class PartnerRepository {
             }).from(reservationsTable).where(and(
                 inArray(reservationsTable.venue_match_id, vmIds),
                 gte(reservationsTable.created_at, previousPeriodStart),
-                lte(reservationsTable.created_at, currentPeriodStart)
+                lte(reservationsTable.created_at, currentPeriodStart),
             ));
 
             prevClientStats = {
@@ -525,7 +525,7 @@ export class PartnerRepository {
             .where(and(
                 inArray(venueMatchesTable.venue_id, venueIds),
                 eq(matchesTable.status, 'finished'),
-                gte(matchesTable.scheduled_at, currentPeriodStart)
+                gte(matchesTable.scheduled_at, currentPeriodStart),
             ));
 
         const prevMatches = await db.select({ count: count() })
@@ -535,7 +535,7 @@ export class PartnerRepository {
                 inArray(venueMatchesTable.venue_id, venueIds),
                 eq(matchesTable.status, 'finished'),
                 gte(matchesTable.scheduled_at, previousPeriodStart),
-                lte(matchesTable.scheduled_at, currentPeriodStart)
+                lte(matchesTable.scheduled_at, currentPeriodStart),
             ));
 
         // Get all match stats for overall counts (upcoming/completed total)
@@ -554,7 +554,7 @@ export class PartnerRepository {
             .where(and(
                 inArray(analyticsTable.venue_id, venueIds),
                 eq(analyticsTable.event_type, 'venue_view'),
-                gte(analyticsTable.created_at, currentPeriodStart)
+                gte(analyticsTable.created_at, currentPeriodStart),
             ));
 
         const prevViews = await db.select({ count: count() })
@@ -563,14 +563,14 @@ export class PartnerRepository {
                 inArray(analyticsTable.venue_id, venueIds),
                 eq(analyticsTable.event_type, 'venue_view'),
                 gte(analyticsTable.created_at, previousPeriodStart),
-                lte(analyticsTable.created_at, currentPeriodStart)
+                lte(analyticsTable.created_at, currentPeriodStart),
             ));
 
         const totalViewsResult = await db.select({ count: count() })
             .from(analyticsTable)
             .where(and(
                 inArray(analyticsTable.venue_id, venueIds),
-                eq(analyticsTable.event_type, 'venue_view')
+                eq(analyticsTable.event_type, 'venue_view'),
             ));
 
         return {
@@ -583,7 +583,7 @@ export class PartnerRepository {
                 reservations: calculateTrend(clientStats.totalReservations, prevClientStats.totalReservations),
                 matches: calculateTrend(Number(currentMatches[0]?.count) || 0, Number(prevMatches[0]?.count) || 0),
                 views: calculateTrend(Number(currentViews[0]?.count) || 0, Number(prevViews[0]?.count) || 0),
-            }
+            },
         };
     }
 
@@ -624,7 +624,7 @@ export class PartnerRepository {
             .from(reservationsTable)
             .where(and(
                 inArray(reservationsTable.venue_match_id, vmIds),
-                gte(reservationsTable.created_at, startDate)
+                gte(reservationsTable.created_at, startDate),
             ));
 
         return {
@@ -670,7 +670,7 @@ export class PartnerRepository {
                         first_name: true,
                         last_name: true,
                         email: true,
-                    }
+                    },
                 },
                 venueMatch: {
                     with: {
@@ -678,10 +678,10 @@ export class PartnerRepository {
                             with: {
                                 homeTeam: true,
                                 awayTeam: true,
-                            }
-                        }
-                    }
-                }
+                            },
+                        },
+                    },
+                },
             },
             orderBy: (reservations, { desc }) => [desc(reservations.created_at)],
         });
@@ -696,7 +696,7 @@ export class PartnerRepository {
     async updateReservationStatus(
         reservationId: string, 
         ownerId: string, 
-        newStatus: 'CONFIRMED' | 'DECLINED'
+        newStatus: 'CONFIRMED' | 'DECLINED',
     ): Promise<{ success: boolean; reservation?: any; error?: string; statusCode?: number }> {
         // Get the reservation with venue match and venue info
         const reservation = await db.query.reservationsTable.findFirst({
@@ -709,11 +709,11 @@ export class PartnerRepository {
                                 id: true,
                                 owner_id: true,
                                 name: true,
-                            }
-                        }
-                    }
-                }
-            }
+                            },
+                        },
+                    },
+                },
+            },
         });
 
         if (!reservation) {
@@ -730,7 +730,7 @@ export class PartnerRepository {
             return { 
                 success: false, 
                 error: `Cannot update reservation with status '${reservation.status}'. Only PENDING reservations can be confirmed or declined.`,
-                statusCode: 400 
+                statusCode: 400, 
             };
         }
 
@@ -744,8 +744,8 @@ export class PartnerRepository {
                 updated_at: new Date(),
                 ...(newStatus === 'DECLINED' ? { 
                     canceled_at: new Date(),
-                    canceled_reason: 'Declined by venue owner'
-                } : {})
+                    canceled_reason: 'Declined by venue owner',
+                } : {}),
             })
             .where(eq(reservationsTable.id, reservationId))
             .returning();
@@ -757,8 +757,8 @@ export class PartnerRepository {
             success: true, 
             reservation: {
                 ...updated,
-                status: newStatus // Return the API-friendly status
-            }
+                status: newStatus, // Return the API-friendly status
+            },
         };
     }
 
@@ -804,7 +804,7 @@ export class PartnerRepository {
                         last_name: true,
                         email: true,
                         phone: true,
-                    }
+                    },
                 },
                 venueMatch: {
                     with: {
@@ -812,10 +812,10 @@ export class PartnerRepository {
                             with: {
                                 homeTeam: true,
                                 awayTeam: true,
-                            }
-                        }
-                    }
-                }
+                            },
+                        },
+                    },
+                },
             },
             orderBy: (reservations, { desc }) => [desc(reservations.created_at)],
             limit,
@@ -859,7 +859,7 @@ export class PartnerRepository {
             .from(venueMatchesTable)
             .where(and(
                 eq(venueMatchesTable.venue_id, venueId),
-                eq(venueMatchesTable.match_id, matchId)
+                eq(venueMatchesTable.match_id, matchId),
             ))
             .limit(1);
 
@@ -875,7 +875,7 @@ export class PartnerRepository {
             })
             .where(and(
                 eq(venueMatchesTable.venue_id, venueId),
-                eq(venueMatchesTable.match_id, matchId)
+                eq(venueMatchesTable.match_id, matchId),
             ))
             .returning();
 
@@ -964,7 +964,7 @@ export class PartnerRepository {
     async getMatchesCalendar(venueId: string, ownerId: string, options?: { month?: string; status?: string }) {
         // Verify ownership
         const venue = await db.query.venuesTable.findFirst({
-            where: and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId))
+            where: and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId)),
         });
         if (!venue) {
             return { success: false, error: "Not authorized", statusCode: 403 };
@@ -1029,7 +1029,7 @@ export class PartnerRepository {
         // Get unique dates with matches
         const daysWithMatches = [...new Set(filteredMatches
             .filter(vm => vm.match?.scheduled_at)
-            .map(vm => vm.match!.scheduled_at!.toISOString().split('T')[0])
+            .map(vm => vm.match!.scheduled_at!.toISOString().split('T')[0]),
         )];
 
         return {
@@ -1051,7 +1051,7 @@ export class PartnerRepository {
     async getReservationStats(venueId: string, ownerId: string, dateRange?: { from?: Date; to?: Date }) {
         // Verify ownership
         const venue = await db.query.venuesTable.findFirst({
-            where: and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId))
+            where: and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId)),
         });
         if (!venue) {
             return { success: false, error: "Not authorized", statusCode: 403 };
@@ -1072,7 +1072,7 @@ export class PartnerRepository {
                     reservations: { total: 0, confirmed: 0, cancelled: 0, no_show: 0, cancellation_rate: 0, no_show_rate: 0 },
                     capacity: { total_seats_available: 0, total_seats_reserved: 0, average_occupancy_rate: 0 },
                     customers: { total_unique: 0, new_customers: 0, returning_customers: 0 },
-                }
+                },
             };
         }
 
@@ -1127,7 +1127,7 @@ export class PartnerRepository {
                 customers: {
                     total_unique: uniqueCustomers.length,
                 },
-            }
+            },
         };
     }
 
@@ -1147,10 +1147,10 @@ export class PartnerRepository {
             with: {
                 venueMatch: {
                     with: {
-                        venue: true
-                    }
-                }
-            }
+                        venue: true,
+                    },
+                },
+            },
         });
 
         if (!reservation) {
@@ -1211,10 +1211,10 @@ export class PartnerRepository {
             with: {
                 venueMatch: {
                     with: {
-                        venue: true
-                    }
-                }
-            }
+                        venue: true,
+                    },
+                },
+            },
         });
 
         if (!reservation) {

@@ -15,8 +15,8 @@ export const CreateVenueSchema = z.object({
     photos: z.array(z.object({
         url: z.string().url(),
         altText: z.string().optional(),
-        isPrimary: z.boolean().optional()
-    })).optional()
+        isPrimary: z.boolean().optional(),
+    })).optional(),
 });
 
 export const UpdateVenueSchema = CreateVenueSchema.partial();
@@ -31,7 +31,7 @@ export const GetVenuesSchema = z.object({
     lat: z.coerce.number().min(-90).max(90).optional(),
     lng: z.coerce.number().min(-180).max(180).optional(),
     distance_km: z.coerce.number().positive().default(10),
-    sort: z.enum(['distance', 'rating', 'newest']).default('newest')
+    sort: z.enum(['distance', 'rating', 'newest']).default('newest'),
 }).refine(data => {
     // If distance sort is requested, lat/lng must be present
     if (data.sort === 'distance') {
@@ -40,5 +40,5 @@ export const GetVenuesSchema = z.object({
     return true;
 }, {
     message: "Latitude and Longitude are required for distance sorting",
-    path: ["lat", "lng"]
+    path: ["lat", "lng"],
 });

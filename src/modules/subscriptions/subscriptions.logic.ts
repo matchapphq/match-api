@@ -103,7 +103,7 @@ export class SubscriptionsLogic {
             payment_method_types: [
                 "card",
                 "sepa_debit",
-                "klarna"
+                "klarna",
             ],
             mode: "subscription",
             line_items: lineItems,

@@ -90,7 +90,7 @@ app.use('*', cors({
         'http://matchapp.fr',
         'http://localhost:5173',
         'matchapp.fr',
-        process.env.FRONTEND_URL as string
+        process.env.FRONTEND_URL as string,
     ],
     credentials: true,
 }));

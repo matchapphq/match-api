@@ -10,7 +10,7 @@ export class VenuesLogic {
     constructor(
         private readonly venueRepository: VenueRepository,
         private readonly favoritesRepository: FavoritesRepository,
-        private readonly analyticsRepository: AnalyticsRepository
+        private readonly analyticsRepository: AnalyticsRepository,
     ) {}
 
     // Helper to check active subscription
@@ -43,7 +43,7 @@ export class VenuesLogic {
             lng: longitude,
             distance_km: radiusKm,
             sort: 'distance',
-            limit: 50 // Get more for nearby
+            limit: 50, // Get more for nearby
         });
         
         return result.data.map((venue: any) => ({
@@ -195,7 +195,7 @@ export class VenuesLogic {
 
         return await this.venueRepository.addOpeningHoursException(venueId, {
             ...body,
-            date: exceptionDate
+            date: exceptionDate,
         });
     }
 

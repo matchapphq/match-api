@@ -35,7 +35,7 @@ export class NotificationsRepository {
             offset?: number; 
             unreadOnly?: boolean;
             types?: string[];
-        }
+        },
     ): Promise<Notification[]> {
         const { limit = 50, offset = 0, unreadOnly = false, types } = options || {};
 
@@ -47,8 +47,8 @@ export class NotificationsRepository {
                     unreadOnly ? eq(notificationsTable.is_read, false) : undefined,
                     types && types.length > 0 
                         ? inArray(notificationsTable.type, types as any) 
-                        : undefined
-                )
+                        : undefined,
+                ),
             )
             .orderBy(desc(notificationsTable.created_at))
             .limit(limit)
@@ -65,7 +65,7 @@ export class NotificationsRepository {
             .from(notificationsTable)
             .where(and(
                 eq(notificationsTable.user_id, userId),
-                eq(notificationsTable.is_read, false)
+                eq(notificationsTable.is_read, false),
             ));
         return Number(result[0]?.count || 0);
     }
@@ -78,7 +78,7 @@ export class NotificationsRepository {
             .from(notificationsTable)
             .where(and(
                 eq(notificationsTable.user_id, userId),
-                sql`${notificationsTable.created_at} > ${since}`
+                sql`${notificationsTable.created_at} > ${since}`,
             ))
             .orderBy(desc(notificationsTable.created_at));
     }
@@ -90,11 +90,11 @@ export class NotificationsRepository {
         const [updated] = await db.update(notificationsTable)
             .set({ 
                 is_read: true, 
-                read_at: new Date() 
+                read_at: new Date(), 
             })
             .where(and(
                 eq(notificationsTable.id, notificationId),
-                eq(notificationsTable.user_id, userId)
+                eq(notificationsTable.user_id, userId),
             ))
             .returning();
         return updated || null;
@@ -107,11 +107,11 @@ export class NotificationsRepository {
         const result = await db.update(notificationsTable)
             .set({ 
                 is_read: true, 
-                read_at: new Date() 
+                read_at: new Date(), 
             })
             .where(and(
                 eq(notificationsTable.user_id, userId),
-                eq(notificationsTable.is_read, false)
+                eq(notificationsTable.is_read, false),
             ));
         return result.rowCount || 0;
     }
@@ -123,7 +123,7 @@ export class NotificationsRepository {
         const result = await db.delete(notificationsTable)
             .where(and(
                 eq(notificationsTable.id, notificationId),
-                eq(notificationsTable.user_id, userId)
+                eq(notificationsTable.user_id, userId),
             ));
         return (result.rowCount || 0) > 0;
     }
@@ -139,7 +139,7 @@ export class NotificationsRepository {
             .where(and(
                 eq(notificationsTable.user_id, userId),
                 eq(notificationsTable.is_read, true),
-                sql`${notificationsTable.created_at} < ${cutoffDate}`
+                sql`${notificationsTable.created_at} < ${cutoffDate}`,
             ));
         return result.rowCount || 0;
     }

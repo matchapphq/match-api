@@ -51,7 +51,7 @@ export const subscriptionsTable = pgTable(
             foreignColumns: [usersTable.id],
             name: 'fk_subscriptions_user_id',
         }).onDelete('cascade'),
-    ]
+    ],
 );
 
 export type Subscription = typeof subscriptionsTable.$inferSelect;

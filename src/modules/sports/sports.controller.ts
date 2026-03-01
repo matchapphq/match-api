@@ -29,7 +29,7 @@ const FixtureQuerySchema = PaginationSchema.extend({
     sport_id: z.string().uuid().optional(),
     league_id: z.string().uuid().optional(),
     date: z.string().optional(),
-    status: z.enum(["scheduled", "live", "finished"]).optional()
+    status: z.enum(["scheduled", "live", "finished"]).optional(),
 });
 
 // API-Sports direct query schemas

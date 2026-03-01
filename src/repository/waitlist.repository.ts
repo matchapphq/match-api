@@ -11,15 +11,15 @@ export class WaitlistRepository {
         userId: string,
         venueMatchId: string,
         partySize: number,
-        requiresAccessibility: boolean = false
+        requiresAccessibility: boolean = false,
     ) {
         // Check if user already in waitlist for this match
         const existing = await db.query.waitlistTable.findFirst({
             where: and(
                 eq(waitlistTable.user_id, userId),
                 eq(waitlistTable.venue_match_id, venueMatchId),
-                eq(waitlistTable.status, 'waiting')
-            )
+                eq(waitlistTable.status, 'waiting'),
+            ),
         });
 
         if (existing) {
@@ -31,7 +31,7 @@ export class WaitlistRepository {
             venue_match_id: venueMatchId,
             party_size: partySize,
             requires_accessibility: requiresAccessibility,
-            status: 'waiting'
+            status: 'waiting',
         }).returning();
 
         return { entry, alreadyInQueue: false };
@@ -42,7 +42,7 @@ export class WaitlistRepository {
      */
     async getPosition(waitlistId: string): Promise<number> {
         const entry = await db.query.waitlistTable.findFirst({
-            where: eq(waitlistTable.id, waitlistId)
+            where: eq(waitlistTable.id, waitlistId),
         });
 
         if (!entry) return -1;
@@ -53,7 +53,7 @@ export class WaitlistRepository {
             .where(and(
                 eq(waitlistTable.venue_match_id, entry.venue_match_id),
                 eq(waitlistTable.status, 'waiting'),
-                lte(waitlistTable.created_at, entry.created_at)
+                lte(waitlistTable.created_at, entry.created_at),
             ));
 
         return ahead.length;
@@ -65,7 +65,7 @@ export class WaitlistRepository {
     async getNextInQueue(venueMatchId: string, partySize?: number, accessible?: boolean) {
         const conditions = [
             eq(waitlistTable.venue_match_id, venueMatchId),
-            eq(waitlistTable.status, 'waiting')
+            eq(waitlistTable.status, 'waiting'),
         ];
 
         // If we have a specific table available, filter by compatibility
@@ -79,7 +79,7 @@ export class WaitlistRepository {
 
         return await db.query.waitlistTable.findFirst({
             where: and(...conditions),
-            orderBy: [asc(waitlistTable.created_at)]
+            orderBy: [asc(waitlistTable.created_at)],
         });
     }
 
@@ -94,7 +94,7 @@ export class WaitlistRepository {
                 status: 'notified',
                 notified_at: new Date(),
                 notification_expires_at: notificationExpiry,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(waitlistTable.id, waitlistId))
             .returning();
@@ -110,7 +110,7 @@ export class WaitlistRepository {
             .set({
                 status: 'converted',
                 reservation_id: reservationId,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(waitlistTable.id, waitlistId))
             .returning();
@@ -125,7 +125,7 @@ export class WaitlistRepository {
         const [updated] = await db.update(waitlistTable)
             .set({
                 status: 'expired',
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(waitlistTable.id, waitlistId))
             .returning();
@@ -140,7 +140,7 @@ export class WaitlistRepository {
         const [deleted] = await db.delete(waitlistTable)
             .where(and(
                 eq(waitlistTable.id, waitlistId),
-                eq(waitlistTable.user_id, userId)
+                eq(waitlistTable.user_id, userId),
             ))
             .returning();
 
@@ -154,9 +154,9 @@ export class WaitlistRepository {
         return await db.query.waitlistTable.findMany({
             where: and(
                 eq(waitlistTable.user_id, userId),
-                eq(waitlistTable.status, 'waiting')
+                eq(waitlistTable.status, 'waiting'),
             ),
-            orderBy: [asc(waitlistTable.created_at)]
+            orderBy: [asc(waitlistTable.created_at)],
         });
     }
 
@@ -167,9 +167,9 @@ export class WaitlistRepository {
         return await db.query.waitlistTable.findMany({
             where: and(
                 eq(waitlistTable.venue_match_id, venueMatchId),
-                eq(waitlistTable.status, 'waiting')
+                eq(waitlistTable.status, 'waiting'),
             ),
-            orderBy: [asc(waitlistTable.created_at)]
+            orderBy: [asc(waitlistTable.created_at)],
         });
     }
 
@@ -203,7 +203,7 @@ export class WaitlistRepository {
             .from(waitlistTable)
             .where(and(
                 eq(waitlistTable.venue_match_id, venueMatchId),
-                eq(waitlistTable.status, 'waiting')
+                eq(waitlistTable.status, 'waiting'),
             ));
 
         return entries.reduce((sum, e) => sum + e.party_size, 0);
@@ -214,7 +214,7 @@ export class WaitlistRepository {
      */
     async notifyUserManually(waitlistId: string, expiryMinutes: number = 60) {
         const entry = await db.query.waitlistTable.findFirst({
-            where: eq(waitlistTable.id, waitlistId)
+            where: eq(waitlistTable.id, waitlistId),
         });
 
         if (!entry) {
@@ -236,7 +236,7 @@ export class WaitlistRepository {
                 status: 'notified',
                 notified_at: new Date(),
                 notification_expires_at: notificationExpiry,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(waitlistTable.id, waitlistId))
             .returning();
@@ -257,7 +257,7 @@ export class WaitlistRepository {
      */
     async findById(waitlistId: string) {
         return await db.query.waitlistTable.findFirst({
-            where: eq(waitlistTable.id, waitlistId)
+            where: eq(waitlistTable.id, waitlistId),
         });
     }
 
@@ -272,7 +272,7 @@ export class WaitlistRepository {
             .from(waitlistTable)
             .where(and(
                 eq(waitlistTable.status, 'notified'),
-                lte(waitlistTable.notification_expires_at, now)
+                lte(waitlistTable.notification_expires_at, now),
             ));
 
         // Move them back to waiting (give them another chance) or expire
@@ -282,7 +282,7 @@ export class WaitlistRepository {
                     status: 'waiting', // Or 'expired' if you want stricter policy
                     notified_at: null,
                     notification_expires_at: null,
-                    updated_at: new Date()
+                    updated_at: new Date(),
                 })
                 .where(eq(waitlistTable.id, entry.id));
         }

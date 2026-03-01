@@ -133,7 +133,7 @@ async function verifyAppleSignature(idToken: string, header: AppleTokenHeader) {
             hash: "SHA-256",
         },
         false,
-        ["verify"]
+        ["verify"],
     );
 
     const signedContent = new TextEncoder().encode(`${encodedHeader}.${encodedPayload}`);
@@ -142,7 +142,7 @@ async function verifyAppleSignature(idToken: string, header: AppleTokenHeader) {
         { name: "RSASSA-PKCS1-v1_5" },
         cryptoKey,
         toArrayBuffer(signature),
-        toArrayBuffer(signedContent)
+        toArrayBuffer(signedContent),
     );
 
     if (!valid) {
@@ -184,7 +184,7 @@ export async function verifyAppleIdToken(idToken: string): Promise<AppleProfile>
     const tokenAudiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
     const hasValidAudience = tokenAudiences.some(
         (audience): audience is string =>
-            typeof audience === "string" && allowedClientIds.includes(audience)
+            typeof audience === "string" && allowedClientIds.includes(audience),
     );
 
     if (!hasValidAudience) {

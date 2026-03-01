@@ -35,7 +35,7 @@ export class ReferralLogic {
         if (!/^MATCH-RESTO-[A-Z0-9]{6}$/.test(referralCode)) {
             return { 
                 valid: false, 
-                message: "Format de code invalide" 
+                message: "Format de code invalide", 
             };
         }
 
@@ -44,7 +44,7 @@ export class ReferralLogic {
         if (!validation.valid) {
             return { 
                 valid: false, 
-                message: "Code de parrainage invalide" 
+                message: "Code de parrainage invalide", 
             };
         }
 

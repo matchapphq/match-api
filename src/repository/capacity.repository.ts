@@ -102,7 +102,7 @@ async function releaseHoldCapacity(venueMatchId: string, partySize: number) {
         .set({
             available_capacity: sql`${venueMatchesTable.available_capacity} + ${partySize}`,
             held_capacity: sql`GREATEST(0, ${venueMatchesTable.held_capacity} - ${partySize})`,
-            updated_at: new Date()
+            updated_at: new Date(),
         })
         .where(eq(venueMatchesTable.id, venueMatchId));
     
@@ -138,7 +138,7 @@ export class CapacityRepository {
                 reserved_capacity: true,
                 held_capacity: true,
                 blocked_capacity: true,
-            }
+            },
         });
 
         if (!venueMatch) return null;
@@ -152,13 +152,13 @@ export class CapacityRepository {
             occupied: (venueMatch.reserved_capacity ?? 0) + (venueMatch.held_capacity ?? 0),
             utilizationPct: venueMatch.total_capacity > 0 
                 ? Math.round(((venueMatch.reserved_capacity ?? 0) + (venueMatch.held_capacity ?? 0)) / venueMatch.total_capacity * 100)
-                : 0
+                : 0,
         };
 
         // Cache the result
         capacityCache.set(venueMatchId, {
             data: stats,
-            expiresAt: Date.now() + CACHE_TTL_MS
+            expiresAt: Date.now() + CACHE_TTL_MS,
         });
 
         return stats;
@@ -206,7 +206,7 @@ export class CapacityRepository {
                 available: false, 
                 availableCapacity: venueMatch.available_capacity, 
                 maxGroupSize: venueMatch.max_group_size,
-                message: `Party size exceeds maximum of ${venueMatch.max_group_size} people` 
+                message: `Party size exceeds maximum of ${venueMatch.max_group_size} people`, 
             };
         }
 
@@ -215,14 +215,14 @@ export class CapacityRepository {
                 available: false, 
                 availableCapacity: venueMatch.available_capacity, 
                 maxGroupSize: venueMatch.max_group_size,
-                message: `Not enough capacity. Only ${venueMatch.available_capacity} spots remaining` 
+                message: `Not enough capacity. Only ${venueMatch.available_capacity} spots remaining`, 
             };
         }
 
         return { 
             available: true, 
             availableCapacity: venueMatch.available_capacity, 
-            maxGroupSize: venueMatch.max_group_size 
+            maxGroupSize: venueMatch.max_group_size, 
         };
     }
 
@@ -248,12 +248,12 @@ export class CapacityRepository {
             .set({
                 available_capacity: sql`${venueMatchesTable.available_capacity} - ${partySize}`,
                 held_capacity: sql`${venueMatchesTable.held_capacity} + ${partySize}`,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(and(
                 eq(venueMatchesTable.id, venueMatchId),
                 gte(venueMatchesTable.available_capacity, partySize),
-                eq(venueMatchesTable.allows_reservations, true)
+                eq(venueMatchesTable.allows_reservations, true),
             ))
             .returning();
 
@@ -274,7 +274,7 @@ export class CapacityRepository {
             userId,
             partySize,
             expiresAt: new Date(Date.now() + this.HOLD_DURATION_MS),
-            createdAt: new Date()
+            createdAt: new Date(),
         };
 
         activeHolds.set(holdId, hold);
@@ -322,7 +322,7 @@ export class CapacityRepository {
             .set({
                 held_capacity: sql`GREATEST(0, ${venueMatchesTable.held_capacity} - ${hold.partySize})`,
                 reserved_capacity: sql`${venueMatchesTable.reserved_capacity} + ${hold.partySize}`,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(venueMatchesTable.id, hold.venueMatchId));
 
@@ -359,7 +359,7 @@ export class CapacityRepository {
             .set({
                 available_capacity: sql`${venueMatchesTable.available_capacity} + ${partySize}`,
                 reserved_capacity: sql`GREATEST(0, ${venueMatchesTable.reserved_capacity} - ${partySize})`,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(venueMatchesTable.id, venueMatchId));
         
@@ -384,11 +384,11 @@ export class CapacityRepository {
             .set({
                 available_capacity: sql`${venueMatchesTable.available_capacity} - ${amount}`,
                 blocked_capacity: sql`${venueMatchesTable.blocked_capacity} + ${amount}`,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(and(
                 eq(venueMatchesTable.id, venueMatchId),
-                gte(venueMatchesTable.available_capacity, amount)
+                gte(venueMatchesTable.available_capacity, amount),
             ))
             .returning();
 
@@ -414,11 +414,11 @@ export class CapacityRepository {
             .set({
                 available_capacity: sql`${venueMatchesTable.available_capacity} + ${amount}`,
                 blocked_capacity: sql`GREATEST(0, ${venueMatchesTable.blocked_capacity} - ${amount})`,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(and(
                 eq(venueMatchesTable.id, venueMatchId),
-                gte(venueMatchesTable.blocked_capacity, amount)
+                gte(venueMatchesTable.blocked_capacity, amount),
             ))
             .returning();
 
@@ -451,7 +451,7 @@ export class CapacityRepository {
         if (newAvailable < 0) {
             return { 
                 success: false, 
-                message: `Cannot block ${blockedAmount}. Would result in negative availability. Max blockable: ${stats.total - stats.reserved - stats.held}` 
+                message: `Cannot block ${blockedAmount}. Would result in negative availability. Max blockable: ${stats.total - stats.reserved - stats.held}`, 
             };
         }
 
@@ -459,7 +459,7 @@ export class CapacityRepository {
             .set({
                 available_capacity: newAvailable,
                 blocked_capacity: blockedAmount,
-                updated_at: new Date()
+                updated_at: new Date(),
             })
             .where(eq(venueMatchesTable.id, venueMatchId));
 
@@ -482,9 +482,9 @@ export class CapacityRepository {
                         homeTeam: true,
                         awayTeam: true,
                         league: true,
-                    }
+                    },
                 },
-            }
+            },
         });
 
         if (!result) return null;
@@ -499,12 +499,12 @@ export class CapacityRepository {
                 street_address: true,
                 booking_mode: true,
                 // Exclude: location (geometry field causes parsing issues)
-            }
+            },
         });
 
         return {
             ...result,
-            venue
+            venue,
         };
     }
 

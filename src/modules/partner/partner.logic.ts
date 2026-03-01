@@ -143,7 +143,7 @@ function invoiceMatchesVenue(invoice: any, venueName: string, stripeSubscription
 export class PartnerLogic {
     constructor(
         private readonly partnerRepo: PartnerRepository,
-        private readonly waitlistRepo: WaitlistRepository
+        private readonly waitlistRepo: WaitlistRepository,
     ) {}
 
     async getMyVenues(userId: string) {
@@ -245,13 +245,13 @@ export class PartnerLogic {
         return { 
             checkout_url: session.url,
             session_id: session.id,
-            message: 'Please complete payment to create your venue'
+            message: 'Please complete payment to create your venue',
         };
     }
 
     async verifyCheckoutAndCreateVenue(userId: string, sessionId: string) {
         const session = await stripe.checkout.sessions.retrieve(sessionId, {
-            expand: ['subscription']
+            expand: ['subscription'],
         });
 
         if (session.metadata?.user_id !== userId) {
@@ -275,18 +275,18 @@ export class PartnerLogic {
         const venueData = JSON.parse(venueDataStr || '{}');
         const alreadyExists = existingVenues.some(v => 
             v.name === venueData.name && 
-            v.street_address === venueData.street_address
+            v.street_address === venueData.street_address,
         );
 
         if (alreadyExists) {
             const existingVenue = existingVenues.find(v => 
                 v.name === venueData.name && 
-                v.street_address === venueData.street_address
+                v.street_address === venueData.street_address,
             );
             return { 
                 venue: existingVenue, 
                 message: "Venue already created",
-                already_exists: true 
+                already_exists: true, 
             };
         }
 
@@ -302,10 +302,10 @@ export class PartnerLogic {
             plan: plan,
             status: "active",
             current_period_start: new Date(
-                (stripeSubscription?.current_period_start || Date.now() / 1000) * 1000
+                (stripeSubscription?.current_period_start || Date.now() / 1000) * 1000,
             ),
             current_period_end: new Date(
-                (stripeSubscription?.current_period_end || Date.now() / 1000) * 1000
+                (stripeSubscription?.current_period_end || Date.now() / 1000) * 1000,
             ),
             stripe_subscription_id: stripeSubscription?.id || session.subscription as string,
             stripe_payment_method_id: stripeSubscription?.default_payment_method as string || "unknown",
@@ -333,7 +333,7 @@ export class PartnerLogic {
         return { 
             venue: newVenue, 
             subscription: newSubscription,
-            message: "Venue created successfully" 
+            message: "Venue created successfully", 
         };
     }
 
@@ -439,7 +439,7 @@ export class PartnerLogic {
                 party_size: r.party_size || r.quantity || 1,
                 status: r.status,
             })),
-            total: clients.length
+            total: clients.length,
         };
     }
 
@@ -452,7 +452,7 @@ export class PartnerLogic {
                 customerCount: 0,
                 totalGuests: 0,
                 totalReservations: 0,
-                period: validPeriod
+                period: validPeriod,
             };
         }
 
@@ -475,8 +475,8 @@ export class PartnerLogic {
                     clients: 0,
                     reservations: 0,
                     matches: 0,
-                    views: 0
-                }
+                    views: 0,
+                },
             };
         }
 
@@ -484,10 +484,10 @@ export class PartnerLogic {
 
         const now = new Date();
         const matchesUpcoming = matchStats.filter(m => 
-            m.status !== 'finished' && new Date(m.scheduledAt) > now
+            m.status !== 'finished' && new Date(m.scheduledAt) > now,
         ).length;
         const matchesCompleted = matchStats.filter(m => 
-            m.status === 'finished' || new Date(m.scheduledAt) <= now
+            m.status === 'finished' || new Date(m.scheduledAt) <= now,
         ).length;
 
         const totalCapacity = venueMatches.reduce((sum, vm) => sum + (vm.total_capacity || 0), 0);
@@ -704,7 +704,7 @@ export class PartnerLogic {
                 reservationId: reservation.id,
                 userId: reservation.user_id,
                 partySize: reservation.party_size,
-                status: 'confirmed'
+                status: 'confirmed',
             }).catch(err => console.error('Failed to send confirmation notification:', err));
         } else {
             notifyReservationCancelled({
@@ -712,7 +712,7 @@ export class PartnerLogic {
                 reservationId: reservation.id,
                 userId: reservation.user_id,
                 partySize: reservation.party_size,
-                reason: 'Refusée par l\'établissement'
+                reason: 'Refusée par l\'établissement',
             }).catch(err => console.error('Failed to send cancellation notification:', err));
         }
 

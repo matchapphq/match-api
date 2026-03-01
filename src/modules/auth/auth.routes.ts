@@ -37,7 +37,7 @@ class AuthService {
             authRepository,
             referralRepository,
             redis,
-            storageService
+            storageService,
         );
 
         this.controller = new AuthController(authLogic);

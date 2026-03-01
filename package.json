@@ -5,6 +5,10 @@
   "private": true,
   "scripts": {
     "start": "bun run index.ts",
+    "lint": "bunx eslint \"src/**/*.ts\"",
+    "lint:fix": "bunx eslint \"src/**/*.ts\" --fix",
+    "lint:commas": "bun run lint",
+    "lint:commas:fix": "bun run lint:fix",
     "db:setup": "bun run src/config/setup.db.ts",
     "db:migrate": "bun run db:setup && drizzle-kit migrate",
     "db:generate": "drizzle-kit generate",
