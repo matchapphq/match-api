@@ -6,6 +6,7 @@ import { EmailType } from "../../types/mail.types";
 export class SupportLogic {
     private static readonly DATA_EXPORT_RECIPIENT = "data@matchapp.fr";
     private static readonly BUG_REPORT_RECIPIENT = "dev@matchapp.fr";
+    private static readonly SUPPORT_RECIPIENT = "support@matchapp.fr";
 
     private static buildDataExportText(data: {
         traceId: string;
@@ -20,6 +21,29 @@ export class SupportLogic {
             `User ID: ${data.userId}`,
             `Nom: ${data.userName}`,
             `Email: ${data.userEmail}`,
+            "",
+            "Message utilisateur:",
+            data.message,
+        ].join("\n");
+    }
+
+    private static buildSupportContactText(data: {
+        traceId: string;
+        userId: string;
+        userName: string;
+        userEmail: string;
+        accountType: "pro" | "guest";
+        subject: string;
+        message: string;
+    }): string {
+        return [
+            "Nouvelle demande de contact support",
+            `Trace ID: ${data.traceId}`,
+            `User ID: ${data.userId}`,
+            `Nom: ${data.userName}`,
+            `Email: ${data.userEmail}`,
+            `Type de compte: ${data.accountType}`,
+            `Sujet: ${data.subject}`,
             "",
             "Message utilisateur:",
             data.message,
@@ -66,6 +90,61 @@ export class SupportLogic {
         return {
             success: true,
             message: "Data export request submitted successfully",
+            traceId,
+        };
+    }
+
+    async requestSupportContact(data: {
+        userId: string;
+        userName: string;
+        userEmail: string;
+        accountType: "pro" | "guest";
+        subject: string;
+        message: string;
+    }) {
+        const traceId = randomUUIDv7();
+        const subject = `[SUPPORT] ${data.subject} - ${data.userEmail}`;
+        const requestText = SupportLogic.buildSupportContactText({
+            traceId,
+            userId: data.userId,
+            userName: data.userName,
+            userEmail: data.userEmail,
+            accountType: data.accountType,
+            subject: data.subject,
+            message: data.message,
+        });
+
+        await mailQueue.add(EmailType.SUPPORT_CONTACT_REQUEST, {
+            to: process.env.SUPPORT_EMAIL || SupportLogic.SUPPORT_RECIPIENT,
+            subject,
+            text: requestText,
+            data: {
+                subject,
+                template: EmailTemplate.SUPPORT_CONTACT_REQUEST,
+                text: requestText,
+                variables: {
+                    traceId,
+                    userId: data.userId,
+                    userName: data.userName,
+                    userEmail: data.userEmail,
+                    accountType: data.accountType,
+                    subject: data.subject,
+                    message: data.message,
+                },
+            },
+        }, {
+            removeOnComplete: true,
+            attempts: 3,
+            backoff: {
+                type: "exponential" as const,
+                delay: 1000,
+            },
+            jobId: `${traceId}-${EmailType.SUPPORT_CONTACT_REQUEST}`,
+        });
+
+        return {
+            success: true,
+            message: "Support contact request submitted successfully",
             traceId,
         };
     }
