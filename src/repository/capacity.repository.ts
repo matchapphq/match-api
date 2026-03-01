@@ -481,6 +481,7 @@ export class CapacityRepository {
                     with: {
                         homeTeam: true,
                         awayTeam: true,
+                        league: true,
                     }
                 },
             }

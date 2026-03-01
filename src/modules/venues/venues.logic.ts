@@ -264,7 +264,7 @@ export class VenuesLogic {
         return true;
     }
 
-    async updateFavoriteNote(userId: string, venueId: string, note: string) {
+    async updateFavoriteNote(userId: string, venueId: string, note: string | null) {
         const updated = await this.favoritesRepository.updateNote(userId, venueId, note);
         if (!updated) throw new Error("FAVORITE_NOT_FOUND");
         return updated;
