@@ -5,6 +5,141 @@ import stripe, { CHECKOUT_URLS, isStripeConfigured } from "../../config/stripe";
 import { geocodeAddress } from "../../utils/geocoding";
 import { notifyNewReservation, notifyReservationCancelled } from "../../services/notifications/notification.triggers";
 
+function formatStripePaymentMethod(paymentMethod: any) {
+    if (!paymentMethod || paymentMethod.deleted) {
+        return null;
+    }
+
+    if (paymentMethod.type === "card" && paymentMethod.card) {
+        return {
+            type: "card",
+            brand: paymentMethod.card.brand || null,
+            last4: paymentMethod.card.last4 || null,
+            exp_month: paymentMethod.card.exp_month || null,
+            exp_year: paymentMethod.card.exp_year || null,
+        };
+    }
+
+    if (paymentMethod.type === "sepa_debit" && paymentMethod.sepa_debit) {
+        return {
+            type: "sepa_debit",
+            brand: "SEPA",
+            last4: paymentMethod.sepa_debit.last4 || null,
+            exp_month: null,
+            exp_year: null,
+        };
+    }
+
+    return {
+        type: paymentMethod.type || "other",
+        brand: null,
+        last4: null,
+        exp_month: null,
+        exp_year: null,
+    };
+}
+
+function mapStripeSubscriptionStatus(status?: string) {
+    if (status === "past_due") return "past_due" as const;
+    if (status === "canceled") return "canceled" as const;
+    if (status === "trialing") return "trialing" as const;
+    return "active" as const;
+}
+
+function resolveStripeSubscriptionPeriod(
+    stripeSubscription: any,
+    fallbackStart?: Date | null,
+    fallbackEnd?: Date | null,
+) {
+    const primaryItem = stripeSubscription?.items?.data?.[0];
+
+    const startTimestamp =
+        stripeSubscription?.current_period_start ??
+        primaryItem?.current_period_start ??
+        primaryItem?.current_period?.start ??
+        null;
+
+    const endTimestamp =
+        stripeSubscription?.current_period_end ??
+        primaryItem?.current_period_end ??
+        primaryItem?.current_period?.end ??
+        null;
+
+    return {
+        current_period_start: startTimestamp ? new Date(startTimestamp * 1000) : fallbackStart || null,
+        current_period_end: endTimestamp ? new Date(endTimestamp * 1000) : fallbackEnd || null,
+    };
+}
+
+function mapStripeInvoiceStatus(status?: string) {
+    if (status === "paid") return "paid" as const;
+    if (status === "draft") return "draft" as const;
+    if (status === "void") return "canceled" as const;
+    if (status === "uncollectible") return "overdue" as const;
+    return "pending" as const;
+}
+
+function mapStripeInvoiceForVenue(invoice: any, userId: string, venueId: string, subscriptionId: string) {
+    const createdDate = new Date((invoice.created || Date.now() / 1000) * 1000);
+    const issueDate = createdDate.toISOString().split("T")[0]!;
+    const dueDate = invoice.due_date
+        ? new Date(invoice.due_date * 1000).toISOString().split("T")[0]!
+        : issueDate;
+
+    return {
+        id: invoice.id,
+        user_id: userId,
+        invoice_number: invoice.number || invoice.id,
+        subscription_id: subscriptionId,
+        stripe_subscription_id: typeof invoice.subscription === "string" ? invoice.subscription : null,
+        venue_id: venueId,
+        status: mapStripeInvoiceStatus(invoice.status),
+        issue_date: issueDate,
+        due_date: dueDate,
+        paid_date: invoice.status_transitions?.paid_at
+            ? new Date(invoice.status_transitions.paid_at * 1000).toISOString().split("T")[0]!
+            : null,
+        subtotal: String((invoice.subtotal || 0) / 100),
+        tax: String((invoice.tax || 0) / 100),
+        total: String((invoice.total || 0) / 100),
+        currency: invoice.currency?.toUpperCase() || "EUR",
+        description: invoice.lines?.data?.[0]?.description || invoice.description || "Match subscription",
+        pdf_url: invoice.invoice_pdf || null,
+        created_at: createdDate,
+        updated_at: createdDate,
+    };
+}
+
+function normalizeInvoiceMatchValue(value?: string | null) {
+    return (value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+}
+
+function invoiceMatchesVenue(invoice: any, venueName: string, stripeSubscriptionId?: string | null) {
+    if (stripeSubscriptionId && invoice.subscription === stripeSubscriptionId) {
+        return true;
+    }
+
+    const normalizedVenueName = normalizeInvoiceMatchValue(venueName);
+    if (!normalizedVenueName) {
+        return false;
+    }
+
+    const searchableValues = [
+        invoice.description,
+        invoice.parent?.subscription_details?.metadata?.venue_name,
+        invoice.subscription_details?.metadata?.venue_name,
+        ...(invoice.lines?.data || []).map((line: any) => line?.description),
+    ];
+
+    return searchableValues.some((value) =>
+        normalizeInvoiceMatchValue(String(value || "")).includes(normalizedVenueName),
+    );
+}
+
 export class PartnerLogic {
     constructor(
         private readonly partnerRepo: PartnerRepository,
@@ -50,8 +185,18 @@ export class PartnerLogic {
             phone: data.phone || '',
             email: data.email || '',
             capacity: data.capacity || 0,
+            type: data.type || 'sports_bar',
+            description: data.description || null,
         };
         const venueDataStr = JSON.stringify(venueData);
+        const venueName = String(data.name || '').trim();
+        const stripeProductName = venueName ? `Match - ${venueName}` : `Match - Abonnement ${plan.name}`;
+        const stripeProductDescription = venueName
+            ? `Abonnement ${plan.name} pour ${venueName}`
+            : `Abonnement ${plan.name}`;
+        const stripeSubscriptionDescription = venueName
+            ? `Abonnement ${plan.name} - ${venueName}`
+            : `Match - Abonnement ${plan.name}`;
 
         const successUrl = data.success_url 
             ? `${data.success_url}?checkout=success&session_id={CHECKOUT_SESSION_ID}` 
@@ -67,8 +212,8 @@ export class PartnerLogic {
                 price_data: {
                     currency: plan.currency,
                     product_data: {
-                        name: `Match - Abonnement ${plan.name}`,
-                        description: `Abonnement pour ${data.name}`,
+                        name: stripeProductName,
+                        description: stripeProductDescription,
                     },
                     unit_amount: plan.price * 100,
                     recurring: {
@@ -82,13 +227,16 @@ export class PartnerLogic {
             metadata: {
                 user_id: userId,
                 plan_id: planId,
+                venue_name: venueName,
                 venue_data: venueDataStr,
                 action: 'create_venue',
             },
             subscription_data: {
+                description: stripeSubscriptionDescription,
                 metadata: {
                     user_id: userId,
                     plan_id: planId,
+                    venue_name: venueName,
                 },
             },
             allow_promotion_codes: true,
@@ -178,6 +326,8 @@ export class PartnerLogic {
             phone: venueData.phone || '',
             email: venueData.email || '',
             capacity: venueData.capacity || 0,
+            type: venueData.type || 'sports_bar',
+            description: venueData.description || null,
         });
 
         return { 
@@ -188,10 +338,29 @@ export class PartnerLogic {
     }
 
     async scheduleMatch(userId: string, venueId: string, data: any) {
-        // Verify ownership
-        const isOwner = await this.partnerRepo.verifyVenueOwnership(venueId, userId);
-        if (!isOwner) {
+        const venue = await this.partnerRepo.getVenueByIdAndOwner(venueId, userId);
+        if (!venue) {
             throw new Error("FORBIDDEN");
+        }
+
+        if (!venue.is_active || venue.subscription_status === "canceled" || venue.status === "suspended") {
+            throw new Error("VENUE_SUBSCRIPTION_INACTIVE");
+        }
+
+        if (venue.subscription_id) {
+            const subscription = await subscriptionsRepository.getSubscriptionById(venue.subscription_id);
+            if (
+                !subscription ||
+                subscription.status === "canceled" ||
+                (!subscription.auto_renew && subscription.current_period_end && new Date(subscription.current_period_end) <= new Date())
+            ) {
+                await this.partnerRepo.updateVenueSubscriptionState(venue.subscription_id, {
+                    subscription_status: "canceled",
+                    is_active: false,
+                    status: "suspended",
+                });
+                throw new Error("VENUE_SUBSCRIPTION_INACTIVE");
+            }
         }
 
         const { match_id, total_capacity, capacity } = data;
@@ -348,7 +517,7 @@ export class PartnerLogic {
 
         if (!venue.subscription_id) return null;
 
-        const subscription = await subscriptionsRepository.getSubscriptionById(venue.subscription_id);
+        let subscription = await subscriptionsRepository.getSubscriptionById(venue.subscription_id);
         if (!subscription) return null;
 
         const planInfo = {
@@ -359,12 +528,146 @@ export class PartnerLogic {
         };
 
         const info = planInfo[subscription.plan as keyof typeof planInfo] || { name: subscription.plan, displayPrice: `${subscription.price}€` };
+        let paymentMethod = null;
+        let nextBillingAt = subscription.current_period_end;
+        let cancelAtPeriodEnd = subscription.auto_renew === false;
+        let willRenew = subscription.auto_renew !== false && !subscription.canceled_at && subscription.status !== "canceled";
+
+        if (
+            isStripeConfigured() &&
+            subscription.stripe_subscription_id &&
+            !subscription.stripe_subscription_id.startsWith("mock_") &&
+            !subscription.stripe_subscription_id.startsWith("pending_")
+        ) {
+            try {
+                const stripeSubscription = await stripe.subscriptions.retrieve(subscription.stripe_subscription_id, {
+                    expand: ["default_payment_method"],
+                }) as any;
+                const stripeWillRenew = !(
+                    stripeSubscription.cancel_at_period_end ||
+                    stripeSubscription.cancel_at ||
+                    stripeSubscription.canceled_at ||
+                    stripeSubscription.status === "canceled"
+                );
+                const stripePeriod = resolveStripeSubscriptionPeriod(
+                    stripeSubscription,
+                    subscription.current_period_start,
+                    subscription.current_period_end,
+                );
+
+                subscription =
+                    (await subscriptionsRepository.updateSubscription(subscription.id, {
+                        status: mapStripeSubscriptionStatus(stripeSubscription.status),
+                        current_period_start: stripePeriod.current_period_start || subscription.current_period_start,
+                        current_period_end: stripePeriod.current_period_end || subscription.current_period_end,
+                        auto_renew: stripeWillRenew,
+                        canceled_at: stripeSubscription.canceled_at ? new Date(stripeSubscription.canceled_at * 1000) : null,
+                        stripe_payment_method_id:
+                            (typeof stripeSubscription.default_payment_method === "string"
+                                ? stripeSubscription.default_payment_method
+                                : stripeSubscription.default_payment_method?.id) ||
+                            subscription.stripe_payment_method_id,
+                    })) || subscription;
+                cancelAtPeriodEnd = Boolean(stripeSubscription.cancel_at_period_end);
+                willRenew = stripeWillRenew;
+
+                if (typeof stripeSubscription.default_payment_method === "string") {
+                    if (subscription.stripe_payment_method_id && subscription.stripe_payment_method_id !== "unknown") {
+                        const stripePaymentMethod = await stripe.paymentMethods.retrieve(subscription.stripe_payment_method_id);
+                        paymentMethod = formatStripePaymentMethod(stripePaymentMethod);
+                    }
+                } else {
+                    paymentMethod = formatStripePaymentMethod(stripeSubscription.default_payment_method);
+                }
+
+                const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
+                if (stripeCustomerId && willRenew) {
+                    try {
+                        const upcomingInvoice = await stripe.invoices.createPreview({
+                            customer: stripeCustomerId,
+                            subscription: subscription.stripe_subscription_id,
+                        }) as any;
+
+                        if (upcomingInvoice?.period_end) {
+                            nextBillingAt = new Date(upcomingInvoice.period_end * 1000);
+                        } else if (upcomingInvoice?.next_payment_attempt) {
+                            nextBillingAt = new Date(upcomingInvoice.next_payment_attempt * 1000);
+                        } else if (upcomingInvoice?.lines?.data?.[0]?.period?.end) {
+                            nextBillingAt = new Date(upcomingInvoice.lines.data[0].period.end * 1000);
+                        }
+                    } catch (error: any) {
+                        if (error?.code !== "invoice_upcoming_none") {
+                            console.error("Error fetching Stripe upcoming invoice:", error);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error syncing Stripe subscription/payment method:", error);
+            }
+        }
 
         return {
             ...subscription,
             plan_name: info.name,
             display_price: info.displayPrice,
+            payment_method: paymentMethod,
+            next_billing_at: nextBillingAt,
+            cancel_at_period_end: cancelAtPeriodEnd,
+            auto_renew: willRenew,
+            will_renew: willRenew,
         };
+    }
+
+    async getVenueInvoices(userId: string, venueId: string) {
+        const venue = await this.partnerRepo.getVenueByIdAndOwner(venueId, userId);
+        if (!venue) throw new Error("FORBIDDEN");
+
+        if (!isStripeConfigured()) {
+            return [];
+        }
+
+        const subscription = venue.subscription_id
+            ? await subscriptionsRepository.getSubscriptionById(venue.subscription_id)
+            : null;
+
+        const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
+        if (!stripeCustomerId) {
+            return [];
+        }
+
+        try {
+            const stripeInvoices = await stripe.invoices.list({
+                customer: stripeCustomerId,
+                limit: 100,
+            });
+
+            const matchedInvoices = (stripeInvoices.data as any[]).filter((invoice: any) =>
+                invoiceMatchesVenue(invoice, venue.name, subscription?.stripe_subscription_id),
+            );
+
+            const mappedInvoices = await Promise.all(
+                matchedInvoices.map(async (invoice: any) => {
+                    const stripeSubscriptionId =
+                        typeof invoice.subscription === "string" ? invoice.subscription : null;
+                    const matchedSubscription = stripeSubscriptionId
+                        ? await subscriptionsRepository.getSubscriptionByStripeId(stripeSubscriptionId)
+                        : null;
+
+                    return mapStripeInvoiceForVenue(
+                        invoice,
+                        userId,
+                        venue.id,
+                        matchedSubscription?.id || subscription?.id || venue.subscription_id || "",
+                    );
+                }),
+            );
+
+            return mappedInvoices
+                .sort((a, b) => new Date(b.issue_date || b.created_at).getTime() - new Date(a.issue_date || a.created_at).getTime());
+        } catch (error) {
+            console.error("Error fetching Stripe venue invoices:", error);
+            return [];
+        }
     }
 
     async getVenuePaymentPortal(userId: string, venueId: string) {

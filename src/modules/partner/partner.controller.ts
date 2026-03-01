@@ -88,6 +88,9 @@ class PartnerController {
             return ctx.json({ venueMatch }, 201);
         } catch (error: any) {
             if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 403);
+            if (error.message === "VENUE_SUBSCRIPTION_INACTIVE") {
+                return ctx.json({ error: "Venue subscription inactive", message: "L’abonnement de ce lieu est terminé. Le lieu est désormais inactif et ne peut plus programmer de match." }, 403);
+            }
             console.error("Error scheduling match:", error);
             if (error.code === '23505') {
                 return ctx.json({ error: "Match already scheduled at this venue" }, 409);
@@ -206,6 +209,25 @@ class PartnerController {
             if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 404);
             console.error("Error fetching venue subscription:", error);
             return ctx.json({ error: "Failed to fetch subscription", details: error.message }, 500);
+        }
+    });
+
+    // GET /partners/venues/:venueId/invoices
+    readonly getVenueInvoices = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
+        const venueId = ctx.req.param('venueId');
+
+        if (!venueId) {
+            return ctx.json({ error: "Venue ID required" }, 400);
+        }
+
+        try {
+            const invoices = await this.partnerLogic.getVenueInvoices(userId, venueId);
+            return ctx.json({ invoices });
+        } catch (error: any) {
+            if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 404);
+            console.error("Error fetching venue invoices:", error);
+            return ctx.json({ error: "Failed to fetch invoices", details: error.message }, 500);
         }
     });
 

@@ -145,10 +145,22 @@ export class PartnerRepository {
         return updated;
     }
 
+    async updateVenueSubscriptionState(subscriptionId: string, data: {
+        subscription_status?: 'trialing' | 'active' | 'past_due' | 'canceled';
+        is_active?: boolean;
+        status?: 'pending' | 'approved' | 'rejected' | 'suspended';
+    }) {
+        return db.update(venuesTable)
+            .set(data)
+            .where(eq(venuesTable.subscription_id, subscriptionId))
+            .returning();
+    }
+
     public async createVenue(data: {
         name: string;
         owner_id: string;
         subscription_id: string;
+        description?: string | null;
         street_address: string;
         city: string;
         state_province?: string;
@@ -157,7 +169,7 @@ export class PartnerRepository {
         phone?: string;
         email?: string;
         capacity?: number;
-        type?: string;
+        type?: 'bar' | 'restaurant' | 'fast_food' | 'nightclub' | 'cafe' | 'lounge' | 'pub' | 'sports_bar';
         coords?: { lat: number, lng: number };
     }) {
         let lat = 0;
@@ -192,16 +204,20 @@ export class PartnerRepository {
             name: data.name,
             owner_id: data.owner_id,
             subscription_id: data.subscription_id,
+            description: data.description || null,
             street_address: data.street_address,
             city: data.city,
             state_province: data.state_province || "",
             postal_code: data.postal_code,
             country: data.country,
+            phone: data.phone || null,
+            email: data.email || null,
+            capacity: data.capacity ?? null,
             location: sql`ST_SetSRID(ST_MakePoint(${finalLng}, ${finalLat}), 4326)`,
             formatted_address: formatted_address,
             latitude: finalLat,
             longitude: finalLng,
-            type: 'sports_bar',
+            type: data.type || 'sports_bar',
             status: 'pending',
             is_active: true
         }).returning();
@@ -238,6 +254,17 @@ export class PartnerRepository {
         const venues = await db.select()
             .from(venuesTable)
             .where(and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId)))
+            .limit(1);
+        return venues[0] || null;
+    }
+
+    /**
+     * Get venue by subscription ID
+     */
+    async getVenueBySubscriptionId(subscriptionId: string) {
+        const venues = await db.select()
+            .from(venuesTable)
+            .where(eq(venuesTable.subscription_id, subscriptionId))
             .limit(1);
         return venues[0] || null;
     }
