@@ -19,7 +19,6 @@ class WebhooksController {
         const signature = ctx.req.header("stripe-signature");
 
         if (!signature) {
-            console.error("Stripe webhook: Missing signature");
             return ctx.json({ error: "Missing signature" }, 400);
         }
 

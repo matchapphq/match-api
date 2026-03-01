@@ -12,14 +12,12 @@ export class WebhooksLogic {
     private readonly partnerRepository = new PartnerRepository();
 
     async handleStripeWebhook(signature: string, rawBody: string) {
-        if (!STRIPE_WEBHOOK_SECRET) {
-            throw new Error("WEBHOOK_NOT_CONFIGURED");
-        }
+        if (!STRIPE_WEBHOOK_SECRET) throw new Error("WEBHOOK_NOT_CONFIGURED");
 
         let event: Stripe.Event;
 
         try {
-            event = stripe.webhooks.constructEvent(
+            event = await stripe.webhooks.constructEventAsync(
                 rawBody,
                 signature,
                 STRIPE_WEBHOOK_SECRET,
