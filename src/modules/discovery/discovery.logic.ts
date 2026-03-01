@@ -86,22 +86,21 @@ export class DiscoveryLogic {
         }
 
         if (type === "all" || type === "matches") {
-            const matchConditions = [
-                gte(matchesTable.scheduled_at, new Date())
-            ];
-
-            if (date) {
-                const filterDate = new Date(date);
-                const nextDay = new Date(filterDate);
-                nextDay.setDate(nextDay.getDate() + 1);
-                matchConditions.push(gte(matchesTable.scheduled_at, filterDate));
-                matchConditions.push(lte(matchesTable.scheduled_at, nextDay));
-            }
-
-            const matchWhere = and(...matchConditions);
-
             let allMatches = await db.query.matchesTable.findMany({
-                where: matchWhere,
+                where: (matches, { and, gte, lte }) => {
+                    const conditions = [];
+                    if (date) {
+                        // date is YYYY-MM-DD. Create start and end of that day in UTC.
+                        const start = new Date(`${date}T00:00:00Z`);
+                        const end = new Date(`${date}T23:59:59.999Z`);
+                        conditions.push(gte(matches.scheduled_at, start));
+                        conditions.push(lte(matches.scheduled_at, end));
+                    } else {
+                        // Default: only show future matches
+                        conditions.push(gte(matches.scheduled_at, new Date()));
+                    }
+                    return and(...conditions);
+                },
                 with: {
                     homeTeam: true,
                     awayTeam: true,
