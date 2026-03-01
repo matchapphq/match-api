@@ -212,8 +212,8 @@ export class PartnerLogic {
                 price_data: {
                     currency: plan.currency,
                     product_data: {
-                        name: `Match - Abonnement ${plan.name}`,
-                        description: `Abonnement pour ${data.name}`,
+                        name: stripeProductName,
+                        description: stripeProductDescription,
                     },
                     unit_amount: plan.price * 100,
                     recurring: {
@@ -227,13 +227,16 @@ export class PartnerLogic {
             metadata: {
                 user_id: userId,
                 plan_id: planId,
+                venue_name: venueName,
                 venue_data: venueDataStr,
                 action: 'create_venue',
             },
             subscription_data: {
+                description: stripeSubscriptionDescription,
                 metadata: {
                     user_id: userId,
                     plan_id: planId,
+                    venue_name: venueName,
                 },
             },
             allow_promotion_codes: true,
