@@ -88,6 +88,9 @@ class PartnerController {
             return ctx.json({ venueMatch }, 201);
         } catch (error: any) {
             if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 403);
+            if (error.message === "VENUE_SUBSCRIPTION_INACTIVE") {
+                return ctx.json({ error: "Venue subscription inactive", message: "L’abonnement de ce lieu est terminé. Le lieu est désormais inactif et ne peut plus programmer de match." }, 403);
+            }
             console.error("Error scheduling match:", error);
             if (error.code === '23505') {
                 return ctx.json({ error: "Match already scheduled at this venue" }, 409);

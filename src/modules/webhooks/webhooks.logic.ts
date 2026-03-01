@@ -114,6 +114,11 @@ export class WebhooksLogic {
                     auto_renew: !stripeSubscription.cancel_at_period_end,
                     commitment_end_date: commitmentEndDate,
                 });
+                await this.partnerRepository.updateVenueSubscriptionState(venue.subscription_id, {
+                    subscription_status: "active",
+                    is_active: true,
+                    status: "approved",
+                });
 
                 if (user) {
                     try {
@@ -152,6 +157,11 @@ export class WebhooksLogic {
                     commitment_end_date: commitmentEndDate,
                 });
                 await this.partnerRepository.updateVenueSubscription(venueId, newSubscription.id);
+                await this.partnerRepository.updateVenueSubscriptionState(newSubscription.id, {
+                    subscription_status: "active",
+                    is_active: true,
+                    status: "approved",
+                });
             }
         } else if (action === 'create_venue' && venueDataStr) {
             try {
@@ -294,6 +304,12 @@ export class WebhooksLogic {
     private async handleSubscriptionUpdated(subscription: any) {
         const existingSubscription = await subscriptionsRepository.getSubscriptionByStripeId(subscription.id);
         if (!existingSubscription) return;
+        const willRenew = !(
+            subscription.cancel_at_period_end ||
+            subscription.cancel_at ||
+            subscription.canceled_at ||
+            subscription.status === "canceled"
+        );
 
         let status: "active" | "trialing" | "past_due" | "canceled" = "active";
         if (subscription.status === "past_due") status = "past_due";
@@ -304,16 +320,37 @@ export class WebhooksLogic {
             status: status,
             current_period_start: new Date((subscription.current_period_start || Date.now() / 1000) * 1000),
             current_period_end: new Date((subscription.current_period_end || Date.now() / 1000) * 1000),
-            auto_renew: !subscription.cancel_at_period_end,
+            auto_renew: willRenew,
             canceled_at: subscription.canceled_at ? new Date(subscription.canceled_at * 1000) : null,
         });
+
+        if (subscription.cancel_at_period_end) {
+            await this.partnerRepository.updateVenueSubscriptionState(existingSubscription.id, {
+                subscription_status: status,
+            });
+        } else {
+            await this.partnerRepository.updateVenueSubscriptionState(existingSubscription.id, {
+                subscription_status: status,
+                is_active: true,
+                status: "approved",
+            });
+        }
     }
 
     private async handleSubscriptionDeleted(subscription: any) {
+        const existingSubscription = await subscriptionsRepository.getSubscriptionByStripeId(subscription.id);
+        if (!existingSubscription) return;
+
         await subscriptionsRepository.updateSubscriptionByStripeId(subscription.id, {
             status: "canceled",
             canceled_at: new Date(),
             auto_renew: false,
+        });
+
+        await this.partnerRepository.updateVenueSubscriptionState(existingSubscription.id, {
+            subscription_status: "canceled",
+            is_active: false,
+            status: "suspended",
         });
     }
 

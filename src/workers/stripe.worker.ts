@@ -173,6 +173,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
                     commitment_end_date: commitmentEndDate,
                 },
             );
+            await partnerRepository.updateVenueSubscriptionState(venue.subscription_id, {
+                subscription_status: "active",
+                is_active: true,
+                status: "approved",
+            });
             console.log(
                 `Subscription updated for venue ${venueId} with plan ${plan}`,
             );
@@ -204,6 +209,11 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
                 venueId,
                 newSubscriptionId,
             );
+            await partnerRepository.updateVenueSubscriptionState(newSubscriptionId, {
+                subscription_status: "active",
+                is_active: true,
+                status: "approved",
+            });
             console.log(
                 `New subscription created and linked to venue ${venueId} with plan ${plan}`,
             );
@@ -427,6 +437,12 @@ async function handleSubscriptionUpdated(subscription: any) {
         console.log("Subscription not found:", subscription.id);
         return;
     }
+    const willRenew = !(
+        subscription.cancel_at_period_end ||
+        subscription.cancel_at ||
+        subscription.canceled_at ||
+        subscription.status === "canceled"
+    );
 
     // Map Stripe status to our status
     let status: "active" | "trialing" | "past_due" | "canceled" = "active";
@@ -446,12 +462,24 @@ async function handleSubscriptionUpdated(subscription: any) {
                 (subscription.current_period_end || Date.now() / 1000) *
                     1000,
             ),
-            auto_renew: !subscription.cancel_at_period_end,
+            auto_renew: willRenew,
             canceled_at: subscription.canceled_at
                 ? new Date(subscription.canceled_at * 1000)
                 : null,
         },
     );
+
+    if (subscription.cancel_at_period_end) {
+        await new PartnerRepository().updateVenueSubscriptionState(existingSubscription.id, {
+            subscription_status: status,
+        });
+    } else {
+        await new PartnerRepository().updateVenueSubscriptionState(existingSubscription.id, {
+            subscription_status: status,
+            is_active: true,
+            status: "approved",
+        });
+    }
 
     console.log("Subscription updated:", subscription.id);
 }
@@ -465,6 +493,15 @@ async function handleSubscriptionDeleted(subscription: any) {
         "Processing customer.subscription.deleted:",
         subscription.id,
     );
+
+    const existingSubscription =
+        await subscriptionsRepository.getSubscriptionByStripeId(
+            subscription.id,
+        );
+    if (!existingSubscription) {
+        console.log("Subscription not found:", subscription.id);
+        return;
+    }
 
     await subscriptionsRepository.updateSubscriptionByStripeId(
         subscription.id,

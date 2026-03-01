@@ -145,10 +145,22 @@ export class PartnerRepository {
         return updated;
     }
 
+    async updateVenueSubscriptionState(subscriptionId: string, data: {
+        subscription_status?: 'trialing' | 'active' | 'past_due' | 'canceled';
+        is_active?: boolean;
+        status?: 'pending' | 'approved' | 'rejected' | 'suspended';
+    }) {
+        return db.update(venuesTable)
+            .set(data)
+            .where(eq(venuesTable.subscription_id, subscriptionId))
+            .returning();
+    }
+
     public async createVenue(data: {
         name: string;
         owner_id: string;
         subscription_id: string;
+        description?: string | null;
         street_address: string;
         city: string;
         state_province?: string;
