@@ -185,8 +185,18 @@ export class PartnerLogic {
             phone: data.phone || '',
             email: data.email || '',
             capacity: data.capacity || 0,
+            type: data.type || 'sports_bar',
+            description: data.description || null,
         };
         const venueDataStr = JSON.stringify(venueData);
+        const venueName = String(data.name || '').trim();
+        const stripeProductName = venueName ? `Match - ${venueName}` : `Match - Abonnement ${plan.name}`;
+        const stripeProductDescription = venueName
+            ? `Abonnement ${plan.name} pour ${venueName}`
+            : `Abonnement ${plan.name}`;
+        const stripeSubscriptionDescription = venueName
+            ? `Abonnement ${plan.name} - ${venueName}`
+            : `Match - Abonnement ${plan.name}`;
 
         const successUrl = data.success_url 
             ? `${data.success_url}?checkout=success&session_id={CHECKOUT_SESSION_ID}` 

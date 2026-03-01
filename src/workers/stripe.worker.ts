@@ -259,6 +259,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
                 name: venueData.name,
                 owner_id: userId,
                 subscription_id: newSubscription.id,
+                description: venueData.description || null,
                 street_address: venueData.street_address,
                 city: venueData.city,
                 state_province: venueData.state_province,
@@ -267,6 +268,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
                 phone: venueData.phone,
                 email: venueData.email,
                 capacity: venueData.capacity,
+                type: venueData.type || 'sports_bar',
                 coords: { lat, lng }
             });
             

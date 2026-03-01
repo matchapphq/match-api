@@ -191,6 +191,7 @@ export class WebhooksLogic {
                     name: venueData.name,
                     owner_id: userId,
                     subscription_id: newSubscription.id,
+                    description: venueData.description || null,
                     street_address: venueData.street_address,
                     city: venueData.city,
                     state_province: venueData.state_province,
@@ -199,6 +200,7 @@ export class WebhooksLogic {
                     phone: venueData.phone,
                     email: venueData.email,
                     capacity: venueData.capacity,
+                    type: venueData.type || 'sports_bar',
                     coords
                 });
                 

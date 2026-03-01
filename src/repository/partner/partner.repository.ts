@@ -169,7 +169,7 @@ export class PartnerRepository {
         phone?: string;
         email?: string;
         capacity?: number;
-        type?: string;
+        type?: 'bar' | 'restaurant' | 'fast_food' | 'nightclub' | 'cafe' | 'lounge' | 'pub' | 'sports_bar';
         coords?: { lat: number, lng: number };
     }) {
         let lat = 0;
@@ -204,16 +204,20 @@ export class PartnerRepository {
             name: data.name,
             owner_id: data.owner_id,
             subscription_id: data.subscription_id,
+            description: data.description || null,
             street_address: data.street_address,
             city: data.city,
             state_province: data.state_province || "",
             postal_code: data.postal_code,
             country: data.country,
+            phone: data.phone || null,
+            email: data.email || null,
+            capacity: data.capacity ?? null,
             location: sql`ST_SetSRID(ST_MakePoint(${finalLng}, ${finalLat}), 4326)`,
             formatted_address: formatted_address,
             latitude: finalLat,
             longitude: finalLng,
-            type: 'sports_bar',
+            type: data.type || 'sports_bar',
             status: 'pending',
             is_active: true
         }).returning();
