@@ -2,6 +2,7 @@ import { createMiddleware } from "hono/factory";
 import { JwtUtils } from "../utils/jwt";
 import { getSignedCookie } from "hono/cookie";
 import TokenRepository from "../repository/token.repository";
+import type { HonoEnv } from "../types/hono.types";
 
 const tokenRepository = new TokenRepository();
 const parsePositiveDays = (envValue: string | undefined, defaultDays: number): number => {
@@ -11,7 +12,7 @@ const parsePositiveDays = (envValue: string | undefined, defaultDays: number): n
 const sessionInactivityMs =
     parsePositiveDays(process.env.SESSION_INACTIVITY_DAYS, 7) * 24 * 60 * 60 * 1000;
 
-export const authMiddleware = createMiddleware(async (c, next) => {
+export const authMiddleware = createMiddleware<HonoEnv>(async (c, next) => {
     if (!Bun.env.ACCESS_JWT_SIGN_KEY) {
         return c.json({ error: "JWT signing key not found" }, 500);
     }
