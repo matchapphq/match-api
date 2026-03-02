@@ -79,10 +79,14 @@ export const userPreferencesTable = pgTable(
 
         // Notifications
         notification_settings: jsonb('notification_settings').default({
-            email: true,
-            push: true,
-            sms: false,
-            marketing: false,
+            email_reservations: true,
+            email_modifications: true,
+            email_cancellations: true,
+            email_match_reminders: true,
+            push_reservations: true,
+            push_updates: true,
+            sms_new_reservations: true,
+            sms_cancellations: true,
         }),
 
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

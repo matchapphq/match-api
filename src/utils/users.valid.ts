@@ -17,12 +17,13 @@ export const UpdatePasswordSchema = z.object({
 
 export const UpdateNotificationPreferencesSchema = z.object({
     email_reservations: z.boolean().optional(),
-    email_marketing: z.boolean().optional(),
-    email_updates: z.boolean().optional(),
+    email_modifications: z.boolean().optional(),
+    email_cancellations: z.boolean().optional(),
+    email_match_reminders: z.boolean().optional(),
     push_reservations: z.boolean().optional(),
-    push_marketing: z.boolean().optional(),
     push_updates: z.boolean().optional(),
-    sms_reservations: z.boolean().optional(),
+    sms_new_reservations: z.boolean().optional(),
+    sms_cancellations: z.boolean().optional(),
 }).refine((data) => Object.keys(data).length > 0, {
     message: "At least one notification preference must be provided",
 });
