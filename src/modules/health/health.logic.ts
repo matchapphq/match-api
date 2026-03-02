@@ -1,4 +1,4 @@
-import { mailQueue } from "../../queue/notification.queue";
+import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailType } from "../../types/mail.types";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
@@ -14,21 +14,22 @@ export class HealthLogic {
             subject: string,
             data: any,
         ) => {
-            await mailQueue.add(
-                emailType,
-                {
+            await queueEmailIfAllowed({
+                jobName: emailType,
+                isTransactional: true,
+                payload: {
                     to: email,
                     subject,
                     type: emailType,
                     data,
                 },
-                {
+                options: {
                     attempts: 3,
                     backoff: { type: "exponential", delay: 2000 },
                     removeOnComplete: { age: 3600, count: 100 },
                     removeOnFail: { age: 2 * 24 * 3600, count: 1000 },
                 },
-            );
+            });
         };
 
         const tests: Record<string, () => Promise<void>> = {
