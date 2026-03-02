@@ -157,12 +157,13 @@ export class UserLogic {
         userId: string,
         updates: {
             email_reservations?: boolean;
-            email_marketing?: boolean;
-            email_updates?: boolean;
+            email_modifications?: boolean;
+            email_cancellations?: boolean;
+            email_match_reminders?: boolean;
             push_reservations?: boolean;
-            push_marketing?: boolean;
             push_updates?: boolean;
-            sms_reservations?: boolean;
+            sms_new_reservations?: boolean;
+            sms_cancellations?: boolean;
         },
     ) {
         return await this.userRepository.updateNotificationPreferences(userId, updates);
