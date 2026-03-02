@@ -3,7 +3,7 @@ import { FavoritesRepository } from "../../repository/favorites.repository";
 import TokenRepository from "../../repository/token.repository";
 import { StorageService } from "../../services/storage.service";
 import { password as BunPassword } from "bun";
-import { mailQueue } from "../../queue/notification.queue";
+import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { decodeSessionDevice, mergeSessionDevicePreservingLocation } from "../../utils/session-device";
 import { EmailType } from "../../types/mail.types";
 
@@ -157,12 +157,13 @@ export class UserLogic {
         userId: string,
         updates: {
             email_reservations?: boolean;
-            email_marketing?: boolean;
-            email_updates?: boolean;
+            email_modifications?: boolean;
+            email_cancellations?: boolean;
+            email_match_reminders?: boolean;
             push_reservations?: boolean;
-            push_marketing?: boolean;
             push_updates?: boolean;
-            sms_reservations?: boolean;
+            sms_new_reservations?: boolean;
+            sms_cancellations?: boolean;
         },
     ) {
         return await this.userRepository.updateNotificationPreferences(userId, updates);
@@ -217,17 +218,22 @@ export class UserLogic {
 
         // Best effort email notification, must never block account deletion.
         try {
-            await mailQueue.add(EmailType.ACCOUNT_DELETION, {
-                to: user.email,
-                subject:
-                    user.role === "venue_owner"
-                        ? `Compte partenaire désactivé (réactivation possible ${this.accountDeletionGraceDays} jours)`
-                        : `Compte désactivé (réactivation possible ${this.accountDeletionGraceDays} jours)`,
-                data: {
-                    userName: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email,
-                    role: user.role,
-                    graceDays: this.accountDeletionGraceDays,
-                    reactivationDeadline,
+            await queueEmailIfAllowed({
+                jobName: EmailType.ACCOUNT_DELETION,
+                recipientUserId: user.id,
+                isTransactional: true,
+                payload: {
+                    to: user.email,
+                    subject:
+                        user.role === "venue_owner"
+                            ? `Compte partenaire désactivé (réactivation possible ${this.accountDeletionGraceDays} jours)`
+                            : `Compte désactivé (réactivation possible ${this.accountDeletionGraceDays} jours)`,
+                    data: {
+                        userName: [user.first_name, user.last_name].filter(Boolean).join(" ") || user.email,
+                        role: user.role,
+                        graceDays: this.accountDeletionGraceDays,
+                        reactivationDeadline,
+                    },
                 },
             });
         } catch (error) {
@@ -264,22 +270,28 @@ export class UserLogic {
         // Best effort security notification: do not block password update if mail enqueue fails.
         try {
             const userName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.email;
-            await mailQueue.add(EmailType.PASSWORD_CHANGED, {
-                to: user.email,
-                subject: "Alerte de sécurité: votre mot de passe a été modifié",
-                data: {
-                    template: EmailType.PASSWORD_CHANGED,
-                    userName,
-                    changedAt: new Date().toISOString(),
-                    supportEmail: "support@matchapp.fr",
-                    text: "Alerte de sécurité: le mot de passe de votre compte Match a été modifié. Si vous ne reconnaissez pas cette activité ou si vous n'êtes pas à l'origine de ce changement, répondez à cet email ou contactez immédiatement support@matchapp.fr.",
+            await queueEmailIfAllowed({
+                jobName: EmailType.PASSWORD_CHANGED,
+                recipientUserId: user.id,
+                isTransactional: true,
+                payload: {
+                    to: user.email,
+                    subject: "Alerte de sécurité: votre mot de passe a été modifié",
+                    data: {
+                        template: EmailType.PASSWORD_CHANGED,
+                        userName,
+                        changedAt: new Date().toISOString(),
+                        supportEmail: "support@matchapp.fr",
+                        text: "Alerte de sécurité: le mot de passe de votre compte Match a été modifié. Si vous ne reconnaissez pas cette activité ou si vous n'êtes pas à l'origine de ce changement, répondez à cet email ou contactez immédiatement support@matchapp.fr.",
+                    },
                 },
-            }, {
-                removeOnComplete: true,
-                attempts: 3,
-                backoff: {
-                    type: "exponential" as const,
-                    delay: 1000,
+                options: {
+                    removeOnComplete: true,
+                    attempts: 3,
+                    backoff: {
+                        type: "exponential" as const,
+                        delay: 1000,
+                    },
                 },
             });
         } catch (error) {

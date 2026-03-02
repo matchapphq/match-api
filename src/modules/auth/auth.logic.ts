@@ -6,7 +6,7 @@ import AuthRepository from "../../repository/auth/auth.repository";
 import referralRepository, { ReferralRepository } from "../../repository/referral.repository";
 import { userOnaboarding } from "./auth.helper";
 import { Redis } from "ioredis";
-import { mailQueue } from "../../queue/notification.queue";
+import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import type { userRegisterData } from "../../utils/userData";
 import { verifyGoogleIdToken } from "../../utils/googleAuth";
 import { verifyAppleIdToken } from "../../utils/appleAuth";
@@ -404,19 +404,25 @@ export class AuthLogic {
         const code = Math.floor(100000 + Math.random() * 900000).toString();
         await this.redis.set(`RESET_CODE:${email}`, code, "EX", 15 * 60);
 
-        await mailQueue.add("forgot-password", {
-            to: email,
-            data: {
-                firstName: user.first_name,
-                lastName: user.last_name,
-                subject: "Reset Password",
-                code,
+        await queueEmailIfAllowed({
+            jobName: EmailType.FORGOT_PASSWORD,
+            recipientUserId: user.id,
+            isTransactional: true,
+            payload: {
+                to: email,
+                data: {
+                    firstName: user.first_name,
+                    lastName: user.last_name,
+                    subject: "Reset Password",
+                    code,
+                },
             },
-        }, {
-            attempts: 3,
-            backoff: { type: "exponential", delay: 5000 },
-            priority: 3,
-            jobId: randomUUIDv7() as string,
+            options: {
+                attempts: 3,
+                backoff: { type: "exponential", delay: 5000 },
+                priority: 3,
+                jobId: randomUUIDv7() as string,
+            },
         });
     }
 
@@ -485,18 +491,27 @@ export class AuthLogic {
     private async enqueueWelcomeEmail(user: any, template: string, path: string) {
         try {
             const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-            await mailQueue.add(template, {
-                to: user.email,
-                subject: template === "welcome" ? "Welcome to Match!" : "Welcome to Match Partner!",
-                data: {
-                    userName: user.first_name,
-                    actionLink: `${frontendUrl}${path}`,
+            const jobName =
+                template === EmailType.WELCOME_PARTNER ? EmailType.WELCOME_PARTNER : EmailType.WELCOME;
+
+            await queueEmailIfAllowed({
+                jobName,
+                recipientUserId: user.id,
+                isTransactional: true,
+                payload: {
+                    to: user.email,
+                    subject: template === EmailType.WELCOME ? "Welcome to Match!" : "Welcome to Match Partner!",
+                    data: {
+                        userName: user.first_name,
+                        actionLink: `${frontendUrl}${path}`,
+                    },
                 },
-            }, {
-                attempts: 3,
-                backoff: { type: "exponential", delay: 5000 },
-                priority: 2,
-                jobId: `welcome-${user.id}`,
+                options: {
+                    attempts: 3,
+                    backoff: { type: "exponential", delay: 5000 },
+                    priority: 2,
+                    jobId: `welcome-${user.id}`,
+                },
             });
         } catch (error) {
             console.error(`Failed to enqueue welcome email (${template}):`, error);
@@ -516,9 +531,11 @@ export class AuthLogic {
             const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
             const displayName = fullName || user.email;
 
-            await mailQueue.add(
-                EmailType.WELCOME_BACK,
-                {
+            await queueEmailIfAllowed({
+                jobName: EmailType.WELCOME_BACK,
+                recipientUserId: user.id,
+                isTransactional: true,
+                payload: {
                     to: user.email,
                     subject: isVenueOwner ? "Bon retour sur Match Partner" : "Bon retour sur Match",
                     data: {
@@ -528,13 +545,13 @@ export class AuthLogic {
                         ...(isVenueOwner ? { actionLink: `${frontendUrl}/dashboard` } : {}),
                     },
                 },
-                {
+                options: {
                     attempts: 3,
                     backoff: { type: "exponential", delay: 5000 },
                     priority: 2,
                     jobId: `welcome-back-${user.id}-${Date.now()}`,
                 },
-            );
+            });
         } catch (error) {
             console.error("Failed to enqueue welcome-back email:", error);
         }

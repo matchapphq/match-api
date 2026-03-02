@@ -16,22 +16,24 @@ export interface SavePreferencesData {
 
 export interface NotificationPreferences {
     email_reservations: boolean;
-    email_marketing: boolean;
-    email_updates: boolean;
+    email_modifications: boolean;
+    email_cancellations: boolean;
+    email_match_reminders: boolean;
     push_reservations: boolean;
-    push_marketing: boolean;
     push_updates: boolean;
-    sms_reservations: boolean;
+    sms_new_reservations: boolean;
+    sms_cancellations: boolean;
 }
 
 export interface UpdateNotificationPreferencesData {
     email_reservations?: boolean;
-    email_marketing?: boolean;
-    email_updates?: boolean;
+    email_modifications?: boolean;
+    email_cancellations?: boolean;
+    email_match_reminders?: boolean;
     push_reservations?: boolean;
-    push_marketing?: boolean;
     push_updates?: boolean;
-    sms_reservations?: boolean;
+    sms_new_reservations?: boolean;
+    sms_cancellations?: boolean;
 }
 
 export interface PrivacyPreferences {
@@ -70,12 +72,13 @@ const toAuthUser = (user: typeof usersTable.$inferSelect): AuthUser => ({
 
 const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
     email_reservations: true,
-    email_marketing: false,
-    email_updates: true,
+    email_modifications: true,
+    email_cancellations: true,
+    email_match_reminders: true,
     push_reservations: true,
-    push_marketing: false,
     push_updates: true,
-    sms_reservations: false,
+    sms_new_reservations: true,
+    sms_cancellations: true,
 };
 
 const DEFAULT_PRIVACY_PREFERENCES: PrivacyPreferences = {
@@ -92,21 +95,34 @@ const asRecord = (value: unknown): Record<string, unknown> => {
 const asBoolean = (value: unknown, fallback: boolean): boolean =>
     typeof value === "boolean" ? value : fallback;
 
+const mergeDefinedBooleanUpdates = <T extends object>(
+    current: T,
+    updates: Partial<T>,
+): T => {
+    const next = { ...current };
+
+    for (const key of Object.keys(updates) as Array<keyof T>) {
+        const value = updates[key];
+        if (typeof value === "boolean") {
+            next[key] = value as T[keyof T];
+        }
+    }
+
+    return next;
+};
+
 const normalizeNotificationPreferences = (settings: unknown): NotificationPreferences => {
     const raw = asRecord(settings);
-    const legacyEmail = asBoolean(raw.email, DEFAULT_NOTIFICATION_PREFERENCES.email_updates);
-    const legacyPush = asBoolean(raw.push, DEFAULT_NOTIFICATION_PREFERENCES.push_updates);
-    const legacySms = asBoolean(raw.sms, DEFAULT_NOTIFICATION_PREFERENCES.sms_reservations);
-    const legacyMarketing = asBoolean(raw.marketing, DEFAULT_NOTIFICATION_PREFERENCES.email_marketing);
 
     return {
-        email_reservations: asBoolean(raw.email_reservations, legacyEmail),
-        email_marketing: asBoolean(raw.email_marketing, legacyMarketing),
-        email_updates: asBoolean(raw.email_updates, legacyEmail),
-        push_reservations: asBoolean(raw.push_reservations, legacyPush),
-        push_marketing: asBoolean(raw.push_marketing, legacyMarketing),
-        push_updates: asBoolean(raw.push_updates, legacyPush),
-        sms_reservations: asBoolean(raw.sms_reservations, legacySms),
+        email_reservations: asBoolean(raw.email_reservations, DEFAULT_NOTIFICATION_PREFERENCES.email_reservations),
+        email_modifications: asBoolean(raw.email_modifications, DEFAULT_NOTIFICATION_PREFERENCES.email_modifications),
+        email_cancellations: asBoolean(raw.email_cancellations, DEFAULT_NOTIFICATION_PREFERENCES.email_cancellations),
+        email_match_reminders: asBoolean(raw.email_match_reminders, DEFAULT_NOTIFICATION_PREFERENCES.email_match_reminders),
+        push_reservations: asBoolean(raw.push_reservations, DEFAULT_NOTIFICATION_PREFERENCES.push_reservations),
+        push_updates: asBoolean(raw.push_updates, DEFAULT_NOTIFICATION_PREFERENCES.push_updates),
+        sms_new_reservations: asBoolean(raw.sms_new_reservations, DEFAULT_NOTIFICATION_PREFERENCES.sms_new_reservations),
+        sms_cancellations: asBoolean(raw.sms_cancellations, DEFAULT_NOTIFICATION_PREFERENCES.sms_cancellations),
     };
 };
 
@@ -121,18 +137,11 @@ const normalizePrivacyPreferences = (settings: unknown): PrivacyPreferences => {
 };
 
 const mergePreferenceSettings = (
-    existingSettings: Record<string, unknown>,
     notifications: NotificationPreferences,
     privacy: PrivacyPreferences,
 ): Record<string, unknown> => ({
-    ...existingSettings,
     ...notifications,
     ...privacy,
-    // Legacy keys kept for backward compatibility with old payloads/readers.
-    email: notifications.email_reservations || notifications.email_updates,
-    push: notifications.push_reservations || notifications.push_updates,
-    sms: notifications.sms_reservations,
-    marketing: notifications.email_marketing || notifications.push_marketing || privacy.marketing_consent,
 });
 
 class UserRepository {
@@ -433,14 +442,13 @@ class UserRepository {
     ): Promise<NotificationPreferences> {
         const existing = await this.getUserPreferenceRow(userId);
         const existingSettings = asRecord(existing?.notification_settings);
-
-        const nextNotifications: NotificationPreferences = {
-            ...normalizeNotificationPreferences(existingSettings),
-            ...updates,
-        };
+        const nextNotifications = mergeDefinedBooleanUpdates(
+            normalizeNotificationPreferences(existingSettings),
+            updates,
+        );
 
         const nextPrivacy = normalizePrivacyPreferences(existingSettings);
-        const mergedSettings = mergePreferenceSettings(existingSettings, nextNotifications, nextPrivacy);
+        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy);
         await this.upsertPreferenceSettings(userId, mergedSettings);
 
         return nextNotifications;
@@ -459,12 +467,12 @@ class UserRepository {
         const existingSettings = asRecord(existing?.notification_settings);
 
         const nextNotifications = normalizeNotificationPreferences(existingSettings);
-        const nextPrivacy: PrivacyPreferences = {
-            ...normalizePrivacyPreferences(existingSettings),
-            ...updates,
-        };
+        const nextPrivacy = mergeDefinedBooleanUpdates(
+            normalizePrivacyPreferences(existingSettings),
+            updates,
+        );
 
-        const mergedSettings = mergePreferenceSettings(existingSettings, nextNotifications, nextPrivacy);
+        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy);
         await this.upsertPreferenceSettings(userId, mergedSettings);
 
         return nextPrivacy;

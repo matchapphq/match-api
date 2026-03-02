@@ -5,7 +5,8 @@ import { PartnerRepository } from "../../repository/partner/partner.repository";
 import boostRepository from "../../repository/boost.repository";
 import UserRepository from "../../repository/user.repository";
 import { geocodeAddress } from "../../utils/geocoding";
-import { mailQueue } from "../../queue/notification.queue";
+import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
+import { EmailType } from "../../types/mail.types";
 
 export class WebhooksLogic {
     private readonly userRepository = new UserRepository();
@@ -122,22 +123,28 @@ export class WebhooksLogic {
 
                 if (user) {
                     try {
-                        await mailQueue.add("venue-payment-success", {
-                            to: user.email,
-                            subject: "Confirmation de paiement - Match",
-                            data: {
-                                userName: user.first_name,
-                                venueName: venue.name,
-                                amount: `${(amount / 100).toFixed(2)}€`,
-                                planName: plan === 'pro' ? 'Annuel (Pro)' : 'Mensuel (Basic)',
-                                date: new Date().toLocaleDateString('fr-FR'),
-                                invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf,
+                        await queueEmailIfAllowed({
+                            jobName: EmailType.VENUE_PAYMENT_SUCCESS,
+                            recipientUserId: user.id,
+                            isTransactional: true,
+                            payload: {
+                                to: user.email,
+                                subject: "Confirmation de paiement - Match",
+                                data: {
+                                    userName: user.first_name,
+                                    venueName: venue.name,
+                                    amount: `${(amount / 100).toFixed(2)}€`,
+                                    planName: plan === 'pro' ? 'Annuel (Pro)' : 'Mensuel (Basic)',
+                                    date: new Date().toLocaleDateString('fr-FR'),
+                                    invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf,
+                                },
                             },
-                        }, {
-                            attempts: 3,
-                            backoff: { type: "exponential", delay: 5000 },
-                            priority: 2,
-                            jobId: `payment-${subscriptionId}`,
+                            options: {
+                                attempts: 3,
+                                backoff: { type: "exponential", delay: 5000 },
+                                priority: 2,
+                                jobId: `payment-${subscriptionId}`,
+                            },
                         });
                     } catch (err) {
                         console.error("Failed to send payment success email:", err);
@@ -206,22 +213,28 @@ export class WebhooksLogic {
                 
                 if (newVenue && user) {
                     try {
-                        await mailQueue.add("venue-payment-success", {
-                            to: user.email,
-                            subject: "Confirmation de paiement - Match",
-                            data: {
-                                userName: user.first_name,
-                                venueName: newVenue.name,
-                                amount: `${(amount / 100).toFixed(2)}€`,
-                                planName: plan === 'pro' ? 'Annuel (Pro)' : 'Mensuel (Basic)',
-                                date: new Date().toLocaleDateString('fr-FR'),
-                                invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf,
+                        await queueEmailIfAllowed({
+                            jobName: EmailType.VENUE_PAYMENT_SUCCESS,
+                            recipientUserId: user.id,
+                            isTransactional: true,
+                            payload: {
+                                to: user.email,
+                                subject: "Confirmation de paiement - Match",
+                                data: {
+                                    userName: user.first_name,
+                                    venueName: newVenue.name,
+                                    amount: `${(amount / 100).toFixed(2)}€`,
+                                    planName: plan === 'pro' ? 'Annuel (Pro)' : 'Mensuel (Basic)',
+                                    date: new Date().toLocaleDateString('fr-FR'),
+                                    invoiceUrl: stripeSubscription.latest_invoice?.invoice_pdf,
+                                },
                             },
-                        }, {
-                            attempts: 3,
-                            backoff: { type: "exponential", delay: 5000 },
-                            priority: 2,
-                            jobId: `payment-${subscriptionId}`,
+                            options: {
+                                attempts: 3,
+                                backoff: { type: "exponential", delay: 5000 },
+                                priority: 2,
+                                jobId: `payment-${subscriptionId}`,
+                            },
                         });
                     } catch (err) {
                         console.error("Failed to send payment success email:", err);
