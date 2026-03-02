@@ -95,6 +95,22 @@ const asRecord = (value: unknown): Record<string, unknown> => {
 const asBoolean = (value: unknown, fallback: boolean): boolean =>
     typeof value === "boolean" ? value : fallback;
 
+const mergeDefinedBooleanUpdates = <T extends object>(
+    current: T,
+    updates: Partial<T>,
+): T => {
+    const next = { ...current };
+
+    for (const key of Object.keys(updates) as Array<keyof T>) {
+        const value = updates[key];
+        if (typeof value === "boolean") {
+            next[key] = value as T[keyof T];
+        }
+    }
+
+    return next;
+};
+
 const normalizeNotificationPreferences = (settings: unknown): NotificationPreferences => {
     const raw = asRecord(settings);
 
@@ -426,32 +442,10 @@ class UserRepository {
     ): Promise<NotificationPreferences> {
         const existing = await this.getUserPreferenceRow(userId);
         const existingSettings = asRecord(existing?.notification_settings);
-        const nextNotifications = normalizeNotificationPreferences(existingSettings);
-
-        if (updates.email_reservations !== undefined) {
-            nextNotifications.email_reservations = updates.email_reservations;
-        }
-        if (updates.email_modifications !== undefined) {
-            nextNotifications.email_modifications = updates.email_modifications;
-        }
-        if (updates.email_cancellations !== undefined) {
-            nextNotifications.email_cancellations = updates.email_cancellations;
-        }
-        if (updates.email_match_reminders !== undefined) {
-            nextNotifications.email_match_reminders = updates.email_match_reminders;
-        }
-        if (updates.push_reservations !== undefined) {
-            nextNotifications.push_reservations = updates.push_reservations;
-        }
-        if (updates.push_updates !== undefined) {
-            nextNotifications.push_updates = updates.push_updates;
-        }
-        if (updates.sms_new_reservations !== undefined) {
-            nextNotifications.sms_new_reservations = updates.sms_new_reservations;
-        }
-        if (updates.sms_cancellations !== undefined) {
-            nextNotifications.sms_cancellations = updates.sms_cancellations;
-        }
+        const nextNotifications = mergeDefinedBooleanUpdates(
+            normalizeNotificationPreferences(existingSettings),
+            updates,
+        );
 
         const nextPrivacy = normalizePrivacyPreferences(existingSettings);
         const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy);
@@ -473,10 +467,10 @@ class UserRepository {
         const existingSettings = asRecord(existing?.notification_settings);
 
         const nextNotifications = normalizeNotificationPreferences(existingSettings);
-        const nextPrivacy: PrivacyPreferences = {
-            ...normalizePrivacyPreferences(existingSettings),
-            ...updates,
-        };
+        const nextPrivacy = mergeDefinedBooleanUpdates(
+            normalizePrivacyPreferences(existingSettings),
+            updates,
+        );
 
         const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy);
         await this.upsertPreferenceSettings(userId, mergedSettings);
