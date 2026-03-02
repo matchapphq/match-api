@@ -3,7 +3,8 @@ import { ReservationRepository } from "../../repository/reservation.repository";
 import { WaitlistRepository } from "../../repository/waitlist.repository";
 import { createQRPayload, generateQRCodeImage, parseQRContent, verifyQRPayload } from "../../utils/qr.utils";
 import { notifyNewReservation, notifyReservationCancelled } from "../../services/notifications/notification.triggers";
-import { mailQueue } from "../../queue/notification.queue";
+import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
+import { EmailType } from "../../types/mail.types";
 
 export class ReservationsLogic {
     constructor(
@@ -72,21 +73,28 @@ export class ReservationsLogic {
                 status: 'confirmed',
             }).catch(err => console.error('[Reservations] Failed to send notification:', err));
 
-            await mailQueue.add("reservation-confirmation", {
-                to: userEmail,
-                data: {
-                    userName: userName,
-                    venueName: venueMatch.venue?.name,
-                    matchName: `${venueMatch.match?.homeTeam?.name || 'TBD'} vs ${venueMatch.match?.awayTeam?.name || 'TBD'}`,
-                    date: venueMatch.match?.scheduled_at,
-                    time: venueMatch.match?.scheduled_at ? new Date(venueMatch.match.scheduled_at).toLocaleTimeString() : '',
-                    guests: partySize,
-                    bookingId: reservation.id,
-                    address: venueMatch.venue?.street_address,
+            await queueEmailIfAllowed({
+                jobName: EmailType.RESERVATION_CONFIRMATION,
+                recipientUserId: userId,
+                isTransactional: false,
+                preferenceKey: "email_reservations",
+                payload: {
+                    to: userEmail,
+                    data: {
+                        userName: userName,
+                        venueName: venueMatch.venue?.name,
+                        matchName: `${venueMatch.match?.homeTeam?.name || 'TBD'} vs ${venueMatch.match?.awayTeam?.name || 'TBD'}`,
+                        date: venueMatch.match?.scheduled_at,
+                        time: venueMatch.match?.scheduled_at ? new Date(venueMatch.match.scheduled_at).toLocaleTimeString() : '',
+                        guests: partySize,
+                        bookingId: reservation.id,
+                        address: venueMatch.venue?.street_address,
+                    },
                 },
-            }, {
-                attempts: 3,
-                backoff: { type: 'exponential', delay: 5000 },
+                options: {
+                    attempts: 3,
+                    backoff: { type: 'exponential', delay: 5000 },
+                },
             });
             
             return {
