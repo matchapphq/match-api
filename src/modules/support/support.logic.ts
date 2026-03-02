@@ -1,5 +1,5 @@
 import { randomUUIDv7 } from "bun";
-import { mailQueue } from "../../queue/notification.queue";
+import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailTemplate } from "../../types/jobs/notifications";
 import { EmailType } from "../../types/mail.types";
 
@@ -67,24 +67,29 @@ export class SupportLogic {
         };
         const requestText = SupportLogic.buildDataExportText(templateData);
 
-        await mailQueue.add(EmailType.DATA_EXPORT_REQUEST, {
-            to: SupportLogic.DATA_EXPORT_RECIPIENT,
-            subject,
-            text: requestText,
-            data: {
+        await queueEmailIfAllowed({
+            jobName: EmailType.DATA_EXPORT_REQUEST,
+            isTransactional: true,
+            payload: {
+                to: SupportLogic.DATA_EXPORT_RECIPIENT,
                 subject,
-                template: EmailTemplate.DATA_EXPORT_REQUEST,
                 text: requestText,
-                variables: templateData,
+                data: {
+                    subject,
+                    template: EmailTemplate.DATA_EXPORT_REQUEST,
+                    text: requestText,
+                    variables: templateData,
+                },
             },
-        }, {
-            removeOnComplete: true,
-            attempts: 3,
-            backoff: {
-                type: "exponential" as const,
-                delay: 1000,
+            options: {
+                removeOnComplete: true,
+                attempts: 3,
+                backoff: {
+                    type: "exponential" as const,
+                    delay: 1000,
+                },
+                jobId: `${traceId}-data-export-request`,
             },
-            jobId: `${traceId}-data-export-request`,
         });
 
         return {
@@ -114,32 +119,37 @@ export class SupportLogic {
             message: data.message,
         });
 
-        await mailQueue.add(EmailType.SUPPORT_CONTACT_REQUEST, {
-            to: process.env.SUPPORT_EMAIL || SupportLogic.SUPPORT_RECIPIENT,
-            subject,
-            text: requestText,
-            data: {
+        await queueEmailIfAllowed({
+            jobName: EmailType.SUPPORT_CONTACT_REQUEST,
+            isTransactional: true,
+            payload: {
+                to: process.env.SUPPORT_EMAIL || SupportLogic.SUPPORT_RECIPIENT,
                 subject,
-                template: EmailTemplate.SUPPORT_CONTACT_REQUEST,
                 text: requestText,
-                variables: {
-                    traceId,
-                    userId: data.userId,
-                    userName: data.userName,
-                    userEmail: data.userEmail,
-                    accountType: data.accountType,
-                    subject: data.subject,
-                    message: data.message,
+                data: {
+                    subject,
+                    template: EmailTemplate.SUPPORT_CONTACT_REQUEST,
+                    text: requestText,
+                    variables: {
+                        traceId,
+                        userId: data.userId,
+                        userName: data.userName,
+                        userEmail: data.userEmail,
+                        accountType: data.accountType,
+                        subject: data.subject,
+                        message: data.message,
+                    },
                 },
             },
-        }, {
-            removeOnComplete: true,
-            attempts: 3,
-            backoff: {
-                type: "exponential" as const,
-                delay: 1000,
+            options: {
+                removeOnComplete: true,
+                attempts: 3,
+                backoff: {
+                    type: "exponential" as const,
+                    delay: 1000,
+                },
+                jobId: `${traceId}-${EmailType.SUPPORT_CONTACT_REQUEST}`,
             },
-            jobId: `${traceId}-${EmailType.SUPPORT_CONTACT_REQUEST}`,
         });
 
         return {
@@ -157,27 +167,32 @@ export class SupportLogic {
     }) {
         const traceId = randomUUIDv7();
         // Queue the bug report email to the admin
-        await mailQueue.add(EmailType.BUG_REPORT, {
-            to: process.env.BUG_REPORT_EMAIL || SupportLogic.BUG_REPORT_RECIPIENT,
-            traceId,
-            data: {
-                subject: `[BUG REPORT] ${data.userName}`,
-                template: EmailTemplate.BUG_REPORT,
-                variables: {
-                    userName: data.userName,
-                    userEmail: data.userEmail,
-                    description: data.description,
-                    metadata: data.metadata || {},
+        await queueEmailIfAllowed({
+            jobName: EmailType.BUG_REPORT,
+            isTransactional: true,
+            payload: {
+                to: process.env.BUG_REPORT_EMAIL || SupportLogic.BUG_REPORT_RECIPIENT,
+                traceId,
+                data: {
+                    subject: `[BUG REPORT] ${data.userName}`,
+                    template: EmailTemplate.BUG_REPORT,
+                    variables: {
+                        userName: data.userName,
+                        userEmail: data.userEmail,
+                        description: data.description,
+                        metadata: data.metadata || {},
+                    },
                 },
             },
-        }, {
-            removeOnComplete: true,
-            attempts: 3,
-            backoff: {
-                type: 'exponential',
-                delay: 1000,
+            options: {
+                removeOnComplete: true,
+                attempts: 3,
+                backoff: {
+                    type: 'exponential',
+                    delay: 1000,
+                },
+                jobId: `${traceId}-bug-report`,
             },
-            jobId: `${traceId}-bug-report`,
         });
 
         return { 
