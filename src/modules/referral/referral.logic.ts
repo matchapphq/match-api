@@ -82,8 +82,9 @@ export class ReferralLogic {
             success: true,
             referral_id: result.referral_id,
             boost_id: result.boost_id,
+            referred_boost_id: result.referred_boost_id,
             referrer_id: result.referrer_id,
-            message: "Parrainage converti, 1 boost ajouté",
+            message: "Parrainage converti, 1 boost ajoute a chaque compte",
         };
     }
 

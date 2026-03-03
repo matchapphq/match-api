@@ -225,9 +225,16 @@ export class ReferralRepository {
     }
 
     /**
-     * Convert a referral (give boost to referrer) - called after first payment
+     * Convert a referral (give one boost to referrer and referred user) - called after first payment
      */
-    async convertReferral(referredUserId: string): Promise<{ success: boolean; error?: string; referral_id?: string; boost_id?: string; referrer_id?: string }> {
+    async convertReferral(referredUserId: string): Promise<{
+        success: boolean;
+        error?: string;
+        referral_id?: string;
+        boost_id?: string;
+        referred_boost_id?: string;
+        referrer_id?: string;
+    }> {
         const referral = await db.select()
             .from(referralsTable)
             .where(and(
@@ -253,21 +260,41 @@ export class ReferralRepository {
             })
             .where(eq(referralsTable.id, referralRecord.id));
 
-        const boostResult = await db.insert(boostsTable).values({
-            user_id: referralRecord.referrer_id,
-            type: 'referral',
-            status: 'available',
-            source: 'referral_reward',
-            metadata: {
+        const convertedAt = new Date().toISOString();
+        const boostResult = await db.insert(boostsTable).values([
+            {
+                user_id: referralRecord.referrer_id,
+                type: 'referral',
+                status: 'available',
+                source: 'referral_reward',
                 referral_id: referralRecord.id,
-                referred_user_id: referredUserId,
-                converted_at: new Date().toISOString(),
+                metadata: {
+                    referral_id: referralRecord.id,
+                    referred_user_id: referredUserId,
+                    reward_side: 'referrer',
+                    converted_at: convertedAt,
+                },
             },
-        }).returning();
+            {
+                user_id: referredUserId,
+                type: 'referral',
+                status: 'available',
+                source: 'referral_reward',
+                referral_id: referralRecord.id,
+                metadata: {
+                    referral_id: referralRecord.id,
+                    referrer_user_id: referralRecord.referrer_id,
+                    reward_side: 'referred',
+                    converted_at: convertedAt,
+                },
+            },
+        ]).returning();
 
-        const boost = boostResult[0];
-        if (!boost) {
-            return { success: false, error: 'Failed to create boost' };
+        const referrerBoost = boostResult.find((boost) => boost.user_id === referralRecord.referrer_id);
+        const referredBoost = boostResult.find((boost) => boost.user_id === referredUserId);
+
+        if (!referrerBoost || !referredBoost) {
+            return { success: false, error: 'Failed to create referral rewards' };
         }
 
         await db.update(referralStatsTable)
@@ -282,7 +309,8 @@ export class ReferralRepository {
         return {
             success: true,
             referral_id: referralRecord.id,
-            boost_id: boost.id,
+            boost_id: referrerBoost.id,
+            referred_boost_id: referredBoost.id,
             referrer_id: referralRecord.referrer_id,
         };
     }
