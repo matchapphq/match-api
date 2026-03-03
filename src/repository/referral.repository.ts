@@ -11,9 +11,9 @@ import {
     type NewBoost,
 } from "../config/db/referral.table";
 import { usersTable } from "../config/db/user.table";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, asc } from "drizzle-orm";
 
-const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://match.app/signup?ref=';
+const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://match.app/register?ref=';
 const BOOST_VALUE = Number(process.env.BOOST_VALUE) || 30;
 
 export class ReferralRepository {
@@ -37,6 +37,7 @@ export class ReferralRepository {
         const result = await db.select()
             .from(referralCodesTable)
             .where(eq(referralCodesTable.user_id, userId))
+            .orderBy(asc(referralCodesTable.created_at))
             .limit(1);
         return result[0] ?? null;
     }
@@ -67,11 +68,21 @@ export class ReferralRepository {
             throw new Error('Failed to generate unique referral code');
         }
 
-        const result = await db.insert(referralCodesTable).values({
-            user_id: userId,
-            referral_code: referralCode,
-            referral_link: `${REFERRAL_BASE_URL}${referralCode}`,
-        }).returning();
+        let result: ReferralCode[];
+        try {
+            result = await db.insert(referralCodesTable).values({
+                user_id: userId,
+                referral_code: referralCode,
+                referral_link: `${REFERRAL_BASE_URL}${referralCode}`,
+            }).returning();
+        } catch (error: any) {
+            // If another request created the code first, return the existing stable code.
+            const existingAfterConflict = await this.getReferralCode(userId);
+            if (existingAfterConflict) {
+                return existingAfterConflict;
+            }
+            throw error;
+        }
 
         await this.initializeStats(userId);
 

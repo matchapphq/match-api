@@ -1,5 +1,7 @@
 import referralRepository from "../../repository/referral.repository";
 
+const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://match.app/register?ref=';
+
 export class ReferralLogic {
     async getCode(userId: string) {
         let referralCode = await referralRepository.getReferralCode(userId);
@@ -14,7 +16,7 @@ export class ReferralLogic {
 
         return {
             referral_code: referralCode.referral_code,
-            referral_link: referralCode.referral_link,
+            referral_link: `${REFERRAL_BASE_URL}${referralCode.referral_code}`,
             created_at: referralCode.created_at?.toISOString(),
         };
     }
