@@ -6,6 +6,7 @@ import stripe from "../config/stripe";
 import subscriptionsRepository from "../repository/subscriptions.repository";
 import { PartnerRepository } from "../repository/partner/partner.repository";
 import boostRepository from "../repository/boost.repository";
+import referralRepository from "../repository/referral.repository";
 import { geocodeAddress } from "../utils/geocoding";
 
 /**
@@ -70,6 +71,21 @@ stripeWorker.on("failed", (job, err) => {
     console.error(`[Stripe Worker] Job ${job?.id} failed with error ${err.message}`);
 });
 
+async function maybeConvertReferral(referredUserId: string, source: string) {
+    const result = await referralRepository.convertReferral(referredUserId);
+
+    if (result.success) {
+        console.log(`[Stripe Worker] Referral converted after ${source} for user ${referredUserId}`);
+        return;
+    }
+
+    if (result.error === "No active referral found") {
+        return;
+    }
+
+    console.error(`[Stripe Worker] Referral conversion failed after ${source} for user ${referredUserId}:`, result.error);
+}
+
 // ============================================
 // HANDLER FUNCTIONS (Moved from Controller)
 // ============================================
@@ -116,6 +132,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             "Subscription already exists, skipping:",
             subscriptionId,
         );
+        await maybeConvertReferral(userId, "checkout.session.completed(existing)");
         return;
     }
 
@@ -338,6 +355,8 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
             console.log("Subscription created for user:", userId);
         }
     }
+
+    await maybeConvertReferral(userId, "checkout.session.completed");
 }
 
 /**
@@ -399,6 +418,7 @@ async function handleInvoicePaid(invoice: any) {
     });
 
     console.log("Invoice recorded for subscription:", subscriptionId);
+    await maybeConvertReferral(subscription.user_id, "invoice.paid");
 }
 
 /**
