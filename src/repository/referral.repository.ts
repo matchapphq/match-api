@@ -5,10 +5,6 @@ import {
     referralStatsTable, 
     boostsTable,
     type ReferralCode,
-    type NewReferralCode,
-    type NewReferral,
-    type NewReferralStats,
-    type NewBoost,
 } from "../config/db/referral.table";
 import { usersTable } from "../config/db/user.table";
 import { eq, and, sql, desc, asc } from "drizzle-orm";
