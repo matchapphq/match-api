@@ -3,6 +3,7 @@ import stripe, { STRIPE_WEBHOOK_SECRET } from "../../config/stripe";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
 import { PartnerRepository } from "../../repository/partner/partner.repository";
 import boostRepository from "../../repository/boost.repository";
+import referralRepository from "../../repository/referral.repository";
 import UserRepository from "../../repository/user.repository";
 import { geocodeAddress } from "../../utils/geocoding";
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
@@ -11,6 +12,21 @@ import { EmailType } from "../../types/mail.types";
 export class WebhooksLogic {
     private readonly userRepository = new UserRepository();
     private readonly partnerRepository = new PartnerRepository();
+
+    private async maybeConvertReferral(referredUserId: string, source: string) {
+        const result = await referralRepository.convertReferral(referredUserId);
+
+        if (result.success) {
+            console.log(`Referral converted after ${source} for user ${referredUserId}`);
+            return;
+        }
+
+        if (result.error === "No active referral found") {
+            return;
+        }
+
+        console.error(`Referral conversion failed after ${source} for user ${referredUserId}:`, result.error);
+    }
 
     async handleStripeWebhook(signature: string, rawBody: string) {
         if (!STRIPE_WEBHOOK_SECRET) throw new Error("WEBHOOK_NOT_CONFIGURED");
@@ -86,6 +102,7 @@ export class WebhooksLogic {
         const existing = await subscriptionsRepository.getSubscriptionByStripeId(subscriptionId);
         if (existing) {
             console.log("Subscription already exists, skipping:", subscriptionId);
+            await this.maybeConvertReferral(userId, "checkout.session.completed(existing)");
             return;
         }
 
@@ -273,6 +290,8 @@ export class WebhooksLogic {
                 });
             }
         }
+
+        await this.maybeConvertReferral(userId, "checkout.session.completed");
     }
 
     private async handleInvoicePaid(invoice: any) {
@@ -305,6 +324,8 @@ export class WebhooksLogic {
             description: `Subscription payment - ${invoice.lines?.data?.[0]?.description || "Match subscription"}`,
             pdf_url: invoice.invoice_pdf || null,
         });
+
+        await this.maybeConvertReferral(subscription.user_id, "invoice.paid");
     }
 
     private async handleInvoicePaymentFailed(invoice: any) {
