@@ -326,6 +326,18 @@ export class ReferralRepository {
         const limit = options.limit || 20;
         const offset = (page - 1) * limit;
         const statusFilter = options.status || 'all';
+        const whereCondition =
+            statusFilter === 'converted'
+                ? and(
+                    eq(referralsTable.referrer_id, userId),
+                    eq(referralsTable.status, 'converted'),
+                )
+                : statusFilter === 'pending'
+                    ? and(
+                        eq(referralsTable.referrer_id, userId),
+                        eq(referralsTable.status, 'signed_up'),
+                    )
+                    : eq(referralsTable.referrer_id, userId);
 
         let query = db.select({
             id: referralsTable.id,
@@ -339,7 +351,7 @@ export class ReferralRepository {
         })
             .from(referralsTable)
             .leftJoin(usersTable, eq(referralsTable.referred_user_id, usersTable.id))
-            .where(eq(referralsTable.referrer_id, userId))
+            .where(whereCondition)
             .orderBy(desc(referralsTable.created_at))
             .limit(limit)
             .offset(offset);
@@ -348,7 +360,7 @@ export class ReferralRepository {
 
         const countResult = await db.select({ count: sql<number>`count(*)` })
             .from(referralsTable)
-            .where(eq(referralsTable.referrer_id, userId));
+            .where(whereCondition);
 
         const total = Number(countResult[0]?.count) || 0;
 
