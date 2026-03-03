@@ -5,15 +5,11 @@ import {
     referralStatsTable, 
     boostsTable,
     type ReferralCode,
-    type NewReferralCode,
-    type NewReferral,
-    type NewReferralStats,
-    type NewBoost,
 } from "../config/db/referral.table";
 import { usersTable } from "../config/db/user.table";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { eq, and, sql, desc, asc } from "drizzle-orm";
 
-const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://match.app/signup?ref=';
+const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://match.app/register?ref=';
 const BOOST_VALUE = Number(process.env.BOOST_VALUE) || 30;
 
 export class ReferralRepository {
@@ -37,6 +33,7 @@ export class ReferralRepository {
         const result = await db.select()
             .from(referralCodesTable)
             .where(eq(referralCodesTable.user_id, userId))
+            .orderBy(asc(referralCodesTable.created_at))
             .limit(1);
         return result[0] ?? null;
     }
@@ -67,11 +64,21 @@ export class ReferralRepository {
             throw new Error('Failed to generate unique referral code');
         }
 
-        const result = await db.insert(referralCodesTable).values({
-            user_id: userId,
-            referral_code: referralCode,
-            referral_link: `${REFERRAL_BASE_URL}${referralCode}`,
-        }).returning();
+        let result: ReferralCode[];
+        try {
+            result = await db.insert(referralCodesTable).values({
+                user_id: userId,
+                referral_code: referralCode,
+                referral_link: `${REFERRAL_BASE_URL}${referralCode}`,
+            }).returning();
+        } catch (error: any) {
+            // If another request created the code first, return the existing stable code.
+            const existingAfterConflict = await this.getReferralCode(userId);
+            if (existingAfterConflict) {
+                return existingAfterConflict;
+            }
+            throw error;
+        }
 
         await this.initializeStats(userId);
 
@@ -214,9 +221,16 @@ export class ReferralRepository {
     }
 
     /**
-     * Convert a referral (give boost to referrer) - called after first payment
+     * Convert a referral (give one boost to referrer and referred user) - called after first payment
      */
-    async convertReferral(referredUserId: string): Promise<{ success: boolean; error?: string; referral_id?: string; boost_id?: string; referrer_id?: string }> {
+    async convertReferral(referredUserId: string): Promise<{
+        success: boolean;
+        error?: string;
+        referral_id?: string;
+        boost_id?: string;
+        referred_boost_id?: string;
+        referrer_id?: string;
+    }> {
         const referral = await db.select()
             .from(referralsTable)
             .where(and(
@@ -242,21 +256,41 @@ export class ReferralRepository {
             })
             .where(eq(referralsTable.id, referralRecord.id));
 
-        const boostResult = await db.insert(boostsTable).values({
-            user_id: referralRecord.referrer_id,
-            type: 'referral',
-            status: 'available',
-            source: 'referral_reward',
-            metadata: {
+        const convertedAt = new Date().toISOString();
+        const boostResult = await db.insert(boostsTable).values([
+            {
+                user_id: referralRecord.referrer_id,
+                type: 'referral',
+                status: 'available',
+                source: 'referral_reward',
                 referral_id: referralRecord.id,
-                referred_user_id: referredUserId,
-                converted_at: new Date().toISOString(),
+                metadata: {
+                    referral_id: referralRecord.id,
+                    referred_user_id: referredUserId,
+                    reward_side: 'referrer',
+                    converted_at: convertedAt,
+                },
             },
-        }).returning();
+            {
+                user_id: referredUserId,
+                type: 'referral',
+                status: 'available',
+                source: 'referral_reward',
+                referral_id: referralRecord.id,
+                metadata: {
+                    referral_id: referralRecord.id,
+                    referrer_user_id: referralRecord.referrer_id,
+                    reward_side: 'referred',
+                    converted_at: convertedAt,
+                },
+            },
+        ]).returning();
 
-        const boost = boostResult[0];
-        if (!boost) {
-            return { success: false, error: 'Failed to create boost' };
+        const referrerBoost = boostResult.find((boost) => boost.user_id === referralRecord.referrer_id);
+        const referredBoost = boostResult.find((boost) => boost.user_id === referredUserId);
+
+        if (!referrerBoost || !referredBoost) {
+            return { success: false, error: 'Failed to create referral rewards' };
         }
 
         await db.update(referralStatsTable)
@@ -271,7 +305,8 @@ export class ReferralRepository {
         return {
             success: true,
             referral_id: referralRecord.id,
-            boost_id: boost.id,
+            boost_id: referrerBoost.id,
+            referred_boost_id: referredBoost.id,
             referrer_id: referralRecord.referrer_id,
         };
     }
@@ -287,6 +322,18 @@ export class ReferralRepository {
         const limit = options.limit || 20;
         const offset = (page - 1) * limit;
         const statusFilter = options.status || 'all';
+        const whereCondition =
+            statusFilter === 'converted'
+                ? and(
+                    eq(referralsTable.referrer_id, userId),
+                    eq(referralsTable.status, 'converted'),
+                )
+                : statusFilter === 'pending'
+                    ? and(
+                        eq(referralsTable.referrer_id, userId),
+                        eq(referralsTable.status, 'signed_up'),
+                    )
+                    : eq(referralsTable.referrer_id, userId);
 
         let query = db.select({
             id: referralsTable.id,
@@ -300,7 +347,7 @@ export class ReferralRepository {
         })
             .from(referralsTable)
             .leftJoin(usersTable, eq(referralsTable.referred_user_id, usersTable.id))
-            .where(eq(referralsTable.referrer_id, userId))
+            .where(whereCondition)
             .orderBy(desc(referralsTable.created_at))
             .limit(limit)
             .offset(offset);
@@ -309,7 +356,7 @@ export class ReferralRepository {
 
         const countResult = await db.select({ count: sql<number>`count(*)` })
             .from(referralsTable)
-            .where(eq(referralsTable.referrer_id, userId));
+            .where(whereCondition);
 
         const total = Number(countResult[0]?.count) || 0;
 
