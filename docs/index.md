@@ -18,7 +18,8 @@
 
 | Document | Description |
 | :--- | :--- |
-| **[💳 Stripe Integration](./stripe_integration.md)** | Setup guide for Subscriptions and Boosts. |
+| **[💳 Stripe Integration](./stripe_integration.md)** | Setup guide for commission billing, payment setup, and boosts. |
+| **[🧪 QA Runbook (Commission)](./qa_runbook_commission_only.md)** | Manual verification scenarios for commission-only billing flow. |
 | **[📧 Mail Service](./mail_service.md)** | Microservice details and email templates. |
 
 ## 🛠️ Internal Roadmap
@@ -54,5 +55,5 @@ bun run dev
 
 Match is a reservation platform connecting sports fans with venues. 
 
-- **Venue Owners**: Pay via Stripe (Subscriptions + Boosts) to list venues.
+- **Venue Owners**: Pay via Stripe commission-only billing (+ optional boosts).
 - **Users**: Book tables for free. Earn rewards via Fidelity & Referral programs.

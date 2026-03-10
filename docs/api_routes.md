@@ -5,11 +5,11 @@
 # Match Project — Complete API Routes Documentation
 
 **Production-ready API routes for Match platform**  
-*Last updated: February 2026*
+*Last updated: March 2026*
 
 ## 💼 Business Model
 
-- **Venue owners pay** for subscriptions (Stripe-integrated)
+- **Venue owners pay** via commission-only billing (Stripe payment method setup + month-end collection)
 - **Users don't pay** — reservations are completely FREE (like booking a restaurant table)
 - Users book a table by party size, receive a QR code, venue owner scans to verify
 
@@ -782,8 +782,8 @@ Request body:
 
 ### Venues & Matches
 - `GET /venues` — Get my venues
-- `POST /venues` — Create venue (triggers Stripe checkout)
-- `POST /venues/verify-checkout` — Finalize venue creation after payment
+- `POST /venues` — Create venue directly (commission-only flow)
+- `POST /venues/verify-checkout` — Deprecated (`410 Gone`)
 - `GET /venues/matches` — Get all matches scheduled across my venues
 - `POST /venues/:venueId/matches` — Schedule a match at my venue
 - `PUT /venues/:venueId/matches/:matchId` — Update capacity/settings for a match
@@ -804,7 +804,7 @@ Request body:
 ### Scans & Check-ins
 - `POST /reservations/:reservationId/status` — Accept/Decline 'Request' mode bookings
 - `POST /reservations/verify-qr` — Verify user's QR code (from scanning)
-- `POST /reservations/:reservationId/check-in` — Confirm guest arrival (Triggers automatic commission billing: €1.50/guest)
+- `POST /reservations/:reservationId/check-in` — Confirm guest arrival (accrues commission for month-end billing)
 - `POST /reservations/:reservationId/mark-no-show` — Mark user as absent
 
 ### Waitlist
@@ -814,6 +814,28 @@ Request body:
 ---
 
 ## 💳 Subscriptions & Billing (`/api/subscriptions`, `/api/invoices`, `/api/transactions`)
+
+### POST /api/partners/venues
+**Create venue (commission-only)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 201
+{
+  "venue": { "...": "..." },
+  "is_first_venue": boolean,
+  "requires_payment_setup": boolean,
+  "payment_setup_flow": "post_first_venue" | null
+}
+```
+
+Rules:
+- First venue without payment method: created with `is_active=false`, `status='pending'`, `requires_payment_setup=true`.
+- Additional venues without payment method: `403 PAYMENT_METHOD_REQUIRED`.
+
+### POST /api/partners/venues/verify-checkout
+**Deprecated — returns `410 Gone`**
 
 ### GET /api/billing/pricing
 **Get commission pricing model**
@@ -867,6 +889,19 @@ Response: 200
 }
 ```
 
+### GET /api/accrued-commission
+**Get accrued (unbilled) commission estimate**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  "guests": number,
+  "amount": "12.00"
+}
+```
+
 ### GET /api/subscriptions/plans
 **Deprecated — returns `410 Gone` (commission-only billing)**
 Use `GET /api/billing/pricing`.
@@ -891,6 +926,16 @@ Use `GET /api/billing/payment-method`.
 ### GET /api/subscriptions/invoices
 **Deprecated — returns `410 Gone`**
 Use `GET /api/invoices`.
+
+Deprecated endpoint response contract:
+```typescript
+Response: 410
+{
+  "error": "ENDPOINT_DEPRECATED",
+  "message": "Subscription billing is deprecated. Match is now commission-only (per checked-in guest).",
+  "replacement": "GET /api/billing/pricing" // varies by endpoint
+}
+```
 
 ### Billing History
 - `GET /api/invoices` — List all invoices

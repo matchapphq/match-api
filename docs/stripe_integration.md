@@ -159,27 +159,28 @@ To support this flow, ensure your Stripe Webhook endpoint is listening for:
 
 ---
 
-## Commission Billing Flow (Real-time)
+## Commission Billing Flow (Month End)
 
 ```
 1. Guest arrives at venue and presents QR code.
 2. Owner scans QR -> Calls POST /api/partners/reservations/:id/check-in.
 3. Backend marks reservation as 'checked_in'.
-4. Backend identifies venue owner's stripe_customer_id.
-5. Backend calculates fee: party_size * 1.50.
-6. Backend queues 'process_commission' job in Stripe Queue.
-7. Stripe Worker retrieves saved payment method and creates off-session PaymentIntent.
-8. If payment succeeds, reservation is marked 'is_billed = true'.
+4. Reservation stays accrued (`is_billed=false`) until monthly billing.
+5. End-of-month job aggregates all accrued check-ins per venue owner.
+6. Backend creates one off-session PaymentIntent per owner for the monthly total.
+7. On success, backend stores commission transaction + invoice and marks reservations billed.
+8. On failure, backend stores failed commission transaction with reason.
 ```
 
 ---
 
 ## Technical Details
 
-### Usage Reporting (Direct Charge)
-Unlike metered billing which aggregates monthly, this implementation uses **Real-time Off-session Charging**. This was validated in the `health` module tests:
+### Usage Reporting (Monthly Aggregation)
+This implementation uses **monthly off-session charging** with idempotent transaction/invoice persistence:
 - **`off_session: true`**: Tells Stripe the customer is not in the checkout flow.
-- **`confirm: true`**: Automatically attempts to capture funds immediately.
+- **`confirm: true`**: Attempts capture immediately when monthly job runs.
+- **Idempotency key**: One key per owner + billing period.
 
 ### Environment Variables
 No new variables required, but `STRIPE_SECRET_KEY` must have permission to create `PaymentIntents`.
@@ -190,11 +191,9 @@ No new variables required, but `STRIPE_SECRET_KEY` must have permission to creat
 
 | Event | Handler Action |
 |-------|---------------|
-| `checkout.session.completed` | Create subscription in DB |
-| `invoice.paid` | Update subscription period, create invoice record |
-| `invoice.payment_failed` | Mark subscription as `past_due` |
-| `customer.subscription.updated` | Sync subscription status and period |
-| `customer.subscription.deleted` | Mark subscription as `canceled` |
+| `checkout.session.completed` (`mode=setup`) | Save `stripe_customer_id`, activate pending venues |
+| `payment_intent.succeeded` (`monthly_commission` / `guest_commission`) | Mark commission transaction completed, create invoice, mark reservations billed |
+| `payment_intent.payment_failed` (`monthly_commission` / `guest_commission`) | Mark commission transaction failed with reason |
 
 ## Database Schema
 
