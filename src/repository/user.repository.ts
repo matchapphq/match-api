@@ -186,6 +186,7 @@ class UserRepository {
             avatar_url: usersTable.avatar_url,
             google_id: usersTable.google_id,
             apple_id: usersTable.apple_id,
+            stripe_customer_id: usersTable.stripe_customer_id,
             created_at: usersTable.created_at,
             fav_sports: userPreferencesTable.fav_sports,
             fav_team_ids: userPreferencesTable.fav_team_ids,
