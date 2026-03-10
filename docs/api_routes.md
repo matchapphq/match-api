@@ -815,6 +815,19 @@ Request body:
 
 ## 💳 Subscriptions & Billing (`/api/subscriptions`, `/api/invoices`, `/api/transactions`)
 
+### GET /api/billing/pricing
+**Get commission pricing model**
+
+```typescript
+Response: 200
+{
+  "model": "commission_per_checked_in_guest",
+  "default_rate": "1.50",
+  "currency": "EUR",
+  "unit": "guest_checked_in"
+}
+```
+
 ### GET /api/subscriptions/plans
 **List available subscription levels**
 

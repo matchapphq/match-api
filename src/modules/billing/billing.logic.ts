@@ -1,7 +1,12 @@
 import { BillingRepository } from "../../repository/billing.repository";
+import { getCommissionPricing } from "../../config/billing";
 
 export class BillingLogic {
     constructor(private readonly billingRepo: BillingRepository) {}
+
+    getPricing() {
+        return getCommissionPricing();
+    }
 
     async getInvoices(userId: string, page = 1, limit = 20) {
         const offset = (page - 1) * limit;
@@ -41,4 +46,4 @@ export class BillingLogic {
     async getAccruedCommission(userId: string) {
         return await this.billingRepo.getUnbilledUsage(userId);
     }
-    }
+}

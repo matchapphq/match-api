@@ -25,6 +25,9 @@ class BillingService {
     private initRoutes() {
         this.router.use("/invoices/*", authMiddleware);
         this.router.use("/transactions/*", authMiddleware);
+
+        // Pricing
+        this.router.get("/billing/pricing", ...this.controller.getPricing);
         
         // Invoices
         this.router.get("/invoices", authMiddleware, ...this.controller.getInvoices);

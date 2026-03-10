@@ -10,6 +10,11 @@ class BillingController {
 
     constructor(private readonly billingLogic: BillingLogic) {}
 
+    readonly getPricing = this.factory.createHandlers(async (ctx) => {
+        const pricing = this.billingLogic.getPricing();
+        return ctx.json(pricing);
+    });
+
     // Invoices
     readonly getInvoices = this.factory.createHandlers(async (ctx) => {
         const user = ctx.get("user");
