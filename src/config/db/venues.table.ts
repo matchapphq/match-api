@@ -65,7 +65,7 @@ export type VerificationDocuments = VerificationDocument[];
 export const venuesTable = pgTable('venues', {
         id: uuid('id').primaryKey().defaultRandom(),
         owner_id: uuid('owner_id').notNull(),
-        subscription_id: uuid('subscription_id').notNull(),
+        subscription_id: uuid('subscription_id'),
 
         // Basic Info
         name: varchar('name', { length: 255 }).notNull(),
