@@ -40,6 +40,11 @@ export const reservationsTable = pgTable(
         // QR Code for check-in
         qr_code: text('qr_code').unique(),
 
+        // Billing info for new economic model
+        is_billed: boolean('is_billed').default(false),
+        billed_at: timestamp('billed_at', { withTimezone: true }),
+        commission_rate: numeric('commission_rate', { precision: 10, scale: 2 }),
+
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
         updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
     },

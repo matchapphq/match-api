@@ -121,6 +121,9 @@ export const venuesTable = pgTable('venues', {
         // Booking Mode: INSTANT = auto confirm, REQUEST = owner must confirm
         booking_mode: bookingModeEnum('booking_mode').default('INSTANT').notNull(),
 
+        // Billing
+        commission_override: numeric('commission_override', { precision: 10, scale: 2 }),
+
         // Stats
         average_rating: numeric('average_rating', { precision: 3, scale: 2 }).default('0.00'),
         total_reviews: integer('total_reviews').default(0),
