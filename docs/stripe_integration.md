@@ -152,6 +152,22 @@ As of March 2026, the platform implements a performance-aligned economic model.
 
 ---
 
+## ⚡ Asynchronous Payment Handling (SEPA & Delayed Methods)
+
+Since some payment methods like **SEPA Direct Debit** are not instant, the system uses a dual-layer confirmation pattern to ensure data integrity.
+
+### The "Worker-Webhook Handshake"
+1. **The Worker (Initiator):** The `stripeWorker` creates the `PaymentIntent`. For instant methods (Credit Card), it marks the reservation as billed immediately if successful. For SEPA, the status will be `processing`, and the worker will exit without marking the reservation.
+2. **The Webhook (Confirmer):** Stripe sends a `payment_intent.succeeded` event once the funds are actually captured (can be 2-14 days later).
+3. **The Handler:** `WebhooksLogic.handlePaymentIntentSucceeded` receives the event, extracts the `reservation_id` from the Stripe metadata, and marks the reservation as `is_billed: true` in our database.
+
+### Required Webhook Events
+To support this flow, ensure your Stripe Webhook endpoint is listening for:
+- `payment_intent.succeeded`
+- `payment_intent.payment_failed`
+
+---
+
 ## Commission Billing Flow (Real-time)
 
 ```
