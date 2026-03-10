@@ -4,6 +4,7 @@ import subscriptionsRepository from "../../repository/subscriptions.repository";
 import stripe, { CHECKOUT_URLS, isStripeConfigured } from "../../config/stripe";
 import { geocodeAddress } from "../../utils/geocoding";
 import { notifyNewReservation, notifyReservationCancelled } from "../../services/notifications/notification.triggers";
+import { resolveHasPaymentMethodLive } from "../../utils/stripe-payment-method";
 
 function formatStripePaymentMethod(paymentMethod: any) {
     if (!paymentMethod || paymentMethod.deleted) {
@@ -148,6 +149,44 @@ export class PartnerLogic {
 
     async getMyVenues(userId: string) {
         return await this.partnerRepo.getVenuesByOwnerId(userId);
+    }
+
+    async createVenue(userId: string, data: any) {
+        const venues = await this.partnerRepo.getVenuesByOwnerId(userId);
+        const isFirstVenue = venues.length === 0;
+
+        const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
+        const hasPaymentMethod = await resolveHasPaymentMethodLive(stripeCustomerId);
+
+        if (!hasPaymentMethod && !isFirstVenue) {
+            throw new Error("PAYMENT_METHOD_REQUIRED");
+        }
+
+        const requiresPaymentSetup = !hasPaymentMethod;
+        const venue = await this.partnerRepo.createVenue({
+            name: data.name,
+            owner_id: userId,
+            street_address: data.street_address,
+            city: data.city,
+            state_province: data.state_province || '',
+            postal_code: data.postal_code,
+            country: data.country,
+            phone: data.phone || '',
+            email: data.email || '',
+            capacity: data.capacity || 0,
+            type: data.type || 'sports_bar',
+            description: data.description || null,
+            commission_override: data.commission_override,
+            status: requiresPaymentSetup ? "pending" : "approved",
+            is_active: !requiresPaymentSetup,
+        });
+
+        return {
+            venue,
+            is_first_venue: isFirstVenue,
+            requires_payment_setup: requiresPaymentSetup,
+            payment_setup_flow: requiresPaymentSetup ? "post_first_venue" : null,
+        };
     }
 
     async createVenueCheckout(userId: string, data: any) {

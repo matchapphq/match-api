@@ -172,6 +172,8 @@ export class PartnerRepository {
         type?: 'bar' | 'restaurant' | 'fast_food' | 'nightclub' | 'cafe' | 'lounge' | 'pub' | 'sports_bar';
         coords?: { lat: number, lng: number };
         commission_override?: string;
+        status?: 'pending' | 'approved' | 'rejected' | 'suspended';
+        is_active?: boolean;
     }) {
         let lat = 0;
         let lng = 0;
@@ -219,8 +221,8 @@ export class PartnerRepository {
             latitude: finalLat,
             longitude: finalLng,
             type: data.type || 'sports_bar',
-            status: 'pending',
-            is_active: true,
+            status: data.status || 'pending',
+            is_active: data.is_active ?? true,
             commission_override: data.commission_override || "1.50",
         }).returning();
 
