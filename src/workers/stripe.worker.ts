@@ -61,11 +61,7 @@ const stripeWorker = new Worker<StripeJobPayload>("stripe", async (job: Job<Stri
     }
 }, { connection: redisConnection });
 
-/**
- * Handle commission processing by charging the venue owner's saved payment method.
- * Uses off-session PaymentIntents as validated in the health module tests.
- */
-async function handleProcessCommission(data: {
+export async function handleProcessCommission(data: {
     reservationId: string;
     venueOwnerId: string;
     stripeCustomerId: string;
@@ -77,7 +73,14 @@ async function handleProcessCommission(data: {
     const reservationRepo = new (await import("../repository/reservation.repository")).ReservationRepository();
 
     try {
-        // 1. Find the customer's default payment method
+        // 1. Idempotency check: is it already billed?
+        const reservation = await reservationRepo.findById(data.reservationId);
+        if (!reservation || reservation.is_billed) {
+            console.log(`[Stripe Worker] Reservation ${data.reservationId} already billed or not found. Skipping.`);
+            return;
+        }
+
+        // 2. Find the customer's default payment method
         const paymentMethods = await stripe.paymentMethods.list({
             customer: data.stripeCustomerId,
             type: 'card',
@@ -85,14 +88,13 @@ async function handleProcessCommission(data: {
 
         if (paymentMethods.data.length === 0) {
             console.error(`[Stripe Worker] No payment method found for customer ${data.stripeCustomerId}`);
-            // We should probably notify the venue owner here
+            // Logic for notifying owner could go here
             return;
         }
 
-        // Get the most recent or default payment method
         const paymentMethodId = paymentMethods.data[0].id;
 
-        // 2. Create and Confirm a PaymentIntent off-session
+        // 3. Create and Confirm a PaymentIntent off-session
         const paymentIntent = await stripe.paymentIntents.create({
             amount: data.amountInCents,
             currency: data.currency.toLowerCase(),
@@ -109,18 +111,23 @@ async function handleProcessCommission(data: {
         });
 
         if (paymentIntent.status === 'succeeded') {
-            // 3. Mark reservation as billed
+            // 4. Mark reservation as billed
             await reservationRepo.markAsBilled([data.reservationId]);
             console.log(`[Stripe Worker] Commission charged successfully for reservation ${data.reservationId}`);
         } else {
-            console.warn(`[Stripe Worker] PaymentIntent status for reservation ${data.reservationId}: ${paymentIntent.status}`);
+            console.warn(`[Stripe Worker] PaymentIntent for ${data.reservationId} ended with status: ${paymentIntent.status}`);
+            if (paymentIntent.status === 'requires_action' || paymentIntent.status === 'requires_payment_method') {
+                // This will be caught by the catch block if Stripe throws, 
+                // but we handle specific non-succeeded statuses here if needed.
+            }
         }
     } catch (error: any) {
         if (error.code === 'authentication_required') {
-            console.error(`[Stripe Worker] Authentication required for customer ${data.stripeCustomerId}. Failed to charge commission.`);
-            // Handle notification or past_due state if needed
+            console.error(`[Stripe Worker] Authentication required for customer ${data.stripeCustomerId}. Charge failed.`);
+            // We could update a 'billing_status' on the reservation here if we had one
         } else {
-            throw error;
+            console.error(`[Stripe Worker] Error during commission processing:`, error.message);
+            throw error; // Retry via BullMQ
         }
     }
 }

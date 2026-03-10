@@ -159,7 +159,7 @@ export class PartnerRepository {
     public async createVenue(data: {
         name: string;
         owner_id: string;
-        subscription_id: string;
+        subscription_id?: string;
         description?: string | null;
         street_address: string;
         city: string;
