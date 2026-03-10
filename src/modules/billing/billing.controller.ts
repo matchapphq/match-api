@@ -1,6 +1,14 @@
 import { createFactory } from "hono/factory";
+import { z } from "zod";
 import { BillingLogic } from "./billing.logic";
 import type { HonoEnv } from "../../types/hono.types";
+
+const setupCheckoutSchema = z.object({
+    flow: z.enum(["post_first_venue", "manual"]).optional(),
+    venue_id: z.string().uuid().optional(),
+    success_url: z.string().url().optional(),
+    cancel_url: z.string().url().optional(),
+});
 
 /**
  * Controller for Billing operations (Invoices, Transactions).
@@ -13,6 +21,52 @@ class BillingController {
     readonly getPricing = this.factory.createHandlers(async (ctx) => {
         const pricing = this.billingLogic.getPricing();
         return ctx.json(pricing);
+    });
+
+    readonly createSetupCheckout = this.factory.createHandlers(async (ctx) => {
+        const user = ctx.get("user");
+        let payload: unknown = {};
+
+        try {
+            payload = await ctx.req.json();
+        } catch {
+            payload = {};
+        }
+
+        const parsed = setupCheckoutSchema.safeParse(payload ?? {});
+        if (!parsed.success) {
+            return ctx.json({ error: "Invalid request", details: parsed.error.flatten() }, 400);
+        }
+
+        try {
+            const result = await this.billingLogic.createSetupCheckout(user.id, parsed.data);
+            return ctx.json(result);
+        } catch (error: any) {
+            if (error.message === "PAYMENT_SYSTEM_NOT_CONFIGURED") {
+                return ctx.json({ error: "Payment system not configured" }, 503);
+            }
+            if (error.message === "USER_NOT_FOUND") {
+                return ctx.json({ error: "User not found" }, 404);
+            }
+            if (error.message === "CHECKOUT_SESSION_URL_MISSING") {
+                return ctx.json({ error: "Checkout URL unavailable" }, 502);
+            }
+
+            console.error("Create setup checkout error:", error);
+            return ctx.json({ error: "Failed to create setup checkout", details: error.message }, 500);
+        }
+    });
+
+    readonly getPaymentMethod = this.factory.createHandlers(async (ctx) => {
+        const user = ctx.get("user");
+
+        try {
+            const result = await this.billingLogic.getPaymentMethod(user.id);
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Get payment method error:", error);
+            return ctx.json({ error: "Failed to retrieve payment method", details: error.message }, 500);
+        }
     });
 
     // Invoices

@@ -28,6 +28,8 @@ class BillingService {
 
         // Pricing
         this.router.get("/billing/pricing", ...this.controller.getPricing);
+        this.router.post("/billing/setup-checkout", authMiddleware, ...this.controller.createSetupCheckout);
+        this.router.get("/billing/payment-method", authMiddleware, ...this.controller.getPaymentMethod);
         
         // Invoices
         this.router.get("/invoices", authMiddleware, ...this.controller.getInvoices);

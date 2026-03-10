@@ -828,6 +828,45 @@ Response: 200
 }
 ```
 
+### POST /api/billing/setup-checkout
+**Create Stripe Checkout setup session (no debit)**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Request body (optional):
+{
+  "flow"?: "post_first_venue" | "manual",
+  "venue_id"?: "uuid",
+  "success_url"?: "https://...",
+  "cancel_url"?: "https://..."
+}
+
+Response: 200
+{
+  "checkout_url": "https://checkout.stripe.com/...",
+  "session_id": "cs_test_..."
+}
+```
+
+### GET /api/billing/payment-method
+**Get Stripe payment method status for current user**
+
+```typescript
+Headers: Authorization: Bearer <token>
+
+Response: 200
+{
+  "has_payment_method": boolean,
+  "provider": "stripe",
+  "payment_method"?: {
+    "type": "card" | "sepa_debit" | string,
+    "brand": string | null,
+    "last4": string | null
+  }
+}
+```
+
 ### GET /api/subscriptions/plans
 **List available subscription levels**
 
