@@ -1,8 +1,20 @@
 import Stripe from "stripe";
 
+export type StripeJobType = 
+    | "webhook_event"
+    | "process_commission";
+
 export interface StripeJobPayload {
     id: string;
-    type: string;
-    data: Stripe.Event.Data;
+    type: StripeJobType;
+    data?: Stripe.Event.Data;
     created: number;
+    // Fields for process_commission
+    commissionData?: {
+        reservationId: string;
+        venueOwnerId: string;
+        stripeCustomerId: string;
+        amountInCents: number;
+        currency: string;
+    };
 }

@@ -14,54 +14,116 @@ import { geocodeAddress } from "../utils/geocoding";
  * Handles events asynchronously to prevent timeouts and ensure reliability.
  */
 const stripeWorker = new Worker<StripeJobPayload>("stripe", async (job: Job<StripeJobPayload>) => {
-    const event = job.data;
-    console.log(`[Stripe Worker] Processing event ${event.type} (Job ID: ${job.id})`);
+    const payload = job.data;
+    console.log(`[Stripe Worker] Processing job type ${payload.type} (Job ID: ${job.id})`);
 
     try {
-        switch (event.type) {
-            case "checkout.session.completed":
-                const session = event.data.object as Stripe.Checkout.Session;
-                // Check if this is a boost purchase
-                if (session.metadata?.type === 'boost_purchase') {
-                    await handleBoostPurchaseCompleted(session);
-                } else {
-                    await handleCheckoutCompleted(session);
-                }
-                break;
+        if (payload.type === "process_commission" && payload.commissionData) {
+            await handleProcessCommission(payload.commissionData);
+            return;
+        }
 
-            case "invoice.paid":
-                await handleInvoicePaid(
-                    event.data.object as Stripe.Invoice,
-                );
-                break;
+        if (payload.type === "webhook_event" && payload.data) {
+            const event = payload.data;
+            switch (event.type) {
+                case "checkout.session.completed":
+                    const session = event.object as Stripe.Checkout.Session;
+                    if (session.metadata?.type === 'boost_purchase') {
+                        await handleBoostPurchaseCompleted(session);
+                    } else {
+                        await handleCheckoutCompleted(session);
+                    }
+                    break;
 
-            case "invoice.payment_failed":
-                await handleInvoicePaymentFailed(
-                    event.data.object as Stripe.Invoice,
-                );
-                break;
+                case "invoice.paid":
+                    await handleInvoicePaid(event.object as Stripe.Invoice);
+                    break;
 
-            case "customer.subscription.updated":
-                await handleSubscriptionUpdated(
-                    event.data.object as Stripe.Subscription,
-                );
-                break;
+                case "invoice.payment_failed":
+                    await handleInvoicePaymentFailed(event.object as Stripe.Invoice);
+                    break;
 
-            case "customer.subscription.deleted":
-                await handleSubscriptionDeleted(
-                    event.data.object as Stripe.Subscription,
-                );
-                break;
+                case "customer.subscription.updated":
+                    await handleSubscriptionUpdated(event.object as Stripe.Subscription);
+                    break;
 
-            default:
-                console.log(`[Stripe Worker] Unhandled Stripe event type: ${event.type}`);
+                case "customer.subscription.deleted":
+                    await handleSubscriptionDeleted(event.object as Stripe.Subscription);
+                    break;
+
+                default:
+                    console.log(`[Stripe Worker] Unhandled Stripe event type: ${event.type}`);
+            }
         }
     } catch (error: any) {
-        console.error(`[Stripe Worker] Error processing event ${event.type}:`, error);
-        throw error; // Let BullMQ handle retries
+        console.error(`[Stripe Worker] Error processing job ${payload.type}:`, error);
+        throw error;
     }
-
 }, { connection: redisConnection });
+
+/**
+ * Handle commission processing by charging the venue owner's saved payment method.
+ * Uses off-session PaymentIntents as validated in the health module tests.
+ */
+async function handleProcessCommission(data: {
+    reservationId: string;
+    venueOwnerId: string;
+    stripeCustomerId: string;
+    amountInCents: number;
+    currency: string;
+}) {
+    console.log(`[Stripe Worker] Processing commission for reservation ${data.reservationId}`);
+
+    const reservationRepo = new (await import("../repository/reservation.repository")).ReservationRepository();
+
+    try {
+        // 1. Find the customer's default payment method
+        const paymentMethods = await stripe.paymentMethods.list({
+            customer: data.stripeCustomerId,
+            type: 'card',
+        });
+
+        if (paymentMethods.data.length === 0) {
+            console.error(`[Stripe Worker] No payment method found for customer ${data.stripeCustomerId}`);
+            // We should probably notify the venue owner here
+            return;
+        }
+
+        // Get the most recent or default payment method
+        const paymentMethodId = paymentMethods.data[0].id;
+
+        // 2. Create and Confirm a PaymentIntent off-session
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: data.amountInCents,
+            currency: data.currency.toLowerCase(),
+            customer: data.stripeCustomerId,
+            payment_method: paymentMethodId,
+            off_session: true,
+            confirm: true,
+            metadata: {
+                reservation_id: data.reservationId,
+                type: 'guest_commission',
+                venue_owner_id: data.venueOwnerId,
+            },
+            description: `Commission Match - Reservation ${data.reservationId.slice(0, 8)}`,
+        });
+
+        if (paymentIntent.status === 'succeeded') {
+            // 3. Mark reservation as billed
+            await reservationRepo.markAsBilled([data.reservationId]);
+            console.log(`[Stripe Worker] Commission charged successfully for reservation ${data.reservationId}`);
+        } else {
+            console.warn(`[Stripe Worker] PaymentIntent status for reservation ${data.reservationId}: ${paymentIntent.status}`);
+        }
+    } catch (error: any) {
+        if (error.code === 'authentication_required') {
+            console.error(`[Stripe Worker] Authentication required for customer ${data.stripeCustomerId}. Failed to charge commission.`);
+            // Handle notification or past_due state if needed
+        } else {
+            throw error;
+        }
+    }
+}
 
 stripeWorker.on("completed", (job) => {
     console.log(`[Stripe Worker] Job ${job.id} completed successfully`);
