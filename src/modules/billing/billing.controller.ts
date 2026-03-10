@@ -69,6 +69,12 @@ class BillingController {
             throw error;
         }
     });
+
+    readonly getAccruedCommission = this.factory.createHandlers(async (ctx) => {
+        const user = ctx.get("user");
+        const result = await this.billingLogic.getAccruedCommission(user.id);
+        return ctx.json(result);
+    });
 }
 
 export default BillingController;

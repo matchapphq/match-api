@@ -72,6 +72,14 @@ export class WebhooksLogic {
                     await this.handleSubscriptionDeleted(event.data.object as Stripe.Subscription);
                     break;
 
+                case "payment_intent.succeeded":
+                    await this.handlePaymentIntentSucceeded(event.data.object as Stripe.PaymentIntent);
+                    break;
+
+                case "payment_intent.payment_failed":
+                    await this.handlePaymentIntentFailed(event.data.object as Stripe.PaymentIntent);
+                    break;
+
                 default:
                     console.log(`Unhandled Stripe event type: ${event.type}`);
             }
@@ -84,18 +92,65 @@ export class WebhooksLogic {
         }
     }
 
+    /**
+     * Handle successful payment intents.
+     * This is critical for SEPA and other async methods where success happens days later.
+     */
+    private async handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent) {
+        const { reservation_id, type } = pi.metadata;
+
+        if (type === 'guest_commission' && reservation_id) {
+            console.log(`[Webhook] Async payment succeeded for reservation ${reservation_id}. Marking as billed.`);
+            const reservationRepo = new (await import("../../repository/reservation.repository")).ReservationRepository();
+            await reservationRepo.markAsBilled([reservation_id]);
+        }
+    }
+
+    /**
+     * Handle failed payment intents.
+     */
+    private async handlePaymentIntentFailed(pi: Stripe.PaymentIntent) {
+        const { reservation_id, type, venue_owner_id } = pi.metadata;
+
+        if (type === 'guest_commission') {
+            console.error(`[Webhook] Payment failed for reservation ${reservation_id}. Owner: ${venue_owner_id}`);
+            // TODO: In a later step, we can queue a notification to the owner here
+        }
+    }
+
     private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         console.log("Processing checkout.session.completed:", session.id);
         
         const userId = session.metadata?.user_id;
+        const stripeCustomerId = session.customer as string;
+
+        if (!userId) {
+            console.error("Missing user_id in checkout session metadata");
+            return;
+        }
+
+        // 1. Always ensure stripe_customer_id is saved on the user
+        if (stripeCustomerId) {
+            await subscriptionsRepository.setStripeCustomerId(userId, stripeCustomerId);
+            console.log(`Saved stripe_customer_id ${stripeCustomerId} for user ${userId}`);
+        }
+
+        // 2. Handle 'setup' mode (Payment Method Only Onboarding)
+        if (session.mode === 'setup') {
+            console.log(`Setup session completed for user ${userId}. Onboarding complete.`);
+            await this.maybeConvertReferral(userId, "checkout.session.completed(setup)");
+            return;
+        }
+
+        // 3. Handle 'subscription' mode (Legacy/Still supported for now)
         const planId = session.metadata?.plan_id;
         const venueId = session.metadata?.venue_id;
         const venueDataStr = session.metadata?.venue_data;
         const action = session.metadata?.action;
         const subscriptionId = session.subscription as string;
 
-        if (!userId || !subscriptionId) {
-            console.error("Missing user_id or subscription in checkout session");
+        if (!subscriptionId) {
+            console.warn("Checkout session completed but no subscription ID found (might be setup mode handled above)");
             return;
         }
 

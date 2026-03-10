@@ -137,7 +137,65 @@ Cancel Subscription:
 6. User retains access until current_period_end
 ```
 
-### Webhook Events
+### Economic Models
+
+### 1. Fixed Subscriptions
+Venue owners can pay a flat monthly or annual fee for platform access.
+- **Monthly:** €30.00
+- **Annual:** €300.00 (Commitment: 12 months)
+
+### 2. Commission-Based Billing (Pay-per-Guest)
+As of March 2026, the platform implements a performance-aligned economic model.
+- **Rate:** €1.50 per guest check-in.
+- **Trigger:** When a venue owner confirms a guest's arrival via QR code scan (`checked_in` status).
+- **Mechanism:** Direct off-session `PaymentIntent` charging the venue owner's default card immediately.
+
+---
+
+## ⚡ Asynchronous Payment Handling (SEPA & Delayed Methods)
+
+Since some payment methods like **SEPA Direct Debit** are not instant, the system uses a dual-layer confirmation pattern to ensure data integrity.
+
+### The "Worker-Webhook Handshake"
+1. **The Worker (Initiator):** The `stripeWorker` creates the `PaymentIntent`. For instant methods (Credit Card), it marks the reservation as billed immediately if successful. For SEPA, the status will be `processing`, and the worker will exit without marking the reservation.
+2. **The Webhook (Confirmer):** Stripe sends a `payment_intent.succeeded` event once the funds are actually captured (can be 2-14 days later).
+3. **The Handler:** `WebhooksLogic.handlePaymentIntentSucceeded` receives the event, extracts the `reservation_id` from the Stripe metadata, and marks the reservation as `is_billed: true` in our database.
+
+### Required Webhook Events
+To support this flow, ensure your Stripe Webhook endpoint is listening for:
+- `payment_intent.succeeded`
+- `payment_intent.payment_failed`
+
+---
+
+## Commission Billing Flow (Real-time)
+
+```
+1. Guest arrives at venue and presents QR code.
+2. Owner scans QR -> Calls POST /api/partners/reservations/:id/check-in.
+3. Backend marks reservation as 'checked_in'.
+4. Backend identifies venue owner's stripe_customer_id.
+5. Backend calculates fee: party_size * 1.50.
+6. Backend queues 'process_commission' job in Stripe Queue.
+7. Stripe Worker retrieves saved payment method and creates off-session PaymentIntent.
+8. If payment succeeds, reservation is marked 'is_billed = true'.
+```
+
+---
+
+## Technical Details
+
+### Usage Reporting (Direct Charge)
+Unlike metered billing which aggregates monthly, this implementation uses **Real-time Off-session Charging**. This was validated in the `health` module tests:
+- **`off_session: true`**: Tells Stripe the customer is not in the checkout flow.
+- **`confirm: true`**: Automatically attempts to capture funds immediately.
+
+### Environment Variables
+No new variables required, but `STRIPE_SECRET_KEY` must have permission to create `PaymentIntents`.
+
+---
+
+## Webhook Events
 
 | Event | Handler Action |
 |-------|---------------|

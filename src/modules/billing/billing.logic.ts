@@ -37,4 +37,8 @@ export class BillingLogic {
         if (!transaction) throw new Error("TRANSACTION_NOT_FOUND");
         return transaction;
     }
-}
+
+    async getAccruedCommission(userId: string) {
+        return await this.billingRepo.getUnbilledUsage(userId);
+    }
+    }

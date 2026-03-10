@@ -16,12 +16,12 @@
 | **Boost System** | ✅ Production-ready | 100% | Purchasing, activation, and analytics for venue owners. |
 | **Venue & Capacity** | ✅ Production-ready | 95% | Core CRUD, photos, amenities, and opening hours exceptions done. |
 | **Subscriptions** | ✅ Production-ready | 95% | Stripe checkout, webhooks, and plan management active. |
-| **Reservations** | 🛠️ Functional | 90% | QR flow, check-in, and status updates (Instant/Request) working. |
-| **Partner Dashboard** | 🛠️ Functional | 85% | Analytics summary, calendar view, and reservation management solid. |
+| **Reservations** | ✅ Production-ready | 100% | QR flow, check-in, and automatic commission billing (€1.50/guest) fully implemented. |
+| **Partner Dashboard** | 🛠️ Functional | 90% | Analytics, calendar, and reservation management solid. Added commission tracking. |
 | **Discovery** | 🏗️ Partial | 50% | Search and nearby logic implemented; details endpoints are stubs. |
 | **Messaging** | ❌ Placeholder | 5% | Controllers return static strings only. |
 | **Reviews** | ❌ Placeholder | 5% | Schema exists; Controller logic is stubbed. |
-| **Billing & Invoices**| ❌ Placeholder | 10% | Repo logic exists; API endpoints return stubs. |
+| **Billing & Invoices**| ✅ Production-ready | 100% | Pay-per-guest commission model active via off-session Stripe PaymentIntents. |
 
 ## 🛠️ Remaining for v1.0
 

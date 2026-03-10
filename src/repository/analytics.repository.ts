@@ -29,6 +29,10 @@ export interface OverviewStats {
     checkedInReservations: number;
     averagePartySize: number;
     averageOccupancy: number;
+    accruedCommission: {
+        guests: number;
+        amount: string;
+    };
     topMatches: TopMatch[];
 }
 
@@ -194,6 +198,19 @@ export class AnalyticsRepository {
             ? Math.round((occupancyStats.totalReserved / occupancyStats.totalCapacity) * 100)
             : 0;
 
+        // Calculate accrued commission for the period (unbilled check-ins)
+        const commissionResult = await db.select({
+            total_guests: sql<number>`COALESCE(SUM(${reservationsTable.party_size}), 0)::int`,
+            total_amount: sql<string>`COALESCE(SUM(${reservationsTable.party_size} * CAST(COALESCE(${reservationsTable.commission_rate}, '1.50') AS NUMERIC)), '0.00')`,
+        })
+        .from(reservationsTable)
+        .where(and(
+            inArray(reservationsTable.venue_match_id, venueMatchIds),
+            eq(reservationsTable.status, 'checked_in'),
+            eq(reservationsTable.is_billed, false),
+            ...(dateConditions.length > 0 ? dateConditions : []),
+        ));
+
         // Top matches
         const topMatches = await this.getTopMatches(venueId, 5);
 
@@ -205,6 +222,10 @@ export class AnalyticsRepository {
             checkedInReservations: periodStats?.checkedIn ?? 0,
             averagePartySize: Math.round((allTimeStats?.avgPartySize ?? 0) * 10) / 10,
             averageOccupancy,
+            accruedCommission: {
+                guests: commissionResult[0]?.total_guests || 0,
+                amount: commissionResult[0]?.total_amount || "0.00",
+            },
             topMatches,
         };
     }

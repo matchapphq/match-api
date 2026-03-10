@@ -804,7 +804,7 @@ Request body:
 ### Scans & Check-ins
 - `POST /reservations/:reservationId/status` — Accept/Decline 'Request' mode bookings
 - `POST /reservations/verify-qr` — Verify user's QR code (from scanning)
-- `POST /reservations/:reservationId/check-in` — Confirm guest arrival
+- `POST /reservations/:reservationId/check-in` — Confirm guest arrival (Triggers automatic commission billing: €1.50/guest)
 - `POST /reservations/:reservationId/mark-no-show` — Mark user as absent
 
 ### Waitlist

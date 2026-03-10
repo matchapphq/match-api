@@ -65,7 +65,7 @@ export type VerificationDocuments = VerificationDocument[];
 export const venuesTable = pgTable('venues', {
         id: uuid('id').primaryKey().defaultRandom(),
         owner_id: uuid('owner_id').notNull(),
-        subscription_id: uuid('subscription_id').notNull(),
+        subscription_id: uuid('subscription_id'),
 
         // Basic Info
         name: varchar('name', { length: 255 }).notNull(),
@@ -120,6 +120,9 @@ export const venuesTable = pgTable('venues', {
 
         // Booking Mode: INSTANT = auto confirm, REQUEST = owner must confirm
         booking_mode: bookingModeEnum('booking_mode').default('INSTANT').notNull(),
+
+        // Billing
+        commission_override: numeric('commission_override', { precision: 10, scale: 2 }),
 
         // Stats
         average_rating: numeric('average_rating', { precision: 3, scale: 2 }).default('0.00'),

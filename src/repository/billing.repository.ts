@@ -1,8 +1,35 @@
 import { db } from "../config/config.db";
 import { invoicesTable, transactionsTable } from "../config/db/billing.table";
-import { eq, and, desc, count } from "drizzle-orm";
+import { reservationsTable } from "../config/db/reservations.table";
+import { venueMatchesTable } from "../config/db/matches.table";
+import { venuesTable } from "../config/db/venues.table";
+import { eq, and, desc, count, sql } from "drizzle-orm";
 
 export class BillingRepository {
+    /**
+     * Calculate unbilled commission for a venue owner.
+     * Sums up party_size * commission_rate for all 'checked_in' but not 'is_billed' reservations.
+     */
+    async getUnbilledUsage(userId: string) {
+        const result = await db.select({
+            total_guests: sql<number>`SUM(${reservationsTable.party_size})::int`,
+            total_commission: sql<string>`SUM(${reservationsTable.party_size} * CAST(COALESCE(${reservationsTable.commission_rate}, '1.50') AS NUMERIC))`,
+        })
+        .from(reservationsTable)
+        .innerJoin(venueMatchesTable, eq(reservationsTable.venue_match_id, venueMatchesTable.id))
+        .innerJoin(venuesTable, eq(venueMatchesTable.venue_id, venuesTable.id))
+        .where(and(
+            eq(venuesTable.owner_id, userId),
+            eq(reservationsTable.status, 'checked_in'),
+            eq(reservationsTable.is_billed, false),
+        ));
+
+        return {
+            guests: result[0]?.total_guests || 0,
+            amount: result[0]?.total_commission || "0.00",
+        };
+    }
+
     async getInvoices(userId: string, limit = 20, offset = 0) {
         const conditions = eq(invoicesTable.user_id, userId);
         

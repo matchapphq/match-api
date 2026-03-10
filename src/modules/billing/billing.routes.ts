@@ -34,6 +34,9 @@ class BillingService {
         // Transactions
         this.router.get("/transactions", authMiddleware, ...this.controller.getTransactions);
         this.router.get("/transactions/:transactionId", ...this.controller.getTransactionDetails);
+
+        // Estimates
+        this.router.get("/accrued-commission", authMiddleware, ...this.controller.getAccruedCommission);
     }
 }
 

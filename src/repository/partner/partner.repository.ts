@@ -159,7 +159,7 @@ export class PartnerRepository {
     public async createVenue(data: {
         name: string;
         owner_id: string;
-        subscription_id: string;
+        subscription_id?: string;
         description?: string | null;
         street_address: string;
         city: string;
@@ -171,6 +171,7 @@ export class PartnerRepository {
         capacity?: number;
         type?: 'bar' | 'restaurant' | 'fast_food' | 'nightclub' | 'cafe' | 'lounge' | 'pub' | 'sports_bar';
         coords?: { lat: number, lng: number };
+        commission_override?: string;
     }) {
         let lat = 0;
         let lng = 0;
@@ -220,6 +221,7 @@ export class PartnerRepository {
             type: data.type || 'sports_bar',
             status: 'pending',
             is_active: true,
+            commission_override: data.commission_override || "1.50",
         }).returning();
 
         return newVenue;
