@@ -27,6 +27,7 @@ class SubscriptionsService {
         
         // Protected routes - require authentication
         this.router.post("/create-checkout", authMiddleware, ...this.controller.createCheckout);
+        this.router.post("/create-setup-session", authMiddleware, ...this.controller.createSetupSession);
         this.router.get("/me", authMiddleware, ...this.controller.getMySubscription);
         this.router.post("/me/update-payment-method", authMiddleware, ...this.controller.updatePaymentMethod);
         this.router.post("/me/cancel", authMiddleware, ...this.controller.cancelSubscription);

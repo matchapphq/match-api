@@ -133,6 +133,44 @@ export class SubscriptionsLogic {
         };
     }
 
+    public async createSetupSession(userId: string, successUrl?: string, cancelUrl?: string) {
+        if (!isStripeConfigured()) {
+            throw new Error("PAYMENT_SYSTEM_NOT_CONFIGURED");
+        }
+
+        let stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
+
+        if (!stripeCustomerId) {
+            const userResult = await this.userRepository.getUserById(userId);
+            if (!userResult) throw new Error("USER_NOT_FOUND");
+            
+            const customer = await stripe.customers.create({
+                email: userResult.email,
+                metadata: { user_id: userId },
+            });
+
+            stripeCustomerId = customer.id;
+            await subscriptionsRepository.setStripeCustomerId(userId, stripeCustomerId);
+        }
+
+        const session = await stripe.checkout.sessions.create({
+            customer: stripeCustomerId,
+            payment_method_types: ["card", "sepa_debit"],
+            mode: "setup", // NO charge, just saving the card
+            success_url: successUrl || `${CHECKOUT_URLS.SUCCESS}&setup=true`,
+            cancel_url: cancelUrl || CHECKOUT_URLS.CANCEL,
+            metadata: {
+                user_id: userId,
+                action: "setup_payment_method",
+            },
+        });
+
+        return {
+            checkout_url: session.url,
+            session_id: session.id,
+        };
+    }
+
     async getMySubscription(userId: string) {
         const subscription = await subscriptionsRepository.getSubscriptionByUserId(userId);
 

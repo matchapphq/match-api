@@ -79,6 +79,37 @@ class SubscriptionsController {
     );
 
     /**
+     * POST /subscriptions/create-setup-session
+     * Creates a Stripe Checkout session in setup mode (no initial charge)
+     */
+    public readonly createSetupSession = this.factory.createHandlers(
+        validator("json", (value, c) => {
+            const schema = z.object({
+                success_url: z.url().optional(),
+                cancel_url: z.url().optional(),
+            });
+            const parsed = schema.safeParse(value);
+            if (!parsed.success) {
+                return c.json({ error: "Invalid request", details: parsed.error }, 400);
+            }
+            return parsed.data;
+        }),
+        async (ctx) => {
+            const user = ctx.get("user");
+            if (!user || !user.id) return ctx.json({ error: "Unauthorized" }, 401);
+
+            try {
+                const { success_url, cancel_url } = ctx.req.valid("json");
+                const result = await this.subscriptionsLogic.createSetupSession(user.id, success_url, cancel_url);
+                return ctx.json(result);
+            } catch (error: any) {
+                console.error("Create setup session error:", error);
+                return ctx.json({ error: "Failed to create setup session", details: error.message }, 500);
+            }
+        },
+    );
+
+    /**
      * GET /subscriptions/me
      * Returns current user's subscription
      */
