@@ -77,21 +77,32 @@ In Stripe Dashboard → Developers → Webhooks:
 In Stripe Dashboard → Settings → Billing → Customer portal:
 
 1. Enable the customer portal
-2. Configure allowed actions (update payment method, cancel subscription, etc.)
+2. Configure allowed actions (update payment method)
 
 ## API Endpoints
 
-### Subscriptions
+### Commission Billing (Current)
 
 | Method | Endpoint | Auth | Description |
 |--------|----------|------|-------------|
-| GET | `/subscriptions/plans` | No | Get available subscription plans |
-| POST | `/subscriptions/create-checkout` | Yes | Create Stripe Checkout session |
-| GET | `/subscriptions/me` | Yes | Get current user's subscription |
+| GET | `/billing/pricing` | No | Get commission pricing model |
+| POST | `/billing/setup-checkout` | Yes | Create Stripe Checkout setup session (save card/SEPA, no charge) |
+| GET | `/billing/payment-method` | Yes | Get payment method status (Stripe) |
 | POST | `/subscriptions/me/update-payment-method` | Yes | Get Stripe Customer Portal URL |
-| POST | `/subscriptions/me/cancel` | Yes | Cancel subscription (at period end) |
-| POST | `/subscriptions/me/upgrade` | Yes | Change subscription plan |
+| GET | `/invoices` | Yes | List commission invoices |
+| GET | `/transactions` | Yes | List commission transactions |
+| GET | `/accrued-commission` | Yes | Preview unbilled accrued commission |
 | POST | `/subscriptions/mock` | Yes | Toggle mock subscription (dev only) |
+
+### Legacy Subscription Endpoints (Deprecated)
+
+The following endpoints now return `410 Gone` with an explicit commission-only message:
+- `GET /subscriptions/plans`
+- `POST /subscriptions/create-checkout`
+- `GET /subscriptions/me`
+- `POST /subscriptions/me/cancel`
+- `POST /subscriptions/me/upgrade`
+- `GET /subscriptions/invoices`
 
 ### Webhooks
 
@@ -99,56 +110,36 @@ In Stripe Dashboard → Settings → Billing → Customer portal:
 |--------|----------|------|-------------|
 | POST | `/webhooks/stripe` | Signature | Handle Stripe webhook events |
 
-## Subscription Flow
+## Commission Flow
 
-### New Subscription (Onboarding)
-
-```
-1. User selects plan in Facturation.tsx
-2. Frontend calls POST /subscriptions/create-checkout
-3. Backend creates Stripe Customer (if needed)
-4. Backend creates Stripe Checkout Session
-5. User redirected to Stripe Checkout
-6. User completes payment on Stripe
-7. Stripe sends checkout.session.completed webhook
-8. Backend creates subscription record in DB
-9. User redirected to success URL
-10. Frontend detects ?checkout=success and shows dashboard
-```
-
-### Subscription Management
+### Payment Method Setup (No Charge)
 
 ```
-Update Payment Method:
-1. User clicks "Modifier" in CompteFacturation
-2. Frontend calls POST /subscriptions/me/update-payment-method
-3. Backend creates Stripe Customer Portal session
-4. User redirected to Stripe Portal
-5. User updates payment method
-6. Stripe sends customer.subscription.updated webhook (if needed)
-7. User redirected back to app
+1. Frontend calls POST /billing/setup-checkout
+2. Backend creates Stripe Checkout Session in mode=setup
+3. User saves card/SEPA in Stripe Checkout
+4. Stripe sends checkout.session.completed (setup)
+5. Backend stores stripe_customer_id and activates pending venues
+```
 
-Cancel Subscription:
-1. User clicks "Résilier" in CompteFacturation
-2. Frontend shows confirmation dialog
-3. Frontend calls POST /subscriptions/me/cancel
-4. Backend calls Stripe API to cancel at period end
-5. Backend updates local subscription record
-6. User retains access until current_period_end
+### Monthly Commission Collection (Month End)
+
+```
+1. Monthly job runs at end of month (last day guard in service)
+2. Backend aggregates unbilled checked-in reservations per owner
+3. Backend creates one off-session PaymentIntent per owner (monthly total)
+4. Backend records idempotent commission transaction
+5. On success, backend creates commission invoice and marks reservations billed
+6. On failure, backend records failed transaction with reason
 ```
 
 ### Economic Models
 
-### 1. Fixed Subscriptions
-Venue owners can pay a flat monthly or annual fee for platform access.
-- **Monthly:** €30.00
-- **Annual:** €300.00 (Commitment: 12 months)
-
-### 2. Commission-Based Billing (Pay-per-Guest)
-As of March 2026, the platform implements a performance-aligned economic model.
+### Commission-Based Billing (Pay-per-Guest)
+As of March 2026, subscription billing is deprecated in favor of commission-only.
 - **Rate:** €1.50 per guest check-in.
-- **Trigger:** When a venue owner confirms a guest's arrival via QR code scan (`checked_in` status).
-- **Mechanism:** Direct off-session `PaymentIntent` charging the venue owner's default card immediately.
+- **Trigger:** Guest status `checked_in`, then collected by monthly job.
+- **Mechanism:** One monthly off-session `PaymentIntent` per owner (aggregated amount), plus local commission transaction + invoice.
 
 ---
 
@@ -156,10 +147,10 @@ As of March 2026, the platform implements a performance-aligned economic model.
 
 Since some payment methods like **SEPA Direct Debit** are not instant, the system uses a dual-layer confirmation pattern to ensure data integrity.
 
-### The "Worker-Webhook Handshake"
-1. **The Worker (Initiator):** The `stripeWorker` creates the `PaymentIntent`. For instant methods (Credit Card), it marks the reservation as billed immediately if successful. For SEPA, the status will be `processing`, and the worker will exit without marking the reservation.
-2. **The Webhook (Confirmer):** Stripe sends a `payment_intent.succeeded` event once the funds are actually captured (can be 2-14 days later).
-3. **The Handler:** `WebhooksLogic.handlePaymentIntentSucceeded` receives the event, extracts the `reservation_id` from the Stripe metadata, and marks the reservation as `is_billed: true` in our database.
+### The "Monthly Job + Webhook" Handshake
+1. **Monthly Job (Initiator):** Creates the monthly commission `PaymentIntent` and records an idempotent pending transaction.
+2. **Webhook (Confirmer):** Stripe sends `payment_intent.succeeded` or `payment_intent.payment_failed`.
+3. **Handler:** Updates transaction state idempotently, creates invoice on success, and marks reservation set as billed only after successful payment.
 
 ### Required Webhook Events
 To support this flow, ensure your Stripe Webhook endpoint is listening for:

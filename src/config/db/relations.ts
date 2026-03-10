@@ -280,7 +280,7 @@ export const invoicesRelations = relations(invoicesTable, ({ one }) => ({
     }),
 }));
 
-// Transactions are for venue owner subscriptions only - users don't pay for reservations
+// Transactions are for venue owner billing (commission model) - users don't pay for reservations
 export const transactionsRelations = relations(transactionsTable, ({ one }) => ({
     user: one(usersTable, {
         fields: [transactionsTable.user_id],
@@ -412,4 +412,3 @@ export const boostAnalyticsRelations = relations(boostAnalyticsTable, ({ one }) 
         references: [usersTable.id],
     }),
 }));
-

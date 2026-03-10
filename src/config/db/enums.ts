@@ -71,7 +71,7 @@ export const invoiceStatusEnum = pgEnum('invoice_status', [
     'canceled',
 ]);
 
-// Transaction types - only for venue owner billing (subscriptions)
+// Transaction types for venue owner billing (commission-first model)
 // Users do NOT pay for reservations
 export const transactionTypeEnum = pgEnum('transaction_type', [
     'subscription',

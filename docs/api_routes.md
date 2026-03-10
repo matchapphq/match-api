@@ -868,16 +868,29 @@ Response: 200
 ```
 
 ### GET /api/subscriptions/plans
-**List available subscription levels**
+**Deprecated — returns `410 Gone` (commission-only billing)**
+Use `GET /api/billing/pricing`.
 
 ### POST /api/subscriptions/create-checkout
-**Start subscription checkout**
+**Deprecated — returns `410 Gone` (commission-only billing)**
+Use `POST /api/billing/setup-checkout`.
 
 ### GET /api/subscriptions/me
-**Get current user subscription status**
+**Deprecated — returns `410 Gone` (commission-only billing)**
+Use `GET /api/billing/payment-method`.
 
 ### POST /api/subscriptions/me/update-payment-method
 **Get payment portal URL**
+
+### POST /api/subscriptions/me/cancel
+**Deprecated — returns `410 Gone` (commission-only billing)**
+
+### POST /api/subscriptions/me/upgrade
+**Deprecated — returns `410 Gone` (commission-only billing)**
+
+### GET /api/subscriptions/invoices
+**Deprecated — returns `410 Gone`**
+Use `GET /api/invoices`.
 
 ### Billing History
 - `GET /api/invoices` — List all invoices
