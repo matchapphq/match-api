@@ -113,6 +113,8 @@ export class ReservationRepository {
                                 street_address: true,
                                 phone: true,
                                 owner_id: true,
+                                is_active: true,
+                                status: true,
                             },
                         },
                         match: {

@@ -156,6 +156,26 @@ export class PartnerRepository {
             .returning();
     }
 
+    async activatePendingVenuesByOwner(ownerId: string) {
+        const updatedVenues = await db
+            .update(venuesTable)
+            .set({
+                is_active: true,
+                status: "approved",
+                updated_at: new Date(),
+            })
+            .where(and(
+                eq(venuesTable.owner_id, ownerId),
+                eq(venuesTable.status, "pending"),
+            ))
+            .returning();
+
+        return updatedVenues.map((venue) => ({
+            id: venue.id,
+            name: venue.name,
+        }));
+    }
+
     public async createVenue(data: {
         name: string;
         owner_id: string;
@@ -260,6 +280,33 @@ export class PartnerRepository {
             .where(and(eq(venuesTable.id, venueId), eq(venuesTable.owner_id, ownerId)))
             .limit(1);
         return venues[0] || null;
+    }
+
+    async getReservationVenueByOwner(reservationId: string, ownerId: string) {
+        const reservation = await db.query.reservationsTable.findFirst({
+            where: eq(reservationsTable.id, reservationId),
+            with: {
+                venueMatch: {
+                    with: {
+                        venue: {
+                            columns: {
+                                id: true,
+                                owner_id: true,
+                                is_active: true,
+                                status: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        const venue = reservation?.venueMatch?.venue;
+        if (!venue || venue.owner_id !== ownerId) {
+            return null;
+        }
+
+        return venue;
     }
 
     /**

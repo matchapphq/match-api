@@ -169,14 +169,17 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.log("Session metadata:", session.metadata);
 
     const userId = session.metadata?.user_id;
+    const stripeCustomerId = session.customer as string | null;
     const planId = session.metadata?.plan_id;
     const venueId = session.metadata?.venue_id;
     const venueDataStr = session.metadata?.venue_data;
     const action = session.metadata?.action;
     const subscriptionId = session.subscription as string;
+    const partnerRepository = new PartnerRepository();
 
     console.log("Parsed values:", {
         userId,
+        stripeCustomerId,
         planId,
         venueId,
         action,
@@ -184,10 +187,26 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         hasVenueData: !!venueDataStr,
     });
 
-    if (!userId || !subscriptionId) {
-        console.error(
-            "Missing user_id or subscription in checkout session",
-        );
+    if (!userId) {
+        console.error("Missing user_id in checkout session");
+        return;
+    }
+
+    if (stripeCustomerId) {
+        await subscriptionsRepository.setStripeCustomerId(userId, stripeCustomerId);
+    }
+
+    if (session.mode === "setup") {
+        const activatedVenues = await partnerRepository.activatePendingVenuesByOwner(userId);
+        if (activatedVenues.length > 0) {
+            console.log(`[Stripe Worker] Activated ${activatedVenues.length} pending venue(s) for user ${userId}`);
+        }
+        await maybeConvertReferral(userId, "checkout.session.completed(setup)");
+        return;
+    }
+
+    if (!subscriptionId) {
+        console.error("Missing subscription in checkout session");
         return;
     }
 
@@ -222,7 +241,6 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         commitmentEndDate.setFullYear(commitmentEndDate.getFullYear() + 1);
     }
 
-    const partnerRepository = new PartnerRepository();
     let newSubscriptionId: string | null = null;
 
     // If there's a venue_id, update the venue's pending subscription

@@ -5,6 +5,7 @@ import stripe, { CHECKOUT_URLS, isStripeConfigured } from "../../config/stripe";
 import { geocodeAddress } from "../../utils/geocoding";
 import { notifyNewReservation, notifyReservationCancelled } from "../../services/notifications/notification.triggers";
 import { resolveHasPaymentMethodLive } from "../../utils/stripe-payment-method";
+import { assertVenueIsActiveForOperations } from "../../utils/venue-active.guard";
 
 function formatStripePaymentMethod(paymentMethod: any) {
     if (!paymentMethod || paymentMethod.deleted) {
@@ -382,8 +383,10 @@ export class PartnerLogic {
             throw new Error("FORBIDDEN");
         }
 
-        if (!venue.is_active || venue.subscription_status === "canceled" || venue.status === "suspended") {
-            throw new Error("VENUE_SUBSCRIPTION_INACTIVE");
+        assertVenueIsActiveForOperations(venue);
+
+        if (venue.subscription_status === "canceled") {
+            throw new Error("VENUE_INACTIVE_PAYMENT_REQUIRED");
         }
 
         if (venue.subscription_id) {
@@ -398,7 +401,7 @@ export class PartnerLogic {
                     is_active: false,
                     status: "suspended",
                 });
-                throw new Error("VENUE_SUBSCRIPTION_INACTIVE");
+                throw new Error("VENUE_INACTIVE_PAYMENT_REQUIRED");
             }
         }
 
@@ -412,7 +415,13 @@ export class PartnerLogic {
         return await this.partnerRepo.scheduleMatch(venueId, match_id, finalCapacity);
     }
 
-    async cancelMatch(venueId: string, matchId: string) {
+    async cancelMatch(userId: string, venueId: string, matchId: string) {
+        const venue = await this.partnerRepo.getVenueByIdAndOwner(venueId, userId);
+        if (!venue) {
+            throw new Error("FORBIDDEN");
+        }
+
+        assertVenueIsActiveForOperations(venue);
         await this.partnerRepo.cancelMatch(venueId, matchId);
         return { success: true };
     }
@@ -727,6 +736,12 @@ export class PartnerLogic {
     }
 
     async updateReservationStatus(userId: string, reservationId: string, status: 'CONFIRMED' | 'DECLINED') {
+        const venue = await this.partnerRepo.getReservationVenueByOwner(reservationId, userId);
+        if (!venue) {
+            throw new Error("FORBIDDEN");
+        }
+
+        assertVenueIsActiveForOperations(venue);
         const result = await this.partnerRepo.updateReservationStatus(reservationId, userId, status);
         if (!result.success) {
             if (result.statusCode === 404) throw new Error("RESERVATION_NOT_FOUND");
@@ -765,6 +780,12 @@ export class PartnerLogic {
     }
 
     async updateVenueMatch(userId: string, venueId: string, matchId: string, data: any) {
+        const venue = await this.partnerRepo.getVenueByIdAndOwner(venueId, userId);
+        if (!venue) {
+            throw new Error("FORBIDDEN");
+        }
+
+        assertVenueIsActiveForOperations(venue);
         const result = await this.partnerRepo.updateVenueMatch(venueId, matchId, userId, data);
         if (!result.success) {
             if (result.statusCode === 403) throw new Error("FORBIDDEN");
@@ -796,6 +817,12 @@ export class PartnerLogic {
     }
 
     async updateReservationFull(userId: string, reservationId: string, data: any) {
+        const venue = await this.partnerRepo.getReservationVenueByOwner(reservationId, userId);
+        if (!venue) {
+            throw new Error("FORBIDDEN");
+        }
+
+        assertVenueIsActiveForOperations(venue);
         const result = await this.partnerRepo.updateReservation(reservationId, userId, data);
         if (!result.success) {
             if (result.statusCode === 403) throw new Error("FORBIDDEN");
@@ -805,6 +832,12 @@ export class PartnerLogic {
     }
 
     async markReservationNoShow(userId: string, reservationId: string, reason?: string) {
+        const venue = await this.partnerRepo.getReservationVenueByOwner(reservationId, userId);
+        if (!venue) {
+            throw new Error("FORBIDDEN");
+        }
+
+        assertVenueIsActiveForOperations(venue);
         const result = await this.partnerRepo.markReservationNoShow(reservationId, userId, reason);
         if (!result.success) {
             if (result.statusCode === 403) throw new Error("FORBIDDEN");
@@ -814,9 +847,12 @@ export class PartnerLogic {
     }
 
     async getVenueMatchWaitlist(userId: string, venueId: string, matchId: string, status?: string) {
-        const venues = await this.partnerRepo.getVenuesByOwnerId(userId);
-        const ownsVenue = venues.some(v => v.id === venueId);
-        if (!ownsVenue) throw new Error("FORBIDDEN");
+        const venue = await this.partnerRepo.getVenueByIdAndOwner(venueId, userId);
+        if (!venue) {
+            throw new Error("FORBIDDEN");
+        }
+
+        assertVenueIsActiveForOperations(venue);
 
         // TODO: Get venue_match_id from venueId and matchId if needed, currently passing matchId as venueMatchId in controller logic
         const venueMatchId = matchId; 

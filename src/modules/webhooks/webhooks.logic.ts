@@ -137,6 +137,10 @@ export class WebhooksLogic {
 
         // 2. Handle 'setup' mode (Payment Method Only Onboarding)
         if (session.mode === 'setup') {
+            const activatedVenues = await this.partnerRepository.activatePendingVenuesByOwner(userId);
+            if (activatedVenues.length > 0) {
+                console.log(`Activated ${activatedVenues.length} pending venue(s) for user ${userId}`);
+            }
             console.log(`Setup session completed for user ${userId}. Onboarding complete.`);
             await this.maybeConvertReferral(userId, "checkout.session.completed(setup)");
             return;

@@ -7,6 +7,7 @@ import { notifyNewReservation, notifyReservationCancelled } from "../../services
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailType } from "../../types/mail.types";
 import { stripeQueue } from "../../queue/stripe.queue";
+import { assertVenueIsActiveForOperations } from "../../utils/venue-active.guard";
 
 export class ReservationsLogic {
     constructor(
@@ -23,6 +24,8 @@ export class ReservationsLogic {
         if (!venueMatch) {
             throw new Error("VENUE_MATCH_NOT_FOUND");
         }
+
+        assertVenueIsActiveForOperations(venueMatch.venue);
 
         const bookingMode = venueMatch.venue?.booking_mode || 'INSTANT';
 
@@ -241,6 +244,8 @@ export class ReservationsLogic {
         const reservation = await this.reservationRepo.findById(payload.rid);
         if (!reservation) throw new Error("RESERVATION_NOT_FOUND");
 
+        assertVenueIsActiveForOperations(reservation.venueMatch?.venue);
+
         if (reservation.status === 'checked_in') {
             return {
                 valid: true,
@@ -280,6 +285,8 @@ export class ReservationsLogic {
             throw new Error("FORBIDDEN");
         }
 
+        assertVenueIsActiveForOperations(reservation.venueMatch?.venue);
+
         if (reservation.status === 'checked_in') {
             return { message: "Guest already checked in", reservation };
         }
@@ -309,7 +316,7 @@ export class ReservationsLogic {
                             stripeCustomerId: stripeCustomerId,
                             amountInCents: amountInCents,
                             currency: "EUR",
-                        }
+                        },
                     });
                     console.log(`[Reservations] Queued commission job for reservation ${reservationId} (${amountInCents / 100}€)`);
                 } else {
