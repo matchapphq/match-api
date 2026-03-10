@@ -271,17 +271,27 @@ export class ReservationsLogic {
     }
 
     async checkIn(userId: string, reservationId: string) {
-        // TODO: Verify user is venue owner
-        // 1. Mark as checked in in DB
-        const checkedIn = await this.reservationRepo.checkIn(reservationId);
-        if (!checkedIn) throw new Error("RESERVATION_NOT_FOUND_OR_CHECKED_IN");
+        // 1. Fetch reservation with venue info to verify ownership
+        const reservation = await this.reservationRepo.findById(reservationId);
+        if (!reservation) throw new Error("RESERVATION_NOT_FOUND");
 
-        // 2. Trigger Commission Billing Job
-        try {
-            // Get venue owner and stripe customer ID
-            const venueMatch = await this.capacityRepo.getVenueMatch(checkedIn.venue_match_id);
-            if (venueMatch && venueMatch.venue) {
-                const ownerId = venueMatch.venue.owner_id;
+        // Verify user is the owner of the venue for this match
+        if (reservation.venueMatch?.venue?.owner_id !== userId) {
+            throw new Error("FORBIDDEN");
+        }
+
+        if (reservation.status === 'checked_in') {
+            return { message: "Guest already checked in", reservation };
+        }
+
+        // 2. Mark as checked in in DB
+        const checkedIn = await this.reservationRepo.checkIn(reservationId);
+        if (!checkedIn) throw new Error("CHECK_IN_FAILED");
+
+        // 3. Trigger Commission Billing Job (if not already billed)
+        if (!checkedIn.is_billed) {
+            try {
+                const ownerId = reservation.venueMatch.venue.owner_id;
                 const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(ownerId);
 
                 if (stripeCustomerId) {
@@ -301,14 +311,13 @@ export class ReservationsLogic {
                             currency: "EUR",
                         }
                     });
-                    console.log(`[Reservations] Queued commission job for reservation ${reservationId} (Amount: ${amountInCents / 100}€)`);
+                    console.log(`[Reservations] Queued commission job for reservation ${reservationId} (${amountInCents / 100}€)`);
                 } else {
-                    console.warn(`[Reservations] No Stripe customer ID found for owner ${ownerId}. Skipping billing for reservation ${reservationId}.`);
+                    console.warn(`[Reservations] No Stripe customer ID found for owner ${ownerId}. Skipping billing.`);
                 }
+            } catch (error) {
+                console.error(`[Reservations] Failed to queue commission job:`, error);
             }
-        } catch (error) {
-            console.error(`[Reservations] Failed to queue commission job for reservation ${reservationId}:`, error);
-            // Non-blocking: check-in is successful even if billing queue fails
         }
 
         return { message: "Guest checked in successfully!", reservation: checkedIn };
