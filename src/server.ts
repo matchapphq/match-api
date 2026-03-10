@@ -29,6 +29,10 @@ import SupportService from "./modules/support/support.routes";
 import WebhooksService from "./modules/webhooks/webhooks.routes";
 import UserRepository from "./repository/user.repository";
 
+// Initialize Workers
+import "./workers/stripe.worker";
+import "./workers/notification.worker";
+
 const authRouter = new AuthService();
 const userRouter = new UserService();
 const discoveryRouter = new DiscoveryService();
