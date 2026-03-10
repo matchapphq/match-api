@@ -8,6 +8,9 @@ import { PartnerRepository } from "../repository/partner/partner.repository";
 import boostRepository from "../repository/boost.repository";
 import referralRepository from "../repository/referral.repository";
 import { geocodeAddress } from "../utils/geocoding";
+import { CommissionBillingService } from "../services/commission-billing.service";
+
+const commissionBillingService = new CommissionBillingService();
 
 /**
  * Worker for processing Stripe webhook events.
@@ -25,9 +28,10 @@ const stripeWorker = new Worker<StripeJobPayload>("stripe", async (job: Job<Stri
 
         if (payload.type === "webhook_event" && payload.data) {
             const event = payload.data;
+            const eventObject = event.data.object;
             switch (event.type) {
                 case "checkout.session.completed":
-                    const session = event.object as Stripe.Checkout.Session;
+                    const session = eventObject as unknown as Stripe.Checkout.Session;
                     if (session.metadata?.type === 'boost_purchase') {
                         await handleBoostPurchaseCompleted(session);
                     } else {
@@ -36,19 +40,33 @@ const stripeWorker = new Worker<StripeJobPayload>("stripe", async (job: Job<Stri
                     break;
 
                 case "invoice.paid":
-                    await handleInvoicePaid(event.object as Stripe.Invoice);
+                    await handleInvoicePaid(eventObject as unknown as Stripe.Invoice);
                     break;
 
                 case "invoice.payment_failed":
-                    await handleInvoicePaymentFailed(event.object as Stripe.Invoice);
+                    await handleInvoicePaymentFailed(eventObject as unknown as Stripe.Invoice);
                     break;
 
                 case "customer.subscription.updated":
-                    await handleSubscriptionUpdated(event.object as Stripe.Subscription);
+                    await handleSubscriptionUpdated(eventObject as unknown as Stripe.Subscription);
                     break;
 
                 case "customer.subscription.deleted":
-                    await handleSubscriptionDeleted(event.object as Stripe.Subscription);
+                    await handleSubscriptionDeleted(eventObject as unknown as Stripe.Subscription);
+                    break;
+
+                case "payment_intent.succeeded":
+                    await commissionBillingService.recordPaymentIntentSucceededFromStripe(
+                        eventObject as unknown as Stripe.PaymentIntent,
+                        "webhook",
+                    );
+                    break;
+
+                case "payment_intent.payment_failed":
+                    await commissionBillingService.recordPaymentIntentFailedFromStripe(
+                        eventObject as unknown as Stripe.PaymentIntent,
+                        "webhook",
+                    );
                     break;
 
                 default:
@@ -81,18 +99,28 @@ export async function handleProcessCommission(data: {
         }
 
         // 2. Find the customer's default payment method
-        const paymentMethods = await stripe.paymentMethods.list({
-            customer: data.stripeCustomerId,
-            type: 'card',
-        });
+        const [cards, sepaDebits] = await Promise.all([
+            stripe.paymentMethods.list({
+                customer: data.stripeCustomerId,
+                type: "card",
+                limit: 1,
+            }),
+            stripe.paymentMethods.list({
+                customer: data.stripeCustomerId,
+                type: "sepa_debit",
+                limit: 1,
+            }),
+        ]);
 
-        if (paymentMethods.data.length === 0) {
+        const paymentMethodId = cards.data[0]?.id || sepaDebits.data[0]?.id;
+        if (!paymentMethodId) {
             console.error(`[Stripe Worker] No payment method found for customer ${data.stripeCustomerId}`);
             // Logic for notifying owner could go here
             return;
         }
 
-        const paymentMethodId = paymentMethods.data[0].id;
+        const reservationIds = [data.reservationId];
+        const totalGuests = reservation.party_size || 1;
 
         // 3. Create and Confirm a PaymentIntent off-session
         const paymentIntent = await stripe.paymentIntents.create({
@@ -104,31 +132,70 @@ export async function handleProcessCommission(data: {
             confirm: true,
             metadata: {
                 reservation_id: data.reservationId,
-                type: 'guest_commission',
+                type: "guest_commission",
                 venue_owner_id: data.venueOwnerId,
+                total_guests: String(totalGuests),
             },
             description: `Commission Match - Reservation ${data.reservationId.slice(0, 8)}`,
         });
 
-        if (paymentIntent.status === 'succeeded') {
-            // 4. Mark reservation as billed
-            await reservationRepo.markAsBilled([data.reservationId]);
+        await commissionBillingService.recordCommissionPaymentPending({
+            stripeTransactionId: paymentIntent.id,
+            userId: data.venueOwnerId,
+            amountInCents: data.amountInCents,
+            currency: paymentIntent.currency,
+            reservationIds,
+            totalGuests,
+            description: `Commission reservation ${data.reservationId.slice(0, 8)}`,
+            source: "legacy_checkin",
+        });
+
+        if (paymentIntent.status === "succeeded") {
+            await commissionBillingService.recordCommissionPaymentSucceeded({
+                stripeTransactionId: paymentIntent.id,
+                userId: data.venueOwnerId,
+                amountInCents: data.amountInCents,
+                currency: paymentIntent.currency,
+                reservationIds,
+                totalGuests,
+                description: `Commission reservation ${data.reservationId.slice(0, 8)}`,
+                source: "legacy_checkin",
+            });
             console.log(`[Stripe Worker] Commission charged successfully for reservation ${data.reservationId}`);
         } else {
             console.warn(`[Stripe Worker] PaymentIntent for ${data.reservationId} ended with status: ${paymentIntent.status}`);
-            if (paymentIntent.status === 'requires_action' || paymentIntent.status === 'requires_payment_method') {
-                // This will be caught by the catch block if Stripe throws, 
-                // but we handle specific non-succeeded statuses here if needed.
+            if (paymentIntent.status === "requires_action" || paymentIntent.status === "requires_payment_method" || paymentIntent.status === "canceled") {
+                await commissionBillingService.recordCommissionPaymentFailed({
+                    stripeTransactionId: paymentIntent.id,
+                    userId: data.venueOwnerId,
+                    amountInCents: data.amountInCents,
+                    currency: paymentIntent.currency,
+                    reservationIds,
+                    totalGuests,
+                    description: `Commission reservation ${data.reservationId.slice(0, 8)}`,
+                    failedReason: `Stripe status ${paymentIntent.status}`,
+                    source: "legacy_checkin",
+                });
             }
         }
     } catch (error: any) {
-        if (error.code === 'authentication_required') {
-            console.error(`[Stripe Worker] Authentication required for customer ${data.stripeCustomerId}. Charge failed.`);
-            // We could update a 'billing_status' on the reservation here if we had one
-        } else {
-            console.error(`[Stripe Worker] Error during commission processing:`, error.message);
-            throw error; // Retry via BullMQ
+        const paymentIntent = (error?.raw?.payment_intent || error?.payment_intent) as Stripe.PaymentIntent | undefined;
+
+        if (paymentIntent?.id) {
+            await commissionBillingService.recordCommissionPaymentFailed({
+                stripeTransactionId: paymentIntent.id,
+                userId: data.venueOwnerId,
+                amountInCents: data.amountInCents,
+                currency: paymentIntent.currency || data.currency,
+                reservationIds: [data.reservationId],
+                description: `Commission reservation ${data.reservationId.slice(0, 8)}`,
+                failedReason: error?.message || "Stripe payment failed",
+                source: "legacy_checkin",
+            });
         }
+
+        console.error(`[Stripe Worker] Error during commission processing:`, error?.message || error);
+        throw error; // Retry via BullMQ
     }
 }
 

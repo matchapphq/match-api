@@ -75,6 +75,7 @@ export const invoiceStatusEnum = pgEnum('invoice_status', [
 // Users do NOT pay for reservations
 export const transactionTypeEnum = pgEnum('transaction_type', [
     'subscription',
+    'commission',
     'refund',
     'payout',
     'adjustment',

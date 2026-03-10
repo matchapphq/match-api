@@ -7,7 +7,7 @@ export type StripeJobType =
 export interface StripeJobPayload {
     id: string;
     type: StripeJobType;
-    data?: Stripe.Event.Data;
+    data?: Stripe.Event;
     created: number;
     // Fields for process_commission
     commissionData?: {

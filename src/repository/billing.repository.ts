@@ -1,5 +1,12 @@
 import { db } from "../config/config.db";
-import { invoicesTable, transactionsTable } from "../config/db/billing.table";
+import {
+    invoicesTable,
+    transactionsTable,
+    type Invoice,
+    type NewInvoice,
+    type NewTransaction,
+    type Transaction,
+} from "../config/db/billing.table";
 import { reservationsTable } from "../config/db/reservations.table";
 import { venueMatchesTable } from "../config/db/matches.table";
 import { venuesTable } from "../config/db/venues.table";
@@ -86,5 +93,46 @@ export class BillingRepository {
                 eq(transactionsTable.user_id, userId),
             ),
         });
+    }
+
+    async getTransactionByStripeTransactionId(stripeTransactionId: string) {
+        return await db.query.transactionsTable.findFirst({
+            where: eq(transactionsTable.stripe_transaction_id, stripeTransactionId),
+        });
+    }
+
+    async createTransaction(data: NewTransaction): Promise<Transaction> {
+        const [transaction] = await db.insert(transactionsTable)
+            .values(data)
+            .returning();
+        return transaction!;
+    }
+
+    async updateTransaction(transactionId: string, data: Partial<Transaction>): Promise<Transaction | null> {
+        const [updated] = await db.update(transactionsTable)
+            .set({
+                ...data,
+                updated_at: new Date(),
+            })
+            .where(eq(transactionsTable.id, transactionId))
+            .returning();
+        return updated || null;
+    }
+
+    async attachInvoiceToTransaction(transactionId: string, invoiceId: string): Promise<Transaction | null> {
+        return this.updateTransaction(transactionId, { invoice_id: invoiceId });
+    }
+
+    async getInvoiceByNumber(invoiceNumber: string) {
+        return await db.query.invoicesTable.findFirst({
+            where: eq(invoicesTable.invoice_number, invoiceNumber),
+        });
+    }
+
+    async createInvoice(data: NewInvoice): Promise<Invoice> {
+        const [invoice] = await db.insert(invoicesTable)
+            .values(data)
+            .returning();
+        return invoice!;
     }
 }

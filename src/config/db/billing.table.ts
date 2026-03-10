@@ -6,7 +6,7 @@ import { subscriptionsTable } from './subscriptions.table';
 
 // ============================================
 // BILLING TABLES - FOR VENUE OWNERS ONLY
-// These tables handle subscription payments for venue owners.
+// These tables handle commission billing for venue owners.
 // Regular users do NOT pay - reservations are completely free.
 // ============================================
 
@@ -136,7 +136,7 @@ export const transactionsTable = pgTable(
         amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
         currency: varchar('currency', { length: 3 }).default('EUR'),
 
-        // Related entities (subscriptions only - users don't pay for reservations)
+        // Related entities
         subscription_id: uuid('subscription_id'),
         invoice_id: uuid('invoice_id'),
 
@@ -169,4 +169,3 @@ export const transactionsTable = pgTable(
 
 export type Transaction = typeof transactionsTable.$inferSelect;
 export type NewTransaction = typeof transactionsTable.$inferInsert;
-

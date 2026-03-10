@@ -2,9 +2,9 @@ import { db } from "../config/config.db";
 import { reservationsTable } from "../config/db/reservations.table";
 import { tablesTable } from "../config/db/tables.table";
 import { venuesTable } from "../config/db/venues.table";
-import { subscriptionsTable } from "../config/db/subscriptions.table";
+import { usersTable } from "../config/db/user.table";
 import { venueMatchesTable } from "../config/db/matches.table";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, lte } from "drizzle-orm";
 
 export class ReservationRepository {
 
@@ -293,23 +293,22 @@ export class ReservationRepository {
      * Get all checked-in reservations that haven't been billed yet, grouped by venue owner.
      */
     async getUnbilledCheckedInReservations() {
-        // We need to join with venues to get the owner and their subscription info
+        // Join with venues/users to retrieve owner and Stripe customer.
         return await db.select({
             reservation_id: reservationsTable.id,
             venue_id: venueMatchesTable.venue_id,
             owner_id: venuesTable.owner_id,
             party_size: reservationsTable.party_size,
             commission_rate: reservationsTable.commission_rate,
-            stripe_subscription_id: subscriptionsTable.stripe_subscription_id,
+            stripe_customer_id: usersTable.stripe_customer_id,
         })
         .from(reservationsTable)
         .innerJoin(venueMatchesTable, eq(reservationsTable.venue_match_id, venueMatchesTable.id))
         .innerJoin(venuesTable, eq(venueMatchesTable.venue_id, venuesTable.id))
-        .innerJoin(subscriptionsTable, eq(venuesTable.owner_id, subscriptionsTable.user_id))
+        .innerJoin(usersTable, eq(venuesTable.owner_id, usersTable.id))
         .where(and(
             eq(reservationsTable.status, 'checked_in'),
             eq(reservationsTable.is_billed, false),
-            // Ensure we only bill active subscriptions or handle this in logic
         ));
     }
 
@@ -327,5 +326,27 @@ export class ReservationRepository {
             })
             .where(inArray(reservationsTable.id, reservationIds))
             .returning();
+    }
+
+    async getUnbilledCheckedInReservationIdsByOwner(ownerId: string, checkedInAtOrBefore?: Date) {
+        const conditions = [
+            eq(venuesTable.owner_id, ownerId),
+            eq(reservationsTable.status, "checked_in"),
+            eq(reservationsTable.is_billed, false),
+        ];
+
+        if (checkedInAtOrBefore) {
+            conditions.push(lte(reservationsTable.checked_in_at, checkedInAtOrBefore));
+        }
+
+        const rows = await db.select({
+            id: reservationsTable.id,
+        })
+            .from(reservationsTable)
+            .innerJoin(venueMatchesTable, eq(reservationsTable.venue_match_id, venueMatchesTable.id))
+            .innerJoin(venuesTable, eq(venueMatchesTable.venue_id, venuesTable.id))
+            .where(and(...conditions));
+
+        return rows.map((row) => row.id);
     }
 }

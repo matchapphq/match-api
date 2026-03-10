@@ -8,10 +8,12 @@ import UserRepository from "../../repository/user.repository";
 import { geocodeAddress } from "../../utils/geocoding";
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailType } from "../../types/mail.types";
+import { CommissionBillingService } from "../../services/commission-billing.service";
 
 export class WebhooksLogic {
     private readonly userRepository = new UserRepository();
     private readonly partnerRepository = new PartnerRepository();
+    private readonly commissionBillingService = new CommissionBillingService();
 
     private async maybeConvertReferral(referredUserId: string, source: string) {
         const result = await referralRepository.convertReferral(referredUserId);
@@ -97,25 +99,26 @@ export class WebhooksLogic {
      * This is critical for SEPA and other async methods where success happens days later.
      */
     private async handlePaymentIntentSucceeded(pi: Stripe.PaymentIntent) {
-        const { reservation_id, type } = pi.metadata;
-
-        if (type === 'guest_commission' && reservation_id) {
-            console.log(`[Webhook] Async payment succeeded for reservation ${reservation_id}. Marking as billed.`);
-            const reservationRepo = new (await import("../../repository/reservation.repository")).ReservationRepository();
-            await reservationRepo.markAsBilled([reservation_id]);
+        const type = pi.metadata?.type;
+        if (type !== "guest_commission" && type !== "monthly_commission") {
+            return;
         }
+
+        await this.commissionBillingService.recordPaymentIntentSucceededFromStripe(pi, "webhook");
+        console.log(`[Webhook] Commission payment succeeded: ${pi.id} (${type}).`);
     }
 
     /**
      * Handle failed payment intents.
      */
     private async handlePaymentIntentFailed(pi: Stripe.PaymentIntent) {
-        const { reservation_id, type, venue_owner_id } = pi.metadata;
-
-        if (type === 'guest_commission') {
-            console.error(`[Webhook] Payment failed for reservation ${reservation_id}. Owner: ${venue_owner_id}`);
-            // TODO: In a later step, we can queue a notification to the owner here
+        const type = pi.metadata?.type;
+        if (type !== "guest_commission" && type !== "monthly_commission") {
+            return;
         }
+
+        await this.commissionBillingService.recordPaymentIntentFailedFromStripe(pi, "webhook");
+        console.error(`[Webhook] Commission payment failed: ${pi.id} (${type}) owner=${pi.metadata?.venue_owner_id || "unknown"}`);
     }
 
     private async handleCheckoutCompleted(session: Stripe.Checkout.Session) {
