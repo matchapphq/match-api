@@ -349,4 +349,25 @@ export class ReservationRepository {
 
         return rows.map((row) => row.id);
     }
+
+    async getVenueIdsByReservationIds(reservationIds: string[]) {
+        if (reservationIds.length === 0) {
+            return new Map<string, string>();
+        }
+
+        const rows = await db.select({
+            reservation_id: reservationsTable.id,
+            venue_id: venueMatchesTable.venue_id,
+        })
+            .from(reservationsTable)
+            .innerJoin(venueMatchesTable, eq(reservationsTable.venue_match_id, venueMatchesTable.id))
+            .where(inArray(reservationsTable.id, reservationIds));
+
+        const mapping = new Map<string, string>();
+        for (const row of rows) {
+            mapping.set(row.reservation_id, row.venue_id);
+        }
+
+        return mapping;
+    }
 }

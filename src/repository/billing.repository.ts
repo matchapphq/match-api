@@ -10,7 +10,7 @@ import {
 import { reservationsTable } from "../config/db/reservations.table";
 import { venueMatchesTable } from "../config/db/matches.table";
 import { venuesTable } from "../config/db/venues.table";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count, sql, isNotNull } from "drizzle-orm";
 
 export class BillingRepository {
     /**
@@ -38,18 +38,29 @@ export class BillingRepository {
     }
 
     async getInvoices(userId: string, limit = 20, offset = 0) {
-        const conditions = eq(invoicesTable.user_id, userId);
-        
+        const conditions = and(
+            eq(transactionsTable.user_id, userId),
+            eq(transactionsTable.type, "commission"),
+            isNotNull(transactionsTable.invoice_id),
+        );
+
         const [countRes] = await db.select({ count: count() })
-            .from(invoicesTable)
+            .from(transactionsTable)
             .where(conditions);
 
-        const data = await db.query.invoicesTable.findMany({
+        const transactions = await db.query.transactionsTable.findMany({
             where: conditions,
+            with: {
+                invoice: true,
+            },
             limit,
             offset,
-            orderBy: desc(invoicesTable.issue_date),
+            orderBy: desc(transactionsTable.completed_at),
         });
+
+        const data = transactions
+            .map((transaction) => transaction.invoice)
+            .filter((invoice): invoice is NonNullable<typeof invoice> => Boolean(invoice));
 
         return {
             data,
@@ -58,6 +69,18 @@ export class BillingRepository {
     }
 
     async getInvoiceById(invoiceId: string, userId: string) {
+        const commissionTransaction = await db.query.transactionsTable.findFirst({
+            where: and(
+                eq(transactionsTable.invoice_id, invoiceId),
+                eq(transactionsTable.user_id, userId),
+                eq(transactionsTable.type, "commission"),
+            ),
+        });
+
+        if (!commissionTransaction) {
+            return null;
+        }
+
         return await db.query.invoicesTable.findFirst({
             where: and(
                 eq(invoicesTable.id, invoiceId),
@@ -67,7 +90,10 @@ export class BillingRepository {
     }
 
     async getTransactions(userId: string, limit = 20, offset = 0) {
-        const conditions = eq(transactionsTable.user_id, userId);
+        const conditions = and(
+            eq(transactionsTable.user_id, userId),
+            eq(transactionsTable.type, "commission"),
+        );
 
         const [countRes] = await db.select({ count: count() })
             .from(transactionsTable)
@@ -91,6 +117,7 @@ export class BillingRepository {
             where: and(
                 eq(transactionsTable.id, transactionId),
                 eq(transactionsTable.user_id, userId),
+                eq(transactionsTable.type, "commission"),
             ),
         });
     }
@@ -134,5 +161,20 @@ export class BillingRepository {
             .values(data)
             .returning();
         return invoice!;
+    }
+
+    async getCommissionTransactionsWithInvoices(userId: string, limit = 200) {
+        return await db.query.transactionsTable.findMany({
+            where: and(
+                eq(transactionsTable.user_id, userId),
+                eq(transactionsTable.type, "commission"),
+                isNotNull(transactionsTable.invoice_id),
+            ),
+            with: {
+                invoice: true,
+            },
+            limit,
+            orderBy: desc(transactionsTable.completed_at),
+        });
     }
 }

@@ -6,6 +6,8 @@ import { geocodeAddress } from "../../utils/geocoding";
 import { notifyNewReservation, notifyReservationCancelled } from "../../services/notifications/notification.triggers";
 import { resolveHasPaymentMethodLive } from "../../utils/stripe-payment-method";
 import { assertVenueIsActiveForOperations } from "../../utils/venue-active.guard";
+import { BillingRepository } from "../../repository/billing.repository";
+import { ReservationRepository } from "../../repository/reservation.repository";
 
 function formatStripePaymentMethod(paymentMethod: any) {
     if (!paymentMethod || paymentMethod.deleted) {
@@ -142,10 +144,28 @@ function invoiceMatchesVenue(invoice: any, venueName: string, stripeSubscription
     );
 }
 
+function extractReservationIdsFromBillingNotes(notes?: string | null) {
+    if (!notes) return [];
+
+    try {
+        const parsed = JSON.parse(notes) as { reservation_ids?: unknown };
+        if (!Array.isArray(parsed.reservation_ids)) {
+            return [];
+        }
+
+        return parsed.reservation_ids
+            .filter((value): value is string => typeof value === "string");
+    } catch {
+        return [];
+    }
+}
+
 export class PartnerLogic {
     constructor(
         private readonly partnerRepo: PartnerRepository,
         private readonly waitlistRepo: WaitlistRepository,
+        private readonly billingRepo: BillingRepository = new BillingRepository(),
+        private readonly reservationRepo: ReservationRepository = new ReservationRepository(),
     ) {}
 
     async getMyVenues(userId: string) {
@@ -670,52 +690,39 @@ export class PartnerLogic {
         const venue = await this.partnerRepo.getVenueByIdAndOwner(venueId, userId);
         if (!venue) throw new Error("FORBIDDEN");
 
-        if (!isStripeConfigured()) {
+        const transactions = await this.billingRepo.getCommissionTransactionsWithInvoices(userId, 300);
+        if (transactions.length === 0) {
             return [];
         }
 
-        const subscription = venue.subscription_id
-            ? await subscriptionsRepository.getSubscriptionById(venue.subscription_id)
-            : null;
-
-        const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
-        if (!stripeCustomerId) {
+        const reservationIds = Array.from(new Set(
+            transactions.flatMap((transaction) => extractReservationIdsFromBillingNotes(transaction.notes)),
+        ));
+        if (reservationIds.length === 0) {
             return [];
         }
 
-        try {
-            const stripeInvoices = await stripe.invoices.list({
-                customer: stripeCustomerId,
-                limit: 100,
-            });
+        const reservationVenueById = await this.reservationRepo.getVenueIdsByReservationIds(reservationIds);
+        const invoicesById = new Map<string, any>();
 
-            const matchedInvoices = (stripeInvoices.data as any[]).filter((invoice: any) =>
-                invoiceMatchesVenue(invoice, venue.name, subscription?.stripe_subscription_id),
+        for (const transaction of transactions) {
+            const invoice = transaction.invoice;
+            if (!invoice) {
+                continue;
+            }
+
+            const linkedReservationIds = extractReservationIdsFromBillingNotes(transaction.notes);
+            const hasVenueReservation = linkedReservationIds.some(
+                (reservationId) => reservationVenueById.get(reservationId) === venueId,
             );
 
-            const mappedInvoices = await Promise.all(
-                matchedInvoices.map(async (invoice: any) => {
-                    const stripeSubscriptionId =
-                        typeof invoice.subscription === "string" ? invoice.subscription : null;
-                    const matchedSubscription = stripeSubscriptionId
-                        ? await subscriptionsRepository.getSubscriptionByStripeId(stripeSubscriptionId)
-                        : null;
-
-                    return mapStripeInvoiceForVenue(
-                        invoice,
-                        userId,
-                        venue.id,
-                        matchedSubscription?.id || subscription?.id || venue.subscription_id || "",
-                    );
-                }),
-            );
-
-            return mappedInvoices
-                .sort((a, b) => new Date(b.issue_date || b.created_at).getTime() - new Date(a.issue_date || a.created_at).getTime());
-        } catch (error) {
-            console.error("Error fetching Stripe venue invoices:", error);
-            return [];
+            if (hasVenueReservation) {
+                invoicesById.set(invoice.id, invoice);
+            }
         }
+
+        return Array.from(invoicesById.values())
+            .sort((a, b) => new Date(b.issue_date || b.created_at).getTime() - new Date(a.issue_date || a.created_at).getTime());
     }
 
     async getVenuePaymentPortal(userId: string, venueId: string) {
