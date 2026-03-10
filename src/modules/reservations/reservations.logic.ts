@@ -1,10 +1,12 @@
 import { CapacityRepository } from "../../repository/capacity.repository";
 import { ReservationRepository } from "../../repository/reservation.repository";
 import { WaitlistRepository } from "../../repository/waitlist.repository";
+import subscriptionsRepository from "../../repository/subscriptions.repository";
 import { createQRPayload, generateQRCodeImage, parseQRContent, verifyQRPayload } from "../../utils/qr.utils";
 import { notifyNewReservation, notifyReservationCancelled } from "../../services/notifications/notification.triggers";
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailType } from "../../types/mail.types";
+import { stripeQueue } from "../../queue/stripe.queue";
 
 export class ReservationsLogic {
     constructor(
@@ -23,6 +25,9 @@ export class ReservationsLogic {
         }
 
         const bookingMode = venueMatch.venue?.booking_mode || 'INSTANT';
+
+        // Get commission rate (default 1.50 or venue override)
+        const commissionRate = (venueMatch.venue as any)?.commission_override || "1.50";
 
         // Check availability
         const availability = await this.capacityRepo.checkAvailability(venueMatchId, partySize);
@@ -56,6 +61,7 @@ export class ReservationsLogic {
                 partySize, 
                 specialRequests || "",
                 qrPayloadString,
+                commissionRate,
             );
 
             if (!reservation) {
@@ -122,6 +128,7 @@ export class ReservationsLogic {
                 partySize,
                 specialRequests || "",
                 requiresAccessibility ?? false,
+                commissionRate,
             );
 
             if (!reservation) throw new Error("RESERVATION_CREATION_FAILED");
@@ -265,8 +272,44 @@ export class ReservationsLogic {
 
     async checkIn(userId: string, reservationId: string) {
         // TODO: Verify user is venue owner
+        // 1. Mark as checked in in DB
         const checkedIn = await this.reservationRepo.checkIn(reservationId);
         if (!checkedIn) throw new Error("RESERVATION_NOT_FOUND_OR_CHECKED_IN");
+
+        // 2. Trigger Commission Billing Job
+        try {
+            // Get venue owner and stripe customer ID
+            const venueMatch = await this.capacityRepo.getVenueMatch(checkedIn.venue_match_id);
+            if (venueMatch && venueMatch.venue) {
+                const ownerId = venueMatch.venue.owner_id;
+                const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(ownerId);
+
+                if (stripeCustomerId) {
+                    const commissionRate = checkedIn.commission_rate ? parseFloat(checkedIn.commission_rate) : 1.50;
+                    const amountInCents = Math.round((checkedIn.party_size || 1) * commissionRate * 100);
+
+                    // Add to Stripe queue for background processing
+                    await stripeQueue.add("process_commission", {
+                        id: `comm-${reservationId}`,
+                        type: "process_commission",
+                        created: Math.floor(Date.now() / 1000),
+                        commissionData: {
+                            reservationId: checkedIn.id,
+                            venueOwnerId: ownerId,
+                            stripeCustomerId: stripeCustomerId,
+                            amountInCents: amountInCents,
+                            currency: "EUR",
+                        }
+                    });
+                    console.log(`[Reservations] Queued commission job for reservation ${reservationId} (Amount: ${amountInCents / 100}€)`);
+                } else {
+                    console.warn(`[Reservations] No Stripe customer ID found for owner ${ownerId}. Skipping billing for reservation ${reservationId}.`);
+                }
+            }
+        } catch (error) {
+            console.error(`[Reservations] Failed to queue commission job for reservation ${reservationId}:`, error);
+            // Non-blocking: check-in is successful even if billing queue fails
+        }
 
         return { message: "Guest checked in successfully!", reservation: checkedIn };
     }

@@ -1,6 +1,8 @@
 import { db } from "../config/config.db";
 import { reservationsTable } from "../config/db/reservations.table";
 import { tablesTable } from "../config/db/tables.table";
+import { venuesTable } from "../config/db/venues.table";
+import { subscriptionsTable } from "../config/db/subscriptions.table";
 import { venueMatchesTable } from "../config/db/matches.table";
 import { eq, and, inArray } from "drizzle-orm";
 
@@ -17,6 +19,7 @@ export class ReservationRepository {
         partySize: number,
         specialRequests: string,
         qrCode: string,
+        commissionRate?: string,
     ) {
         const [reservation] = await db.insert(reservationsTable).values({
             id: reservationId,
@@ -29,6 +32,7 @@ export class ReservationRepository {
             quantity: partySize,
             special_requests: specialRequests || null,
             qr_code: qrCode,
+            commission_rate: commissionRate,
         }).returning();
 
         return reservation;
@@ -45,6 +49,7 @@ export class ReservationRepository {
         partySize: number,
         specialRequests: string,
         requiresAccessibility: boolean,
+        commissionRate?: string,
     ) {
         const [reservation] = await db.insert(reservationsTable).values({
             id: reservationId,
@@ -57,6 +62,7 @@ export class ReservationRepository {
             quantity: partySize,
             special_requests: specialRequests || null,
             qr_code: null, // No QR until confirmed by venue
+            commission_rate: commissionRate,
         }).returning();
 
         return reservation;
@@ -278,5 +284,45 @@ export class ReservationRepository {
             .returning();
 
         return updated;
+    }
+
+    /**
+     * Get all checked-in reservations that haven't been billed yet, grouped by venue owner.
+     */
+    async getUnbilledCheckedInReservations() {
+        // We need to join with venues to get the owner and their subscription info
+        return await db.select({
+            reservation_id: reservationsTable.id,
+            venue_id: venueMatchesTable.venue_id,
+            owner_id: venuesTable.owner_id,
+            party_size: reservationsTable.party_size,
+            commission_rate: reservationsTable.commission_rate,
+            stripe_subscription_id: subscriptionsTable.stripe_subscription_id,
+        })
+        .from(reservationsTable)
+        .innerJoin(venueMatchesTable, eq(reservationsTable.venue_match_id, venueMatchesTable.id))
+        .innerJoin(venuesTable, eq(venueMatchesTable.venue_id, venuesTable.id))
+        .innerJoin(subscriptionsTable, eq(venuesTable.owner_id, subscriptionsTable.user_id))
+        .where(and(
+            eq(reservationsTable.status, 'checked_in'),
+            eq(reservationsTable.is_billed, false),
+            // Ensure we only bill active subscriptions or handle this in logic
+        ));
+    }
+
+    /**
+     * Mark multiple reservations as billed.
+     */
+    async markAsBilled(reservationIds: string[]) {
+        if (reservationIds.length === 0) return;
+
+        return await db.update(reservationsTable)
+            .set({
+                is_billed: true,
+                billed_at: new Date(),
+                updated_at: new Date(),
+            })
+            .where(inArray(reservationsTable.id, reservationIds))
+            .returning();
     }
 }
