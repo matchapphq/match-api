@@ -137,7 +137,49 @@ Cancel Subscription:
 6. User retains access until current_period_end
 ```
 
-### Webhook Events
+### Economic Models
+
+### 1. Fixed Subscriptions
+Venue owners can pay a flat monthly or annual fee for platform access.
+- **Monthly:** €30.00
+- **Annual:** €300.00 (Commitment: 12 months)
+
+### 2. Commission-Based Billing (Pay-per-Guest)
+As of March 2026, the platform implements a performance-aligned economic model.
+- **Rate:** €1.50 per guest check-in.
+- **Trigger:** When a venue owner confirms a guest's arrival via QR code scan (`checked_in` status).
+- **Mechanism:** Direct off-session `PaymentIntent` charging the venue owner's default card immediately.
+
+---
+
+## Commission Billing Flow (Real-time)
+
+```
+1. Guest arrives at venue and presents QR code.
+2. Owner scans QR -> Calls POST /api/partners/reservations/:id/check-in.
+3. Backend marks reservation as 'checked_in'.
+4. Backend identifies venue owner's stripe_customer_id.
+5. Backend calculates fee: party_size * 1.50.
+6. Backend queues 'process_commission' job in Stripe Queue.
+7. Stripe Worker retrieves saved payment method and creates off-session PaymentIntent.
+8. If payment succeeds, reservation is marked 'is_billed = true'.
+```
+
+---
+
+## Technical Details
+
+### Usage Reporting (Direct Charge)
+Unlike metered billing which aggregates monthly, this implementation uses **Real-time Off-session Charging**. This was validated in the `health` module tests:
+- **`off_session: true`**: Tells Stripe the customer is not in the checkout flow.
+- **`confirm: true`**: Automatically attempts to capture funds immediately.
+
+### Environment Variables
+No new variables required, but `STRIPE_SECRET_KEY` must have permission to create `PaymentIntents`.
+
+---
+
+## Webhook Events
 
 | Event | Handler Action |
 |-------|---------------|
