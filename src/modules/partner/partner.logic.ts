@@ -202,8 +202,13 @@ export class PartnerLogic {
             is_active: !requiresPaymentSetup,
         });
 
+        if (!venue) {
+            throw new Error("VENUE_CREATION_FAILED");
+        }
+
         return {
             venue,
+            venue_id: venue.id,
             is_first_venue: isFirstVenue,
             requires_payment_setup: requiresPaymentSetup,
             payment_setup_flow: requiresPaymentSetup ? "post_first_venue" : null,

@@ -46,7 +46,9 @@ export class BillingLogic {
         for (const [key, value] of Object.entries(params)) {
             parsedUrl.searchParams.set(key, value);
         }
-        return parsedUrl.toString();
+        return parsedUrl
+            .toString()
+            .replace(encodeURIComponent("{CHECKOUT_SESSION_ID}"), "{CHECKOUT_SESSION_ID}");
     }
 
     private async ensureStripeCustomer(userId: string) {
