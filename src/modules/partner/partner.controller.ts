@@ -49,14 +49,6 @@ class PartnerController {
         }
     });
 
-    // POST /partners/venues/verify-checkout
-    public readonly verifyCheckoutAndCreateVenue = this.factory.createHandlers(async (ctx) => {
-        return ctx.json({
-            error: "ENDPOINT_DEPRECATED",
-            message: "This endpoint is deprecated. Venue creation is now commission-only and does not require subscription checkout verification.",
-        }, 410);
-    });
-
     // POST /partners/venues/:venueId/matches
     readonly scheduleMatch = this.factory.createHandlers(async (ctx) => {
         const userId = ctx.get('user').id;
@@ -188,25 +180,6 @@ class PartnerController {
         } catch (error: any) {
             console.error("Error fetching recent activity:", error);
             return ctx.json({ error: "Failed to fetch recent activity", details: error.message }, 500);
-        }
-    });
-
-    // GET /partners/venues/:venueId/subscription
-    readonly getVenueSubscription = this.factory.createHandlers(async (ctx) => {
-        const userId = ctx.get('user').id;
-        const venueId = ctx.req.param('venueId');
-
-        if (!venueId) {
-            return ctx.json({ error: "Venue ID required" }, 400);
-        }
-
-        try {
-            const subscription = await this.partnerLogic.getVenueSubscription(userId, venueId);
-            return ctx.json({ subscription });
-        } catch (error: any) {
-            if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 404);
-            console.error("Error fetching venue subscription:", error);
-            return ctx.json({ error: "Failed to fetch subscription", details: error.message }, 500);
         }
     });
 

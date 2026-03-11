@@ -1,107 +1,54 @@
-import { eq, and, desc } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 import { db } from '../config/config.db';
-import { subscriptionsTable, type Subscription, type NewSubscription } from '../config/db/subscriptions.table';
 import { invoicesTable, type Invoice, type NewInvoice } from '../config/db/billing.table';
 import { usersTable } from '../config/db/user.table';
 
+type LegacySubscriptionRecord = {
+    id: string;
+    [key: string]: unknown;
+};
+
 /**
- * Repository for Subscription-related database operations
- * 
- * Handles all CRUD operations for subscriptions, invoices, and Stripe customer management.
+ * Compatibility repository for former subscription operations.
+ * Commission-only model no longer persists subscriptions.
  */
 export class SubscriptionsRepository {
-    
     // ============================================
-    // SUBSCRIPTIONS
+    // LEGACY SUBSCRIPTIONS (DEPRECATED COMPAT)
     // ============================================
 
-    /**
-     * Create a new subscription record
-     */
-    async createSubscription(data: NewSubscription): Promise<Subscription> {
-        const [subscription] = await db.insert(subscriptionsTable)
-            .values(data)
-            .returning();
-        return subscription!;
+    async createSubscription(data: Record<string, unknown>): Promise<LegacySubscriptionRecord> {
+        return {
+            id: `deprecated_sub_${Date.now()}`,
+            ...data,
+        };
     }
 
-    /**
-     * Get subscription by user ID
-     */
-    async getSubscriptionByUserId(userId: string): Promise<Subscription | null> {
-        const result = await db.select()
-            .from(subscriptionsTable)
-            .where(eq(subscriptionsTable.user_id, userId))
-            .limit(1);
-        return result[0] || null;
+    async getSubscriptionByUserId(_userId: string): Promise<LegacySubscriptionRecord | null> {
+        return null;
     }
 
-    /**
-     * Get subscription by Stripe subscription ID
-     */
-    async getSubscriptionByStripeId(stripeSubscriptionId: string): Promise<Subscription | null> {
-        const result = await db.select()
-            .from(subscriptionsTable)
-            .where(eq(subscriptionsTable.stripe_subscription_id, stripeSubscriptionId))
-            .limit(1);
-        return result[0] || null;
+    async getSubscriptionByStripeId(_stripeSubscriptionId: string): Promise<LegacySubscriptionRecord | null> {
+        return null;
     }
 
-    /**
-     * Get subscription by ID
-     */
-    async getSubscriptionById(id: string): Promise<Subscription | null> {
-        const result = await db.select()
-            .from(subscriptionsTable)
-            .where(eq(subscriptionsTable.id, id))
-            .limit(1);
-        return result[0] || null;
+    async getSubscriptionById(_id: string): Promise<LegacySubscriptionRecord | null> {
+        return null;
     }
 
-    /**
-     * Update subscription by ID
-     */
-    async updateSubscription(id: string, data: Partial<Subscription>): Promise<Subscription | null> {
-        const [updated] = await db.update(subscriptionsTable)
-            .set({ ...data, updated_at: new Date() })
-            .where(eq(subscriptionsTable.id, id))
-            .returning();
-        return updated || null;
+    async updateSubscription(_id: string, _data: Record<string, unknown>): Promise<LegacySubscriptionRecord | null> {
+        return null;
     }
 
-    /**
-     * Update subscription by Stripe subscription ID
-     */
-    async updateSubscriptionByStripeId(stripeSubscriptionId: string, data: Partial<Subscription>): Promise<Subscription | null> {
-        const [updated] = await db.update(subscriptionsTable)
-            .set({ ...data, updated_at: new Date() })
-            .where(eq(subscriptionsTable.stripe_subscription_id, stripeSubscriptionId))
-            .returning();
-        return updated || null;
+    async updateSubscriptionByStripeId(_stripeSubscriptionId: string, _data: Record<string, unknown>): Promise<LegacySubscriptionRecord | null> {
+        return null;
     }
 
-    /**
-     * Cancel subscription (soft delete - marks as canceled)
-     */
-    async cancelSubscription(id: string): Promise<Subscription | null> {
-        const [updated] = await db.update(subscriptionsTable)
-            .set({
-                status: 'canceled',
-                canceled_at: new Date(),
-                auto_renew: false,
-                updated_at: new Date(),
-            })
-            .where(eq(subscriptionsTable.id, id))
-            .returning();
-        return updated || null;
+    async cancelSubscription(_id: string): Promise<LegacySubscriptionRecord | null> {
+        return null;
     }
 
-    /**
-     * Delete subscription (hard delete)
-     */
-    async deleteSubscription(id: string): Promise<boolean> {
-        const result = await db.delete(subscriptionsTable)
-            .where(eq(subscriptionsTable.id, id));
+    async deleteSubscription(_id: string): Promise<boolean> {
         return true;
     }
 
@@ -109,9 +56,6 @@ export class SubscriptionsRepository {
     // STRIPE CUSTOMER MANAGEMENT
     // ============================================
 
-    /**
-     * Get user's Stripe customer ID
-     */
     async getStripeCustomerId(userId: string): Promise<string | null> {
         const result = await db.select({ stripe_customer_id: usersTable.stripe_customer_id })
             .from(usersTable)
@@ -120,18 +64,12 @@ export class SubscriptionsRepository {
         return result[0]?.stripe_customer_id || null;
     }
 
-    /**
-     * Set user's Stripe customer ID
-     */
     async setStripeCustomerId(userId: string, stripeCustomerId: string): Promise<void> {
         await db.update(usersTable)
             .set({ stripe_customer_id: stripeCustomerId, updated_at: new Date() })
             .where(eq(usersTable.id, userId));
     }
 
-    /**
-     * Get user by ID
-     */
     async getUserById(userId: string): Promise<{ id: string; email: string } | null> {
         const result = await db.select({ id: usersTable.id, email: usersTable.email })
             .from(usersTable)
@@ -140,9 +78,6 @@ export class SubscriptionsRepository {
         return result[0] || null;
     }
 
-    /**
-     * Get user by Stripe customer ID
-     */
     async getUserByStripeCustomerId(stripeCustomerId: string): Promise<{ id: string; email: string } | null> {
         const result = await db.select({ id: usersTable.id, email: usersTable.email })
             .from(usersTable)
@@ -155,19 +90,28 @@ export class SubscriptionsRepository {
     // INVOICES
     // ============================================
 
-    /**
-     * Create a new invoice record
-     */
-    async createInvoice(data: NewInvoice): Promise<Invoice> {
+    async createInvoice(data: NewInvoice & Record<string, unknown>): Promise<Invoice> {
+        const values: NewInvoice = {
+            user_id: data.user_id as string,
+            invoice_number: data.invoice_number as string,
+            status: data.status as any,
+            issue_date: data.issue_date as string,
+            due_date: data.due_date as string,
+            paid_date: (data.paid_date as string | null | undefined) ?? null,
+            subtotal: data.subtotal as string,
+            tax: data.tax as string,
+            total: data.total as string,
+            description: (data.description as string | null | undefined) ?? null,
+            items: (data.items as any) ?? null,
+            pdf_url: (data.pdf_url as string | null | undefined) ?? null,
+        };
+
         const [invoice] = await db.insert(invoicesTable)
-            .values(data)
+            .values(values)
             .returning();
         return invoice!;
     }
 
-    /**
-     * Get invoices by user ID (paginated, most recent first)
-     */
     async getInvoicesByUserId(userId: string, limit = 10, offset = 0): Promise<Invoice[]> {
         return db.select()
             .from(invoicesTable)
@@ -177,9 +121,6 @@ export class SubscriptionsRepository {
             .offset(offset);
     }
 
-    /**
-     * Get invoice by ID
-     */
     async getInvoiceById(id: string): Promise<Invoice | null> {
         const result = await db.select()
             .from(invoicesTable)
@@ -188,9 +129,6 @@ export class SubscriptionsRepository {
         return result[0] || null;
     }
 
-    /**
-     * Update invoice status
-     */
     async updateInvoiceStatus(id: string, status: string, paidDate?: Date): Promise<Invoice | null> {
         const [updated] = await db.update(invoicesTable)
             .set({
@@ -203,26 +141,23 @@ export class SubscriptionsRepository {
         return updated || null;
     }
 
-    /**
-     * Generate next invoice number
-     */
     async generateInvoiceNumber(): Promise<string> {
         const year = new Date().getFullYear();
         const result = await db.select()
             .from(invoicesTable)
             .orderBy(desc(invoicesTable.created_at))
             .limit(1);
-        
+
         const lastNumber = result[0]?.invoice_number;
         let nextSeq = 1;
-        
+
         if (lastNumber) {
             const match = lastNumber.match(/INV-(\d{4})-(\d+)/);
             if (match && match[1] && match[2] && match[1] === String(year)) {
                 nextSeq = parseInt(match[2], 10) + 1;
             }
         }
-        
+
         return `INV-${year}-${String(nextSeq).padStart(4, '0')}`;
     }
 }
