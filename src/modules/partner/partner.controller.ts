@@ -526,6 +526,13 @@ class PartnerController {
                     message: "Customer has been notified and has " + expiry_minutes + " minutes to claim their spot.",
                 });
             } catch (error: any) {
+                if (error.message === "FORBIDDEN") return ctx.json({ error: "Not authorized to notify this waitlist entry" }, 403);
+                if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                    return ctx.json({
+                        error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                        message: "Venue is inactive until a valid payment method is configured.",
+                    }, 403);
+                }
                 console.error("Error notifying waitlist customer:", error);
                 return ctx.json({ error: "Failed to notify customer", details: error.message }, 500);
             }

@@ -476,6 +476,12 @@ export class PartnerLogic {
     }
 
     async notifyWaitlistCustomer(userId: string, entryId: string, expiryMinutes: number) {
+        const venue = await this.waitlistRepo.getVenueOperationalStateByWaitlistEntry(entryId, userId);
+        if (!venue) {
+            throw new Error("FORBIDDEN");
+        }
+
+        assertVenueIsActiveForOperations(venue);
         const result = await this.waitlistRepo.notifyUserManually(entryId, expiryMinutes);
         if (!result.success) {
             throw new Error(result.error || "NOTIFY_FAILED");
