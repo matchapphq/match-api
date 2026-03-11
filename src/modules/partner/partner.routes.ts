@@ -28,7 +28,6 @@ class PartnerService {
         // Venues
         this.router.get("/venues", ...this.controller.getMyVenues);
         this.router.post("/venues", ...this.controller.createVenue);
-        this.router.post("/venues/verify-checkout", ...this.controller.verifyCheckoutAndCreateVenue);
         
         // Venue Matches (must be before :venueId routes to avoid conflict)
         this.router.get("/venues/matches", ...this.controller.getMyMatches);
@@ -46,8 +45,6 @@ class PartnerService {
         // Venue Clients
         this.router.get("/venues/:venueId/clients", ...this.controller.getVenueClients);
         
-        // Venue Subscription
-        this.router.get("/venues/:venueId/subscription", ...this.controller.getVenueSubscription);
         this.router.get("/venues/:venueId/invoices", ...this.controller.getVenueInvoices);
         
         // Venue Payment Portal

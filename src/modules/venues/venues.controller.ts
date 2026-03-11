@@ -95,7 +95,6 @@ class VenueController {
                 return ctx.json(venue, 201);
             } catch (error: any) {
                 if (error.message === "Unauthorized") return ctx.json({ error: "Unauthorized" }, 401);
-                if (error.message === "SUBSCRIPTION_REQUIRED") return ctx.json({ error: "Active subscription required to create a venue." }, 403);
                 
                 console.error("Create venue error:", error);
                 return ctx.json({ error: "Failed to create venue" }, 500);

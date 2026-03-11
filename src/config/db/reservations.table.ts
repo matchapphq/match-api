@@ -8,7 +8,7 @@ import { tablesTable } from './tables.table';
 // 15. RESERVATIONS TABLE
 // Note: Reservations are FREE for users. Users simply book a table
 // for a match, similar to a restaurant reservation. No payment required.
-// The venue owner pays for the platform subscription, not the users.
+// The venue owner is billed via commission model, not the users.
 // ============================================
 
 export const reservationsTable = pgTable(

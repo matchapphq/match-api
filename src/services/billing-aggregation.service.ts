@@ -1,89 +1,260 @@
 import { ReservationRepository } from "../repository/reservation.repository";
 import stripe from "../config/stripe";
-import { db } from "../config/config.db";
-import { eq, and, sql } from "drizzle-orm";
+import Stripe from "stripe";
+import { CommissionBillingService } from "./commission-billing.service";
+import { createHash } from "crypto";
+
+function isLastDayOfMonth(date: Date) {
+    const nextDay = new Date(date);
+    nextDay.setDate(date.getDate() + 1);
+    return nextDay.getMonth() !== date.getMonth();
+}
+
+function toBillingPeriod(date: Date) {
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${date.getFullYear()}-${month}`;
+}
+
+function buildReservationBatchHash(reservationIds: string[]) {
+    const normalized = [...reservationIds].sort().join(",");
+    return createHash("sha256").update(normalized).digest("hex").slice(0, 12);
+}
+
+interface MonthlyOwnerGroup {
+    ownerId: string;
+    stripeCustomerId: string | null;
+    reservationIds: string[];
+    totalGuests: number;
+    totalAmountInCents: number;
+}
 
 export class BillingAggregationService {
-    private reservationRepo = new ReservationRepository();
+    private readonly reservationRepo = new ReservationRepository();
+    private readonly commissionBillingService = new CommissionBillingService();
 
-    /**
-     * Aggregates all unbilled check-ins and reports them to Stripe.
-     * This should run on the 29th of each month.
-     */
-    async processMonthlyBilling() {
-        console.log("[BillingAggregation] Starting monthly billing process...");
-        
-        // 1. Get all unbilled check-ins
-        const unbilled = await this.reservationRepo.getUnbilledCheckedInReservations();
-        
-        if (unbilled.length === 0) {
-            console.log("[BillingAggregation] No unbilled reservations found.");
-            return { processed: 0 };
+    private async resolvePaymentMethodId(stripeCustomerId: string) {
+        const customer = await stripe.customers.retrieve(stripeCustomerId, {
+            expand: ["invoice_settings.default_payment_method"],
+        });
+
+        if ("deleted" in customer && customer.deleted) {
+            return null;
         }
 
-        // 2. Group by Stripe Subscription ID
-        const groups = new Map<string, {
-            reservationIds: string[];
-            totalGuests: number;
-            ownerId: string;
-        }>();
+        const defaultPaymentMethod = customer.invoice_settings?.default_payment_method;
+        if (defaultPaymentMethod) {
+            if (typeof defaultPaymentMethod === "string") {
+                return defaultPaymentMethod;
+            }
+
+            return defaultPaymentMethod.id;
+        }
+
+        const [cards, sepaDebits] = await Promise.all([
+            stripe.paymentMethods.list({
+                customer: stripeCustomerId,
+                type: "card",
+                limit: 1,
+            }),
+            stripe.paymentMethods.list({
+                customer: stripeCustomerId,
+                type: "sepa_debit",
+                limit: 1,
+            }),
+        ]);
+
+        return cards.data[0]?.id || sepaDebits.data[0]?.id || null;
+    }
+
+    /**
+     * Aggregates all unbilled check-ins and charges venue owners once at month end.
+     */
+    async processMonthlyBilling() {
+        const now = new Date();
+        if (!isLastDayOfMonth(now)) {
+            console.log("[BillingAggregation] Not the last day of month. Skipping run.");
+            return {
+                processed: 0,
+                chargedOwners: 0,
+                failedOwners: 0,
+                pendingOwners: 0,
+                skippedOwners: 0,
+                skipped: true,
+            };
+        }
+
+        const billingPeriod = toBillingPeriod(now);
+        console.log(`[BillingAggregation] Starting monthly billing process for period ${billingPeriod}...`);
+
+        // 1. Get all unbilled check-ins
+        const unbilled = await this.reservationRepo.getUnbilledCheckedInReservations();
+
+        if (unbilled.length === 0) {
+            console.log("[BillingAggregation] No unbilled reservations found.");
+            return {
+                processed: 0,
+                chargedOwners: 0,
+                failedOwners: 0,
+                pendingOwners: 0,
+                skippedOwners: 0,
+                skipped: false,
+            };
+        }
+
+        // 2. Group by venue owner
+        const groups = new Map<string, MonthlyOwnerGroup>();
 
         for (const item of unbilled) {
-            if (!item.stripe_subscription_id) {
-                console.warn(`[BillingAggregation] No stripe_subscription_id found for owner ${item.owner_id}. Skipping reservation ${item.reservation_id}.`);
+            const ownerId = item.owner_id;
+            if (!ownerId) {
                 continue;
             }
 
-            const group = groups.get(item.stripe_subscription_id) || {
+            const partySize = Number(item.party_size || 0);
+            const commissionRate = Number(item.commission_rate || "1.50");
+            const reservationAmountInCents = Math.round(partySize * commissionRate * 100);
+
+            const group = groups.get(ownerId) || {
+                ownerId,
+                stripeCustomerId: item.stripe_customer_id || null,
                 reservationIds: [],
                 totalGuests: 0,
-                ownerId: item.owner_id,
+                totalAmountInCents: 0,
             };
 
+            if (!group.stripeCustomerId && item.stripe_customer_id) {
+                group.stripeCustomerId = item.stripe_customer_id;
+            }
+
             group.reservationIds.push(item.reservation_id);
-            group.totalGuests += (item.party_size || 0);
-            groups.set(item.stripe_subscription_id, group);
+            group.totalGuests += partySize;
+            group.totalAmountInCents += reservationAmountInCents;
+            groups.set(ownerId, group);
         }
 
         let totalProcessed = 0;
+        let chargedOwners = 0;
+        let failedOwners = 0;
+        let pendingOwners = 0;
+        let skippedOwners = 0;
 
-        // 3. Report each group to Stripe
-        for (const [subscriptionId, data] of groups.entries()) {
+        // 3. Charge each owner once for the full monthly commission.
+        for (const data of groups.values()) {
+            if (!data.stripeCustomerId) {
+                skippedOwners += 1;
+                console.warn(`[BillingAggregation] Missing Stripe customer for owner ${data.ownerId}. Skipping.`);
+                continue;
+            }
+
+            if (data.totalAmountInCents <= 0) {
+                skippedOwners += 1;
+                console.warn(`[BillingAggregation] Computed amount is zero for owner ${data.ownerId}. Skipping.`);
+                continue;
+            }
+
             try {
-                console.log(`[BillingAggregation] Reporting ${data.totalGuests} guests for subscription ${subscriptionId}...`);
-                
-                // We need to find the subscription item ID for the "commission" product
-                // For simplicity, we assume the subscription has a single item or we find the right one
-                const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-                const item = subscription.items.data.find(i => 
-                    i.price.nickname === 'Match Commission' || 
-                    i.metadata.type === 'commission'
-                ) || subscription.items.data[0];
-
-                if (!item) {
-                    console.error(`[BillingAggregation] No subscription item found for ${subscriptionId}`);
+                const paymentMethodId = await this.resolvePaymentMethodId(data.stripeCustomerId);
+                if (!paymentMethodId) {
+                    skippedOwners += 1;
+                    console.warn(`[BillingAggregation] No payment method found for owner ${data.ownerId}. Skipping.`);
                     continue;
                 }
 
-                // Create usage record
-                await stripe.subscriptionItems.createUsageRecord(item.id, {
-                    quantity: data.totalGuests,
-                    timestamp: Math.floor(Date.now() / 1000),
-                    action: 'increment',
+                const paymentIntent = await stripe.paymentIntents.create({
+                    amount: data.totalAmountInCents,
+                    currency: "eur",
+                    customer: data.stripeCustomerId,
+                    payment_method: paymentMethodId,
+                    off_session: true,
+                    confirm: true,
+                    metadata: {
+                        type: "monthly_commission",
+                        venue_owner_id: data.ownerId,
+                        total_guests: String(data.totalGuests),
+                        reservation_count: String(data.reservationIds.length),
+                        billing_period: billingPeriod,
+                    },
+                    description: `Commission ${billingPeriod}`,
+                }, {
+                    idempotencyKey: `monthly-commission-${data.ownerId}-${billingPeriod}-${buildReservationBatchHash(data.reservationIds)}`,
                 });
 
-                // 4. Mark as billed in DB
-                await this.reservationRepo.markAsBilled(data.reservationIds);
-                totalProcessed += data.reservationIds.length;
+                await this.commissionBillingService.recordCommissionPaymentPending({
+                    stripeTransactionId: paymentIntent.id,
+                    userId: data.ownerId,
+                    amountInCents: data.totalAmountInCents,
+                    currency: paymentIntent.currency,
+                    reservationIds: data.reservationIds,
+                    totalGuests: data.totalGuests,
+                    billingPeriod,
+                    description: `Commission ${billingPeriod}`,
+                    source: "monthly_job",
+                });
 
-                console.log(`[BillingAggregation] Successfully billed group for owner ${data.ownerId}`);
+                if (paymentIntent.status === "succeeded") {
+                    await this.commissionBillingService.recordPaymentIntentSucceededFromStripe(
+                        paymentIntent,
+                        "monthly_job",
+                    );
+                    totalProcessed += data.reservationIds.length;
+                    chargedOwners += 1;
+                    continue;
+                }
 
+                if (
+                    paymentIntent.status === "requires_payment_method"
+                    || paymentIntent.status === "requires_action"
+                    || paymentIntent.status === "canceled"
+                ) {
+                    await this.commissionBillingService.recordCommissionPaymentFailed({
+                        stripeTransactionId: paymentIntent.id,
+                        userId: data.ownerId,
+                        amountInCents: data.totalAmountInCents,
+                        currency: paymentIntent.currency,
+                        reservationIds: data.reservationIds,
+                        totalGuests: data.totalGuests,
+                        billingPeriod,
+                        description: `Commission ${billingPeriod}`,
+                        failedReason: `Stripe status ${paymentIntent.status}`,
+                        source: "monthly_job",
+                    });
+                    failedOwners += 1;
+                    continue;
+                }
+
+                pendingOwners += 1;
+                console.log(`[BillingAggregation] PaymentIntent ${paymentIntent.id} is ${paymentIntent.status}. Waiting for webhook finalization.`);
             } catch (error: any) {
-                console.error(`[BillingAggregation] Failed to process subscription ${subscriptionId}:`, error.message);
+                const paymentIntent = (error?.raw?.payment_intent || error?.payment_intent) as Stripe.PaymentIntent | undefined;
+
+                if (paymentIntent?.id) {
+                    await this.commissionBillingService.recordCommissionPaymentFailed({
+                        stripeTransactionId: paymentIntent.id,
+                        userId: data.ownerId,
+                        amountInCents: data.totalAmountInCents,
+                        currency: paymentIntent.currency || "eur",
+                        reservationIds: data.reservationIds,
+                        totalGuests: data.totalGuests,
+                        billingPeriod,
+                        description: `Commission ${billingPeriod}`,
+                        failedReason: error?.message || "Stripe payment failed",
+                        source: "monthly_job",
+                    });
+                }
+
+                failedOwners += 1;
+                console.error(`[BillingAggregation] Failed to charge owner ${data.ownerId}:`, error?.message || error);
             }
         }
 
-        console.log(`[BillingAggregation] Process completed. Total reservations billed: ${totalProcessed}`);
-        return { processed: totalProcessed };
+        console.log(`[BillingAggregation] Process completed. Reservations billed: ${totalProcessed}`);
+        return {
+            processed: totalProcessed,
+            chargedOwners,
+            failedOwners,
+            pendingOwners,
+            skippedOwners,
+            skipped: false,
+        };
     }
 }

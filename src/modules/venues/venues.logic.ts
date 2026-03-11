@@ -1,9 +1,6 @@
 import { VenueRepository } from "../../repository/venue.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
 import { AnalyticsRepository } from "../../repository/analytics.repository";
-import { db } from "../../config/config.db";
-import { subscriptionsTable } from "../../config/db/subscriptions.table";
-import { eq, and, gt } from "drizzle-orm";
 import type { CreateVenueInput, UpdateVenueInput, GetVenuesQuery } from "../../types/venue.types";
 
 export class VenuesLogic {
@@ -12,21 +9,6 @@ export class VenuesLogic {
         private readonly favoritesRepository: FavoritesRepository,
         private readonly analyticsRepository: AnalyticsRepository,
     ) {}
-
-    // Helper to check active subscription
-    private async getActiveSubscription(userId: string) {
-        const sub = await db.query.subscriptionsTable.findFirst({
-            where: and(
-                eq(subscriptionsTable.user_id, userId),
-                gt(subscriptionsTable.current_period_end, new Date()),
-            ),
-        });
-
-        if (!sub || (sub.status !== "active" && sub.status !== "trialing")) {
-            return null;
-        }
-        return sub;
-    }
 
     async findAll(query: GetVenuesQuery) {
         return await this.venueRepository.findAll(query);
@@ -76,11 +58,7 @@ export class VenuesLogic {
     }
 
     public async create(userId: string, body: CreateVenueInput) {
-        const subscription = await this.getActiveSubscription(userId);
-        if (!subscription) {
-            throw new Error("SUBSCRIPTION_REQUIRED");
-        }
-        return await this.venueRepository.create(userId, subscription.id, body);
+        return await this.venueRepository.create(userId, body);
     }
 
     async update(userId: string, venueId: string, body: UpdateVenueInput) {

@@ -34,39 +34,18 @@ class PartnerController {
                 return ctx.json({ error: "Missing required address fields" }, 400);
             }            
             
-            const result = await this.partnerLogic.createVenueCheckout(userId, body);
-            return ctx.json(result);
+            const result = await this.partnerLogic.createVenue(userId, body);
+            return ctx.json(result, 201);
         } catch (error: any) {
-            if (error.message === "PAYMENT_SYSTEM_NOT_CONFIGURED") return ctx.json({ error: "Payment system not configured" }, 503);
-            if (error.message === "USER_NOT_FOUND") return ctx.json({ error: "User not found" }, 404);
-            
-            console.error("Error creating venue checkout:", error);
-            return ctx.json({ error: "Failed to create checkout session", details: error.message }, 500);
-        }
-    });
-
-    // POST /partners/venues/verify-checkout
-    public readonly verifyCheckoutAndCreateVenue = this.factory.createHandlers(async (ctx) => {
-        const userId = ctx.get('user').id;
-
-        try {
-            const body = await ctx.req.json();
-            const { session_id } = body;
-
-            if (!session_id) {
-                return ctx.json({ error: "session_id is required" }, 400);
+            if (error.message === "PAYMENT_METHOD_REQUIRED") {
+                return ctx.json({
+                    error: "PAYMENT_METHOD_REQUIRED",
+                    message: "A payment method is required before creating additional venues.",
+                }, 403);
             }
-
-            const result = await this.partnerLogic.verifyCheckoutAndCreateVenue(userId, session_id);
-            return ctx.json(result);
-        } catch (error: any) {
-            if (error.message === "SESSION_USER_MISMATCH") return ctx.json({ error: "Session does not belong to this user" }, 403);
-            if (error.message === "PAYMENT_NOT_COMPLETED") return ctx.json({ error: "Payment not completed" }, 400);
-            if (error.message === "INVALID_SESSION_ACTION") return ctx.json({ error: "Invalid session type or missing venue data" }, 400);
-            if (error.message === "MISSING_VENUE_DATA") return ctx.json({ error: "Missing venue data" }, 400);
-
-            console.error("Error verifying checkout:", error);
-            return ctx.json({ error: "Failed to verify checkout", details: error.message }, 500);
+            
+            console.error("Error creating venue:", error);
+            return ctx.json({ error: "Failed to create venue", details: error.message }, 500);
         }
     });
 
@@ -88,8 +67,11 @@ class PartnerController {
             return ctx.json({ venueMatch }, 201);
         } catch (error: any) {
             if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 403);
-            if (error.message === "VENUE_SUBSCRIPTION_INACTIVE") {
-                return ctx.json({ error: "Venue subscription inactive", message: "L’abonnement de ce lieu est terminé. Le lieu est désormais inactif et ne peut plus programmer de match." }, 403);
+            if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                return ctx.json({
+                    error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                    message: "Venue is inactive until a valid payment method is configured.",
+                }, 403);
             }
             console.error("Error scheduling match:", error);
             if (error.code === '23505') {
@@ -101,6 +83,7 @@ class PartnerController {
 
     // DELETE /partners/venues/:venueId/matches/:matchId
     readonly cancelMatch = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get('user').id;
         const venueId = ctx.req.param("venueId");
         const matchId = ctx.req.param("matchId");
 
@@ -109,9 +92,16 @@ class PartnerController {
                 return ctx.json({ error: "venueId and matchId are required" }, 400);
             }
 
-            await this.partnerLogic.cancelMatch(venueId, matchId);
+            await this.partnerLogic.cancelMatch(userId, venueId, matchId);
             return ctx.json({ success: true });
         } catch (error: any) {
+            if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 403);
+            if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                return ctx.json({
+                    error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                    message: "Venue is inactive until a valid payment method is configured.",
+                }, 403);
+            }
             console.error("Error canceling match:", error);
             return ctx.json({ error: "Failed to cancel match" }, 500);
         }
@@ -193,25 +183,6 @@ class PartnerController {
         }
     });
 
-    // GET /partners/venues/:venueId/subscription
-    readonly getVenueSubscription = this.factory.createHandlers(async (ctx) => {
-        const userId = ctx.get('user').id;
-        const venueId = ctx.req.param('venueId');
-
-        if (!venueId) {
-            return ctx.json({ error: "Venue ID required" }, 400);
-        }
-
-        try {
-            const subscription = await this.partnerLogic.getVenueSubscription(userId, venueId);
-            return ctx.json({ subscription });
-        } catch (error: any) {
-            if (error.message === "FORBIDDEN") return ctx.json({ error: "Venue not found or access denied" }, 404);
-            console.error("Error fetching venue subscription:", error);
-            return ctx.json({ error: "Failed to fetch subscription", details: error.message }, 500);
-        }
-    });
-
     // GET /partners/venues/:venueId/invoices
     readonly getVenueInvoices = this.factory.createHandlers(async (ctx) => {
         const userId = ctx.get('user').id;
@@ -275,6 +246,12 @@ class PartnerController {
         } catch (error: any) {
             if (error.message === "RESERVATION_NOT_FOUND") return ctx.json({ error: "Reservation not found" }, 404);
             if (error.message === "FORBIDDEN") return ctx.json({ error: "Not authorized to manage this reservation" }, 403);
+            if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                return ctx.json({
+                    error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                    message: "Venue is inactive until a valid payment method is configured.",
+                }, 403);
+            }
             
             console.error("Error updating reservation status:", error);
             return ctx.json({ error: error.message }, 500);
@@ -326,6 +303,12 @@ class PartnerController {
             return ctx.json({ venueMatch });
         } catch (error: any) {
             if (error.message === "FORBIDDEN") return ctx.json({ error: "Not authorized" }, 403);
+            if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                return ctx.json({
+                    error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                    message: "Venue is inactive until a valid payment method is configured.",
+                }, 403);
+            }
             console.error("Error updating venue match:", error);
             return ctx.json({ error: error.message }, 500);
         }
@@ -432,6 +415,12 @@ class PartnerController {
                 return ctx.json({ reservation });
             } catch (error: any) {
                 if (error.message === "FORBIDDEN") return ctx.json({ error: "Not authorized to modify this reservation" }, 403);
+                if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                    return ctx.json({
+                        error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                        message: "Venue is inactive until a valid payment method is configured.",
+                    }, 403);
+                }
                 console.error("Error updating reservation:", error);
                 return ctx.json({ error: error.message || "Failed to update reservation" }, 500);
             }
@@ -464,6 +453,12 @@ class PartnerController {
                 return ctx.json(result);
             } catch (error: any) {
                 if (error.message === "FORBIDDEN") return ctx.json({ error: "Not authorized to mark this reservation as no-show" }, 403);
+                if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                    return ctx.json({
+                        error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                        message: "Venue is inactive until a valid payment method is configured.",
+                    }, 403);
+                }
                 console.error("Error marking reservation as no-show:", error);
                 return ctx.json({ error: error.message || "Failed to mark reservation as no-show" }, 500);
             }
@@ -489,6 +484,12 @@ class PartnerController {
             return ctx.json(result);
         } catch (error: any) {
             if (error.message === "FORBIDDEN") return ctx.json({ error: "Not authorized to view this venue's waitlist" }, 403);
+            if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                return ctx.json({
+                    error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                    message: "Venue is inactive until a valid payment method is configured.",
+                }, 403);
+            }
             console.error("Error getting waitlist:", error);
             return ctx.json({ error: "Failed to get waitlist", details: error.message }, 500);
         }
@@ -525,6 +526,13 @@ class PartnerController {
                     message: "Customer has been notified and has " + expiry_minutes + " minutes to claim their spot.",
                 });
             } catch (error: any) {
+                if (error.message === "FORBIDDEN") return ctx.json({ error: "Not authorized to notify this waitlist entry" }, 403);
+                if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                    return ctx.json({
+                        error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                        message: "Venue is inactive until a valid payment method is configured.",
+                    }, 403);
+                }
                 console.error("Error notifying waitlist customer:", error);
                 return ctx.json({ error: "Failed to notify customer", details: error.message }, 500);
             }

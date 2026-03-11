@@ -1,7 +1,6 @@
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailType } from "../../types/mail.types";
 import stripe from "../../config/stripe";
-import subscriptionsRepository from "../../repository/subscriptions.repository";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
@@ -52,7 +51,12 @@ export class HealthLogic {
             throw new Error("No saved card found for this customer. Please add one via the portal test first.");
         }
 
-        const paymentMethodId = paymentMethods.data[0].id;
+        const defaultPaymentMethod = paymentMethods.data[0];
+        if (!defaultPaymentMethod) {
+            throw new Error("No saved card found for this customer. Please add one via the portal test first.");
+        }
+
+        const paymentMethodId = defaultPaymentMethod.id;
 
         // 2. Create and Confirm a PaymentIntent off-session
         try {

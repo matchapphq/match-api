@@ -2,11 +2,10 @@ import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey,
 import { usersTable } from './user.table';
 import { paymentMethodTypeEnum, invoiceStatusEnum, transactionTypeEnum, transactionStatusEnum } from './enums';
 import { reservationsTable } from './reservations.table';
-import { subscriptionsTable } from './subscriptions.table';
 
 // ============================================
 // BILLING TABLES - FOR VENUE OWNERS ONLY
-// These tables handle subscription payments for venue owners.
+// These tables handle commission billing for venue owners.
 // Regular users do NOT pay - reservations are completely free.
 // ============================================
 
@@ -136,8 +135,7 @@ export const transactionsTable = pgTable(
         amount: numeric('amount', { precision: 12, scale: 2 }).notNull(),
         currency: varchar('currency', { length: 3 }).default('EUR'),
 
-        // Related entities (subscriptions only - users don't pay for reservations)
-        subscription_id: uuid('subscription_id'),
+        // Related entities
         invoice_id: uuid('invoice_id'),
 
         // Payment
@@ -169,4 +167,3 @@ export const transactionsTable = pgTable(
 
 export type Transaction = typeof transactionsTable.$inferSelect;
 export type NewTransaction = typeof transactionsTable.$inferInsert;
-

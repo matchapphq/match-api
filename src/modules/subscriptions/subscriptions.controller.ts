@@ -7,76 +7,37 @@ import { SubscriptionsLogic } from "./subscriptions.logic";
 /**
  * Subscriptions Controller
  *
- * Handles all subscription-related operations including:
- * - Listing available plans
- * - Creating Stripe Checkout sessions
- * - Managing user subscriptions
- * - Cancellation and upgrades
+ * Legacy subscription endpoints are kept for compatibility only.
+ * Billing model is now commission-only.
  */
 class SubscriptionsController {
     private readonly factory = createFactory<HonoEnv>();
 
     constructor(private readonly subscriptionsLogic: SubscriptionsLogic) {}
 
+    private deprecatedSubscriptionEndpoint(ctx: any, replacement: string) {
+        return ctx.json({
+            error: "ENDPOINT_DEPRECATED",
+            message: "Subscription billing is deprecated. Match is now commission-only (per checked-in guest).",
+            replacement,
+        }, 410);
+    }
+
     /**
      * GET /subscriptions/plans
-     * Returns available subscription plans
+     * Deprecated: billing is commission-only
      */
     readonly getPlans = this.factory.createHandlers(async (ctx) => {
-        const plans = this.subscriptionsLogic.getPlans();
-        return ctx.json({ plans });
+        return this.deprecatedSubscriptionEndpoint(ctx, "GET /api/billing/pricing");
     });
 
     /**
      * POST /subscriptions/create-checkout
-     * Creates a Stripe Checkout session for subscription
+     * Deprecated: billing is commission-only
      */
-    readonly createCheckout = this.factory.createHandlers(
-        validator("json", (value, c) => {
-            const schema = z.object({
-                plan_id: z.enum(["monthly", "annual"]),
-                venue_id: z.string().uuid().optional(),
-                success_url: z.string().url().optional(),
-                cancel_url: z.string().url().optional(),
-            });
-            const parsed = schema.safeParse(value);
-            if (!parsed.success) {
-                return c.json(
-                    {
-                        error: "Invalid request",
-                        details: parsed.error.flatten(),
-                    },
-                    400,
-                );
-            }
-            return parsed.data;
-        }),
-        async (ctx) => {
-            const user = ctx.get("user");
-            if (!user || !user.id) {
-                return ctx.json({ error: "Unauthorized" }, 401);
-            }
-
-            try {
-                const body = ctx.req.valid("json");
-                const result = await this.subscriptionsLogic.createCheckout(user.id, body);
-                return ctx.json(result);
-            } catch (error: any) {
-                if (error.message === "PAYMENT_SYSTEM_NOT_CONFIGURED") return ctx.json({ error: "Payment system not configured" }, 503);
-                if (error.message === "INVALID_PLAN") return ctx.json({ error: "Invalid plan selected" }, 400);
-                if (error.message === "USER_NOT_FOUND") return ctx.json({ error: "User not found" }, 404);
-
-                console.error("Stripe checkout error:", error);
-                return ctx.json(
-                    {
-                        error: "Failed to create checkout session",
-                        details: error.message,
-                    },
-                    500,
-                );
-            }
-        },
-    );
+    readonly createCheckout = this.factory.createHandlers(async (ctx) => {
+        return this.deprecatedSubscriptionEndpoint(ctx, "POST /api/billing/setup-checkout");
+    });
 
     /**
      * POST /subscriptions/create-setup-session
@@ -111,21 +72,10 @@ class SubscriptionsController {
 
     /**
      * GET /subscriptions/me
-     * Returns current user's subscription
+     * Deprecated: billing is commission-only
      */
     readonly getMySubscription = this.factory.createHandlers(async (ctx) => {
-        const user = ctx.get("user");
-        if (!user || !user.id) {
-            return ctx.json({ error: "Unauthorized" }, 401);
-        }
-
-        try {
-            const result = await this.subscriptionsLogic.getMySubscription(user.id);
-            return ctx.json({ subscription: result });
-        } catch (error: any) {
-            console.error("Get subscription error:", error);
-            return ctx.json({ error: "Failed to fetch subscription" }, 500);
-        }
+        return this.deprecatedSubscriptionEndpoint(ctx, "GET /api/billing/payment-method");
     });
 
     /**
@@ -152,92 +102,26 @@ class SubscriptionsController {
 
     /**
      * POST /subscriptions/me/cancel
-     * Cancels the user's subscription (at period end)
+     * Deprecated: billing is commission-only
      */
     readonly cancelSubscription = this.factory.createHandlers(async (ctx) => {
-        const user = ctx.get("user");
-        if (!user || !user.id) {
-            return ctx.json({ error: "Unauthorized" }, 401);
-        }
-
-        try {
-            const result = await this.subscriptionsLogic.cancelSubscription(user.id);
-            return ctx.json(result);
-        } catch (error: any) {
-            if (error.message === "NO_ACTIVE_SUBSCRIPTION") return ctx.json({ error: "No active subscription found" }, 404);
-            if (error.message === "SUBSCRIPTION_ALREADY_CANCELED") return ctx.json({ error: "Subscription already canceled" }, 400);
-            
-            if (error.message.startsWith("COMMITMENT_PERIOD")) {
-                const parts = error.message.split(":");
-                return ctx.json(
-                    {
-                        error: "Cannot cancel during commitment period",
-                        message: `Votre engagement de 12 mois se termine le ${parts[1]}. Il reste ${parts[2]} mois avant de pouvoir résilier.`,
-                    },
-                    403,
-                );
-            }
-
-            console.error("Cancel subscription error:", error);
-            return ctx.json({ error: "Failed to cancel subscription" }, 500);
-        }
+        return this.deprecatedSubscriptionEndpoint(ctx, "GET /api/billing/pricing");
     });
 
     /**
      * POST /subscriptions/me/upgrade
-     * Upgrades/changes the subscription plan
+     * Deprecated: billing is commission-only
      */
-    readonly upgradeSubscription = this.factory.createHandlers(
-        validator("json", (value, c) => {
-            const schema = z.object({
-                plan_id: z.enum(["monthly", "annual"]),
-            });
-            const parsed = schema.safeParse(value);
-            if (!parsed.success) {
-                return c.json({ error: "Invalid request" }, 400);
-            }
-            return parsed.data;
-        }),
-        async (ctx) => {
-            const user = ctx.get("user");
-            if (!user || !user.id) {
-                return ctx.json({ error: "Unauthorized" }, 401);
-            }
-
-            try {
-                const { plan_id } = ctx.req.valid("json");
-                const result = await this.subscriptionsLogic.upgradeSubscription(user.id, plan_id);
-                return ctx.json(result);
-            } catch (error: any) {
-                if (error.message === "INVALID_PLAN") return ctx.json({ error: "Invalid plan" }, 400);
-                if (error.message === "NO_ACTIVE_SUBSCRIPTION") return ctx.json({ error: "No active subscription found" }, 404);
-
-                console.error("Upgrade subscription error:", error);
-                return ctx.json(
-                    { error: "Failed to upgrade subscription" },
-                    500,
-                );
-            }
-        },
-    );
+    readonly upgradeSubscription = this.factory.createHandlers(async (ctx) => {
+        return this.deprecatedSubscriptionEndpoint(ctx, "GET /api/billing/pricing");
+    });
 
     /**
      * GET /subscriptions/invoices
-     * Returns all invoices for the current user
+     * Deprecated: use /api/invoices
      */
     readonly getMyInvoices = this.factory.createHandlers(async (ctx) => {
-        const user = ctx.get("user");
-        if (!user || !user.id) {
-            return ctx.json({ error: "Unauthorized" }, 401);
-        }
-
-        try {
-            const invoices = await this.subscriptionsLogic.getMyInvoices(user.id);
-            return ctx.json({ invoices });
-        } catch (error: any) {
-            console.error("Get invoices error:", error);
-            return ctx.json({ error: "Failed to fetch invoices" }, 500);
-        }
+        return this.deprecatedSubscriptionEndpoint(ctx, "GET /api/invoices");
     });
 
     /**

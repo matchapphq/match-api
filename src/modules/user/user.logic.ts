@@ -6,6 +6,9 @@ import { password as BunPassword } from "bun";
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { decodeSessionDevice, mergeSessionDevicePreservingLocation } from "../../utils/session-device";
 import { EmailType } from "../../types/mail.types";
+import { mapToClientUserProfile } from "../../utils/user-profile";
+import type { ClientUserProfile } from "../../types/user-profile.types";
+import { resolveHasPaymentMethodLive } from "../../utils/stripe-payment-method";
 
 const parsePositiveDays = (envValue: string | undefined, defaultDays: number): number => {
     const parsed = Number(envValue);
@@ -33,7 +36,7 @@ export class UserLogic {
     /**
      * Get the current user's full profile.
      */
-    async getUserProfile(userId: string) {
+    async getUserProfile(userId: string): Promise<ClientUserProfile> {
         const users = await this.userRepository.getMe({ id: userId });
         
         if (!users || users.length === 0) {
@@ -41,43 +44,22 @@ export class UserLogic {
         }
 
         const userData = users[0]!;
-        const toArray = (value: unknown): string[] =>
-            Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-        const authProvider = userData.google_id
-            ? "google"
-            : userData.apple_id
-              ? "apple"
-              : "email";
-        const sports = toArray(userData.fav_sports);
-        const ambiances = toArray(userData.ambiances);
-        const venueTypes = toArray(userData.venue_types);
-        const needsCompletion = authProvider !== "email" && userData.role === "user";
-        const hasCompletedOnboarding =
-            !needsCompletion ||
-            (Boolean(userData.phone?.trim()) &&
-                sports.length > 0 &&
-                ambiances.length > 0 &&
-                venueTypes.length > 0 &&
-                Boolean(userData.budget));
+        const baseProfile = mapToClientUserProfile(
+            userData,
+            this.storageService.getFullUrl(userData.avatar_url),
+        );
+
+        const hasPaymentMethod = await resolveHasPaymentMethodLive(
+            userData.stripe_customer_id,
+        );
 
         return {
-            id: userData.id,
-            email: userData.email,
-            first_name: userData.first_name,
-            last_name: userData.last_name,
-            bio: userData.bio,
-            phone: userData.phone,
-            avatar: this.storageService.getFullUrl(userData.avatar_url),
-            role: userData.role,
-            auth_provider: authProvider,
-            preferences: {
-                sports,
-                ambiance: ambiances,
-                foodTypes: venueTypes,
-                budget: userData.budget || "",
-            },
-            created_at: userData.created_at,
-            has_completed_onboarding: hasCompletedOnboarding,
+            ...baseProfile,
+            has_payment_method: hasPaymentMethod,
+            has_completed_onboarding:
+                baseProfile.role === "venue_owner"
+                    ? hasPaymentMethod
+                    : baseProfile.has_completed_onboarding,
         };
     }
 
