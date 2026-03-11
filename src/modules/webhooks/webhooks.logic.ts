@@ -62,6 +62,14 @@ export class WebhooksLogic {
                     await this.handleInvoicePaid(event.data.object as Stripe.Invoice);
                     break;
 
+                case "invoice.finalized":
+                    await this.handleCommissionInvoiceLifecycle(event.data.object as Stripe.Invoice, "invoice.finalized");
+                    break;
+
+                case "invoice.updated":
+                    await this.handleCommissionInvoiceLifecycle(event.data.object as Stripe.Invoice, "invoice.updated");
+                    break;
+
                 case "invoice.payment_failed":
                     await this.handleInvoicePaymentFailed(event.data.object as Stripe.Invoice);
                     break;
@@ -357,6 +365,12 @@ export class WebhooksLogic {
     }
 
     private async handleInvoicePaid(invoice: any) {
+        const syncedCommissionInvoice = await this.commissionBillingService.syncCommissionInvoiceFromStripeInvoice(invoice, "webhook");
+        if (syncedCommissionInvoice) {
+            console.log(`[Webhook] Commission invoice synced from invoice.paid: ${invoice.id}`);
+            return;
+        }
+
         const subscriptionId = invoice.subscription as string;
         if (!subscriptionId) return;
 
@@ -388,6 +402,13 @@ export class WebhooksLogic {
         });
 
         await this.maybeConvertReferral(subscription.user_id, "invoice.paid");
+    }
+
+    private async handleCommissionInvoiceLifecycle(invoice: Stripe.Invoice, eventType: string) {
+        const synced = await this.commissionBillingService.syncCommissionInvoiceFromStripeInvoice(invoice, "webhook");
+        if (synced) {
+            console.log(`[Webhook] Commission invoice synced from ${eventType}: ${invoice.id}`);
+        }
     }
 
     private async handleInvoicePaymentFailed(invoice: any) {

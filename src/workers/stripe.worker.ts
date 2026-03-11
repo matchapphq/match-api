@@ -43,6 +43,14 @@ const stripeWorker = new Worker<StripeJobPayload>("stripe", async (job: Job<Stri
                     await handleInvoicePaid(eventObject as unknown as Stripe.Invoice);
                     break;
 
+                case "invoice.finalized":
+                    await handleCommissionInvoiceLifecycle(eventObject as unknown as Stripe.Invoice, "invoice.finalized");
+                    break;
+
+                case "invoice.updated":
+                    await handleCommissionInvoiceLifecycle(eventObject as unknown as Stripe.Invoice, "invoice.updated");
+                    break;
+
                 case "invoice.payment_failed":
                     await handleInvoicePaymentFailed(eventObject as unknown as Stripe.Invoice);
                     break;
@@ -151,16 +159,10 @@ export async function handleProcessCommission(data: {
         });
 
         if (paymentIntent.status === "succeeded") {
-            await commissionBillingService.recordCommissionPaymentSucceeded({
-                stripeTransactionId: paymentIntent.id,
-                userId: data.venueOwnerId,
-                amountInCents: data.amountInCents,
-                currency: paymentIntent.currency,
-                reservationIds,
-                totalGuests,
-                description: `Commission reservation ${data.reservationId.slice(0, 8)}`,
-                source: "legacy_checkin",
-            });
+            await commissionBillingService.recordPaymentIntentSucceededFromStripe(
+                paymentIntent,
+                "legacy_checkin",
+            );
             console.log(`[Stripe Worker] Commission charged successfully for reservation ${data.reservationId}`);
         } else {
             console.warn(`[Stripe Worker] PaymentIntent for ${data.reservationId} ended with status: ${paymentIntent.status}`);
@@ -520,6 +522,12 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 async function handleInvoicePaid(invoice: any) {
     console.log("Processing invoice.paid:", invoice.id);
 
+    const syncedCommissionInvoice = await commissionBillingService.syncCommissionInvoiceFromStripeInvoice(invoice, "webhook");
+    if (syncedCommissionInvoice) {
+        console.log(`Commission invoice synced from invoice.paid: ${invoice.id}`);
+        return;
+    }
+
     const subscriptionId = invoice.subscription as string;
     if (!subscriptionId) return;
 
@@ -573,6 +581,13 @@ async function handleInvoicePaid(invoice: any) {
 
     console.log("Invoice recorded for subscription:", subscriptionId);
     await maybeConvertReferral(subscription.user_id, "invoice.paid");
+}
+
+async function handleCommissionInvoiceLifecycle(invoice: Stripe.Invoice, eventType: string) {
+    const synced = await commissionBillingService.syncCommissionInvoiceFromStripeInvoice(invoice, "webhook");
+    if (synced) {
+        console.log(`Commission invoice synced from ${eventType}: ${invoice.id}`);
+    }
 }
 
 /**

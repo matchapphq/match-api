@@ -2,6 +2,7 @@ import { ReservationRepository } from "../repository/reservation.repository";
 import stripe from "../config/stripe";
 import Stripe from "stripe";
 import { CommissionBillingService } from "./commission-billing.service";
+import { createHash } from "crypto";
 
 function isLastDayOfMonth(date: Date) {
     const nextDay = new Date(date);
@@ -12,6 +13,11 @@ function isLastDayOfMonth(date: Date) {
 function toBillingPeriod(date: Date) {
     const month = String(date.getMonth() + 1).padStart(2, "0");
     return `${date.getFullYear()}-${month}`;
+}
+
+function buildReservationBatchHash(reservationIds: string[]) {
+    const normalized = [...reservationIds].sort().join(",");
+    return createHash("sha256").update(normalized).digest("hex").slice(0, 12);
 }
 
 interface MonthlyOwnerGroup {
@@ -170,7 +176,7 @@ export class BillingAggregationService {
                     },
                     description: `Commission ${billingPeriod}`,
                 }, {
-                    idempotencyKey: `monthly-commission-${data.ownerId}-${billingPeriod}`,
+                    idempotencyKey: `monthly-commission-${data.ownerId}-${billingPeriod}-${buildReservationBatchHash(data.reservationIds)}`,
                 });
 
                 await this.commissionBillingService.recordCommissionPaymentPending({
@@ -186,17 +192,10 @@ export class BillingAggregationService {
                 });
 
                 if (paymentIntent.status === "succeeded") {
-                    await this.commissionBillingService.recordCommissionPaymentSucceeded({
-                        stripeTransactionId: paymentIntent.id,
-                        userId: data.ownerId,
-                        amountInCents: data.totalAmountInCents,
-                        currency: paymentIntent.currency,
-                        reservationIds: data.reservationIds,
-                        totalGuests: data.totalGuests,
-                        billingPeriod,
-                        description: `Commission ${billingPeriod}`,
-                        source: "monthly_job",
-                    });
+                    await this.commissionBillingService.recordPaymentIntentSucceededFromStripe(
+                        paymentIntent,
+                        "monthly_job",
+                    );
                     totalProcessed += data.reservationIds.length;
                     chargedOwners += 1;
                     continue;

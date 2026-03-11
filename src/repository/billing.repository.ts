@@ -163,6 +163,18 @@ export class BillingRepository {
         return invoice!;
     }
 
+    async updateInvoicePdfUrl(invoiceId: string, pdfUrl: string): Promise<Invoice | null> {
+        const [updated] = await db.update(invoicesTable)
+            .set({
+                pdf_url: pdfUrl,
+                updated_at: new Date(),
+            })
+            .where(eq(invoicesTable.id, invoiceId))
+            .returning();
+
+        return updated || null;
+    }
+
     async getCommissionTransactionsWithInvoices(userId: string, limit = 200) {
         return await db.query.transactionsTable.findMany({
             where: and(

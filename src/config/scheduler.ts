@@ -1,18 +1,37 @@
 import { billingQueue } from "../queue/billing.queue";
 
+const MONTHLY_BILLING_CRON_PATTERN = "55 23 28-31 * *";
+const MONTHLY_BILLING_SCHEDULER_ID = "monthly_billing_aggregation";
+const MONTHLY_BILLING_JOB_NAME = "MONTHLY_USAGE_AGGREGATION";
+
 export async function setupScheduler() {
     console.log("[Scheduler] Setting up recurring jobs...");
 
-    // 1. Monthly commission collection.
-    // Runs on days 28-31 at 23:55 and the service keeps only the true last day.
-    await billingQueue.add("MONTHLY_USAGE_AGGREGATION", {},
+    const existingSchedulers = await billingQueue.getJobSchedulers();
+    for (const scheduler of existingSchedulers) {
+        const schedulerId = scheduler.id || scheduler.key;
+        if (!schedulerId) {
+            continue;
+        }
+
+        if (scheduler.name === MONTHLY_BILLING_JOB_NAME && schedulerId !== MONTHLY_BILLING_SCHEDULER_ID) {
+            await billingQueue.removeJobScheduler(schedulerId);
+        }
+    }
+
+    await billingQueue.upsertJobScheduler(
+        MONTHLY_BILLING_SCHEDULER_ID,
         {
-            repeat: {
-                pattern: "55 23 28-31 * *",
+            pattern: MONTHLY_BILLING_CRON_PATTERN,
+        },
+        {
+            name: MONTHLY_BILLING_JOB_NAME,
+            data: {},
+            opts: {
+                removeOnComplete: true,
             },
-            jobId: "monthly_billing_aggregation", // Prevent duplicates
         },
     );
 
-    console.log("[Scheduler] Monthly billing aggregation scheduled (last day of month at 23:55).");
+    console.log(`[Scheduler] Billing aggregation scheduler "${MONTHLY_BILLING_SCHEDULER_ID}" set with cron "${MONTHLY_BILLING_CRON_PATTERN}" (month-end guarded).`);
 }

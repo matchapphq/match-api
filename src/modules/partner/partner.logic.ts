@@ -704,6 +704,7 @@ export class PartnerLogic {
 
         const reservationVenueById = await this.reservationRepo.getVenueIdsByReservationIds(reservationIds);
         const invoicesById = new Map<string, any>();
+        const missingPdfByInvoiceId = new Map<string, string>();
 
         for (const transaction of transactions) {
             const invoice = transaction.invoice;
@@ -718,6 +719,47 @@ export class PartnerLogic {
 
             if (hasVenueReservation) {
                 invoicesById.set(invoice.id, invoice);
+                if (!invoice.pdf_url && transaction.stripe_transaction_id) {
+                    missingPdfByInvoiceId.set(invoice.id, transaction.stripe_transaction_id);
+                }
+            }
+        }
+
+        if (missingPdfByInvoiceId.size > 0) {
+            try {
+                const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
+                if (stripeCustomerId) {
+                    const stripeInvoices = await stripe.invoices.list({
+                        customer: stripeCustomerId,
+                        limit: 100,
+                    });
+
+                    const stripeInvoiceByPaymentIntentId = new Map<string, any>();
+                    for (const stripeInvoice of stripeInvoices.data) {
+                        const paymentIntentId = stripeInvoice.metadata?.payment_intent_id;
+                        if (paymentIntentId) {
+                            stripeInvoiceByPaymentIntentId.set(paymentIntentId, stripeInvoice);
+                        }
+                    }
+
+                    for (const [invoiceId, stripeTransactionId] of missingPdfByInvoiceId.entries()) {
+                        const stripeInvoice = stripeInvoiceByPaymentIntentId.get(stripeTransactionId);
+                        const fallbackUrl = stripeInvoice?.invoice_pdf || stripeInvoice?.hosted_invoice_url || null;
+                        if (!fallbackUrl) {
+                            continue;
+                        }
+
+                        const existingInvoice = invoicesById.get(invoiceId);
+                        if (existingInvoice) {
+                            existingInvoice.pdf_url = fallbackUrl;
+                            invoicesById.set(invoiceId, existingInvoice);
+                        }
+
+                        await this.billingRepo.updateInvoicePdfUrl(invoiceId, fallbackUrl);
+                    }
+                }
+            } catch (error) {
+                console.error("Error enriching commission invoice URLs from Stripe:", error);
             }
         }
 

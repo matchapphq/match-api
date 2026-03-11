@@ -370,4 +370,32 @@ export class ReservationRepository {
 
         return mapping;
     }
+
+    async getBillingDetailsByReservationIds(reservationIds: string[]) {
+        if (reservationIds.length === 0) {
+            return [];
+        }
+
+        const rows = await db.select({
+            reservation_id: reservationsTable.id,
+            party_size: reservationsTable.party_size,
+            commission_rate: reservationsTable.commission_rate,
+            checked_in_at: reservationsTable.checked_in_at,
+            created_at: reservationsTable.created_at,
+            venue_name: venuesTable.name,
+        })
+            .from(reservationsTable)
+            .innerJoin(venueMatchesTable, eq(reservationsTable.venue_match_id, venueMatchesTable.id))
+            .innerJoin(venuesTable, eq(venueMatchesTable.venue_id, venuesTable.id))
+            .where(inArray(reservationsTable.id, reservationIds));
+
+        const orderByReservationId = new Map<string, number>();
+        reservationIds.forEach((id, index) => orderByReservationId.set(id, index));
+
+        return rows.sort((a, b) => {
+            const aIndex = orderByReservationId.get(a.reservation_id) ?? Number.MAX_SAFE_INTEGER;
+            const bIndex = orderByReservationId.get(b.reservation_id) ?? Number.MAX_SAFE_INTEGER;
+            return aIndex - bIndex;
+        });
+    }
 }
