@@ -2,7 +2,6 @@ import { pgTable, varchar, numeric, boolean, timestamp, uuid, index, foreignKey,
 import { usersTable } from './user.table';
 import { paymentMethodTypeEnum, invoiceStatusEnum, transactionTypeEnum, transactionStatusEnum } from './enums';
 import { reservationsTable } from './reservations.table';
-import { subscriptionsTable } from './subscriptions.table';
 
 // ============================================
 // BILLING TABLES - FOR VENUE OWNERS ONLY
@@ -137,7 +136,6 @@ export const transactionsTable = pgTable(
         currency: varchar('currency', { length: 3 }).default('EUR'),
 
         // Related entities
-        subscription_id: uuid('subscription_id'),
         invoice_id: uuid('invoice_id'),
 
         // Payment

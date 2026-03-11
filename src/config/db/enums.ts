@@ -3,9 +3,6 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 export const userRoleEnum = pgEnum('user_role', ['venue_owner', 'user', 'admin']);
 export const userStatusEnum = pgEnum('user_status', ['active', 'suspended', 'deleted']);
 
-export const subscriptionPlanEnum = pgEnum('subscription_plan', ['basic', 'pro', 'enterprise', 'trial']);
-export const subscriptionStatusEnum = pgEnum('subscription_status', ['trialing', 'active', 'past_due', 'canceled']);
-
 export const venueTypeEnum = pgEnum('venue_type', [
     'bar',
     'restaurant',
@@ -17,7 +14,6 @@ export const venueTypeEnum = pgEnum('venue_type', [
     'sports_bar',
 ]);
 export const venueStatusEnum = pgEnum('venue_status', ['pending', 'approved', 'rejected', 'suspended']);
-export const subscriptionLevelEnum = pgEnum('subscription_level', ['basic', 'pro', 'enterprise']);
 export const bookingModeEnum = pgEnum('booking_mode', ['INSTANT', 'REQUEST']);
 
 export const matchStatusEnum = pgEnum('match_status', ['scheduled', 'live', 'finished', 'canceled', 'postponed']);
@@ -43,7 +39,6 @@ export const notificationTypeEnum = pgEnum('notification_type', [
     'reservation_reminder',
     'match_starting',
     'review_response',
-    'subscription_expiring',
     'payment_failed',
     'promotional',
     'system',
@@ -74,7 +69,6 @@ export const invoiceStatusEnum = pgEnum('invoice_status', [
 // Transaction types for venue owner billing (commission-first model)
 // Users do NOT pay for reservations
 export const transactionTypeEnum = pgEnum('transaction_type', [
-    'subscription',
     'commission',
     'refund',
     'payout',

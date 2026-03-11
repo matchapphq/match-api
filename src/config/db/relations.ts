@@ -2,7 +2,6 @@ import { relations } from 'drizzle-orm';
 import { usersTable, userPreferencesTable } from './user.table';
 import { userAddressesTable } from './user-addresses.table';
 import { userFavoriteVenuesTable } from './user-favorites.table';
-import { subscriptionsTable } from './subscriptions.table';
 import { venuesTable } from './venues.table';
 import { venuePhotosTable } from './venue-photos.table';
 import { countriesTable, sportsTable, leaguesTable, teamsTable } from './sports.table';
@@ -26,7 +25,6 @@ export const usersRelations = relations(usersTable, ({ one, many }) => ({
     }),
     addresses: many(userAddressesTable),
     favorites: many(userFavoriteVenuesTable),
-    subscriptions: many(subscriptionsTable),
     venues: many(venuesTable), // Owned venues
     reservations: many(reservationsTable),
     notifications: many(notificationsTable),
@@ -58,22 +56,10 @@ export const userFavoriteVenuesRelations = relations(userFavoriteVenuesTable, ({
     }),
 }));
 
-export const subscriptionsRelations = relations(subscriptionsTable, ({ one, many }) => ({
-    user: one(usersTable, {
-        fields: [subscriptionsTable.user_id],
-        references: [usersTable.id],
-    }),
-    venues: many(venuesTable),
-}));
-
 export const venuesRelations = relations(venuesTable, ({ one, many }) => ({
     owner: one(usersTable, {
         fields: [venuesTable.owner_id],
         references: [usersTable.id],
-    }),
-    subscription: one(subscriptionsTable, {
-        fields: [venuesTable.subscription_id],
-        references: [subscriptionsTable.id],
     }),
     photos: many(venuePhotosTable),
     venueMatches: many(venueMatchesTable),
@@ -285,10 +271,6 @@ export const transactionsRelations = relations(transactionsTable, ({ one }) => (
     user: one(usersTable, {
         fields: [transactionsTable.user_id],
         references: [usersTable.id],
-    }),
-    subscription: one(subscriptionsTable, {
-        fields: [transactionsTable.subscription_id],
-        references: [subscriptionsTable.id],
     }),
     invoice: one(invoicesTable, {
         fields: [transactionsTable.invoice_id],
