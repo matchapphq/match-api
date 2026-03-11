@@ -5,10 +5,6 @@ import { PartnerRepository } from "../../repository/partner/partner.repository";
 import boostRepository from "../../repository/boost.repository";
 import referralRepository from "../../repository/referral.repository";
 import { CommissionBillingService } from "../../services/commission-billing.service";
-import UserRepository from "../../repository/user.repository";
-import { geocodeAddress } from "../../utils/geocoding";
-import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
-import { EmailType } from "../../types/mail.types";
 
 export class WebhooksLogic {
     private readonly partnerRepository = new PartnerRepository();
