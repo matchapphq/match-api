@@ -15,8 +15,6 @@ function isEnvsDefined(): boolean {
         "STRIPE_SECRET_KEY",
         "STRIPE_PUBLISHABLE_KEY",
         "STRIPE_WEBHOOK_SECRET",
-        "STRIPE_PRICE_MONTHLY",
-        "STRIPE_PRICE_ANNUAL",
         "FRONTEND_URL",
         "LOCATIONIQ_KEY",
         "PORT",

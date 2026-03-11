@@ -24,8 +24,8 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
 });
 
 /**
- * Stripe Price IDs for subscription plans
- * These should be created in the Stripe Dashboard and IDs stored here
+ * Legacy Stripe Price IDs (subscription model deprecated).
+ * Kept only for backwards compatibility with old code paths.
  */
 export const STRIPE_PRICES = {
     // Monthly plan: €30/month
@@ -52,8 +52,7 @@ export const CHECKOUT_URLS = {
 } as const;
 
 /**
- * Subscription plan details
- * Used for displaying plan information and mapping to Stripe prices
+ * Legacy subscription plan details (deprecated).
  */
 export const SUBSCRIPTION_PLANS = {
     monthly: {
@@ -95,14 +94,10 @@ export const SUBSCRIPTION_PLANS = {
 } as const;
 
 /**
- * Check if Stripe is properly configured
+ * Check if Stripe is configured for commission/setup/payment-method flows.
  */
 export function isStripeConfigured(): boolean {
-    return !!(
-        process.env.STRIPE_SECRET_KEY &&
-        process.env.STRIPE_PRICE_MONTHLY &&
-        process.env.STRIPE_PRICE_ANNUAL
-    );
+    return !!process.env.STRIPE_SECRET_KEY;
 }
 
 /**

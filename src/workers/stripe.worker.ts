@@ -7,14 +7,13 @@ import subscriptionsRepository from "../repository/subscriptions.repository";
 import { PartnerRepository } from "../repository/partner/partner.repository";
 import boostRepository from "../repository/boost.repository";
 import referralRepository from "../repository/referral.repository";
-import { geocodeAddress } from "../utils/geocoding";
 import { CommissionBillingService } from "../services/commission-billing.service";
 
 const commissionBillingService = new CommissionBillingService();
 
 /**
- * Worker for processing Stripe webhook events.
- * Handles events asynchronously to prevent timeouts and ensure reliability.
+ * Worker for processing Stripe events queued asynchronously.
+ * Commission-only model: setup checkout + commission payments + boosts.
  */
 const stripeWorker = new Worker<StripeJobPayload>("stripe", async (job: Job<StripeJobPayload>) => {
     const payload = job.data;
@@ -29,18 +28,20 @@ const stripeWorker = new Worker<StripeJobPayload>("stripe", async (job: Job<Stri
         if (payload.type === "webhook_event" && payload.data) {
             const event = payload.data;
             const eventObject = event.data.object;
+
             switch (event.type) {
-                case "checkout.session.completed":
+                case "checkout.session.completed": {
                     const session = eventObject as unknown as Stripe.Checkout.Session;
-                    if (session.metadata?.type === 'boost_purchase') {
+                    if (session.metadata?.type === "boost_purchase") {
                         await handleBoostPurchaseCompleted(session);
                     } else {
                         await handleCheckoutCompleted(session);
                     }
                     break;
+                }
 
                 case "invoice.paid":
-                    await handleInvoicePaid(eventObject as unknown as Stripe.Invoice);
+                    await handleCommissionInvoiceLifecycle(eventObject as unknown as Stripe.Invoice, "invoice.paid");
                     break;
 
                 case "invoice.finalized":
@@ -55,14 +56,6 @@ const stripeWorker = new Worker<StripeJobPayload>("stripe", async (job: Job<Stri
                     await handleInvoicePaymentFailed(eventObject as unknown as Stripe.Invoice);
                     break;
 
-                case "customer.subscription.updated":
-                    await handleSubscriptionUpdated(eventObject as unknown as Stripe.Subscription);
-                    break;
-
-                case "customer.subscription.deleted":
-                    await handleSubscriptionDeleted(eventObject as unknown as Stripe.Subscription);
-                    break;
-
                 case "payment_intent.succeeded":
                     await commissionBillingService.recordPaymentIntentSucceededFromStripe(
                         eventObject as unknown as Stripe.PaymentIntent,
@@ -75,6 +68,11 @@ const stripeWorker = new Worker<StripeJobPayload>("stripe", async (job: Job<Stri
                         eventObject as unknown as Stripe.PaymentIntent,
                         "webhook",
                     );
+                    break;
+
+                case "customer.subscription.updated":
+                case "customer.subscription.deleted":
+                    console.log(`[Stripe Worker] Ignoring legacy subscription event ${event.type}.`);
                     break;
 
                 default:
@@ -99,14 +97,12 @@ export async function handleProcessCommission(data: {
     const reservationRepo = new (await import("../repository/reservation.repository")).ReservationRepository();
 
     try {
-        // 1. Idempotency check: is it already billed?
         const reservation = await reservationRepo.findById(data.reservationId);
         if (!reservation || reservation.is_billed) {
             console.log(`[Stripe Worker] Reservation ${data.reservationId} already billed or not found. Skipping.`);
             return;
         }
 
-        // 2. Find the customer's default payment method
         const [cards, sepaDebits] = await Promise.all([
             stripe.paymentMethods.list({
                 customer: data.stripeCustomerId,
@@ -123,14 +119,12 @@ export async function handleProcessCommission(data: {
         const paymentMethodId = cards.data[0]?.id || sepaDebits.data[0]?.id;
         if (!paymentMethodId) {
             console.error(`[Stripe Worker] No payment method found for customer ${data.stripeCustomerId}`);
-            // Logic for notifying owner could go here
             return;
         }
 
         const reservationIds = [data.reservationId];
         const totalGuests = reservation.party_size || 1;
 
-        // 3. Create and Confirm a PaymentIntent off-session
         const paymentIntent = await stripe.paymentIntents.create({
             amount: data.amountInCents,
             currency: data.currency.toLowerCase(),
@@ -166,7 +160,11 @@ export async function handleProcessCommission(data: {
             console.log(`[Stripe Worker] Commission charged successfully for reservation ${data.reservationId}`);
         } else {
             console.warn(`[Stripe Worker] PaymentIntent for ${data.reservationId} ended with status: ${paymentIntent.status}`);
-            if (paymentIntent.status === "requires_action" || paymentIntent.status === "requires_payment_method" || paymentIntent.status === "canceled") {
+            if (
+                paymentIntent.status === "requires_action" ||
+                paymentIntent.status === "requires_payment_method" ||
+                paymentIntent.status === "canceled"
+            ) {
                 await commissionBillingService.recordCommissionPaymentFailed({
                     stripeTransactionId: paymentIntent.id,
                     userId: data.venueOwnerId,
@@ -197,7 +195,7 @@ export async function handleProcessCommission(data: {
         }
 
         console.error(`[Stripe Worker] Error during commission processing:`, error?.message || error);
-        throw error; // Retry via BullMQ
+        throw error;
     }
 }
 
@@ -224,37 +222,12 @@ async function maybeConvertReferral(referredUserId: string, source: string) {
     console.error(`[Stripe Worker] Referral conversion failed after ${source} for user ${referredUserId}:`, result.error);
 }
 
-// ============================================
-// HANDLER FUNCTIONS (Moved from Controller)
-// ============================================
-
-/**
- * Handle checkout.session.completed
- * Creates the subscription record in our database
- * If action is 'create_venue', also creates the venue after payment success
- */
 async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     console.log("Processing checkout.session.completed:", session.id);
-    console.log("Session metadata:", session.metadata);
 
     const userId = session.metadata?.user_id;
     const stripeCustomerId = session.customer as string | null;
-    const planId = session.metadata?.plan_id;
-    const venueId = session.metadata?.venue_id;
-    const venueDataStr = session.metadata?.venue_data;
-    const action = session.metadata?.action;
-    const subscriptionId = session.subscription as string;
     const partnerRepository = new PartnerRepository();
-
-    console.log("Parsed values:", {
-        userId,
-        stripeCustomerId,
-        planId,
-        venueId,
-        action,
-        subscriptionId,
-        hasVenueData: !!venueDataStr,
-    });
 
     if (!userId) {
         console.error("Missing user_id in checkout session");
@@ -274,492 +247,64 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
         return;
     }
 
-    if (!subscriptionId) {
-        console.error("Missing subscription in checkout session");
-        return;
-    }
-
-    // Check if subscription already exists (idempotency)
-    const existing =
-        await subscriptionsRepository.getSubscriptionByStripeId(
-            subscriptionId,
-        );
-    if (existing) {
-        console.log(
-            "Subscription already exists, skipping:",
-            subscriptionId,
-        );
-        await maybeConvertReferral(userId, "checkout.session.completed(existing)");
-        return;
-    }
-
-    // Get subscription details from Stripe
-    const stripeSubscription = (await stripe.subscriptions.retrieve(
-        subscriptionId,
-    )) as any;
-    const amount =
-        stripeSubscription.items?.data?.[0]?.price?.unit_amount || 0;
-
-    // Determine plan type based on plan_id
-    const plan = planId === "annual" ? "pro" : "basic";
-
-    // Calculate commitment end date ONLY for annual plan
-    let commitmentEndDate: Date | null = null;
-    if (planId === "annual") {
-        commitmentEndDate = new Date();
-        commitmentEndDate.setFullYear(commitmentEndDate.getFullYear() + 1);
-    }
-
-    let newSubscriptionId: string | null = null;
-
-    // If there's a venue_id, update the venue's pending subscription
-    // Note: venue_id could be empty string "", so check for truthy value
-    if (venueId && venueId.length > 0) {
-        console.log(
-            `Processing subscription for venue ${venueId} with plan: ${plan} (planId: ${planId})`,
-        );
-
-        // Get the venue to find its pending subscription
-        const venue = await partnerRepository.getVenueById(venueId);
-
-        if (venue && venue.subscription_id) {
-            // Update the venue's existing pending subscription with real Stripe data
-            await subscriptionsRepository.updateSubscription(
-                venue.subscription_id,
-                {
-                    plan: plan,
-                    status: "active",
-                    current_period_start: new Date(
-                        (stripeSubscription.current_period_start ||
-                            Date.now() / 1000) * 1000,
-                    ),
-                    current_period_end: new Date(
-                        (stripeSubscription.current_period_end ||
-                            Date.now() / 1000) * 1000,
-                    ),
-                    stripe_subscription_id: subscriptionId,
-                    stripe_payment_method_id:
-                        (stripeSubscription.default_payment_method as string) ||
-                        "unknown",
-                    price: String(amount / 100),
-                    auto_renew: !stripeSubscription.cancel_at_period_end,
-                    commitment_end_date: commitmentEndDate,
-                },
-            );
-            await partnerRepository.updateVenueSubscriptionState(venue.subscription_id, {
-                subscription_status: "active",
-                is_active: true,
-                status: "approved",
-            });
-            console.log(
-                `Subscription updated for venue ${venueId} with plan ${plan}`,
-            );
-        } else {
-            // Venue not found or no subscription - create new subscription and link
-            const newSubscription =
-                await subscriptionsRepository.createSubscription({
-                    user_id: userId,
-                    plan: plan,
-                    status: "active",
-                    current_period_start: new Date(
-                        (stripeSubscription.current_period_start ||
-                            Date.now() / 1000) * 1000,
-                    ),
-                    current_period_end: new Date(
-                        (stripeSubscription.current_period_end ||
-                            Date.now() / 1000) * 1000,
-                    ),
-                    stripe_subscription_id: subscriptionId,
-                    stripe_payment_method_id:
-                        (stripeSubscription.default_payment_method as string) ||
-                        "unknown",
-                    price: String(amount / 100),
-                    auto_renew: !stripeSubscription.cancel_at_period_end,
-                    commitment_end_date: commitmentEndDate,
-                });
-            newSubscriptionId = newSubscription.id;
-            await partnerRepository.updateVenueSubscription(
-                venueId,
-                newSubscriptionId,
-            );
-            await partnerRepository.updateVenueSubscriptionState(newSubscriptionId, {
-                subscription_status: "active",
-                is_active: true,
-                status: "approved",
-            });
-            console.log(
-                `New subscription created and linked to venue ${venueId} with plan ${plan}`,
-            );
-        }
-    } else if (action === 'create_venue' && venueDataStr) {
-        // Payment successful for venue creation - NOW create the venue
-        console.log("Creating venue after successful payment...");
-        
-        try {
-            const venueData = JSON.parse(venueDataStr);
-            
-            // First create the subscription
-            const newSubscription = await subscriptionsRepository.createSubscription({
-                user_id: userId,
-                plan: plan,
-                status: "active",
-                current_period_start: new Date(
-                    (stripeSubscription.current_period_start || Date.now() / 1000) * 1000,
-                ),
-                current_period_end: new Date(
-                    (stripeSubscription.current_period_end || Date.now() / 1000) * 1000,
-                ),
-                stripe_subscription_id: subscriptionId,
-                stripe_payment_method_id:
-                    (stripeSubscription.default_payment_method as string) || "unknown",
-                price: String(amount / 100),
-                auto_renew: !stripeSubscription.cancel_at_period_end,
-                commitment_end_date: commitmentEndDate,
-            });
-            
-            const coords = await geocodeAddress({
-                street: venueData.street_address,
-                city: venueData.city,
-                country: venueData.country,
-                state: venueData.state_province,
-                postal_code: venueData.postal_code,
-            });
-            
-            const { lat, lng } = coords;
-            
-            // Now create the venue with the subscription
-            const newVenue = await partnerRepository.createVenue({
-                name: venueData.name,
-                owner_id: userId,
-                subscription_id: newSubscription.id,
-                description: venueData.description || null,
-                street_address: venueData.street_address,
-                city: venueData.city,
-                state_province: venueData.state_province,
-                postal_code: venueData.postal_code,
-                country: venueData.country,
-                phone: venueData.phone,
-                email: venueData.email,
-                capacity: venueData.capacity,
-                type: venueData.type || 'sports_bar',
-                coords: { lat, lng },
-            });
-            
-            if (newVenue) {
-                console.log(`Venue created after payment: ${newVenue.id} - ${newVenue.name}`);
-            }
-        } catch (parseError: any) {
-            console.error("Error creating venue after payment:", parseError);
-        }
-    } else {
-        // No venue_id and no create_venue action - check for pending subscription to update
-        const existingSubscription =
-            await subscriptionsRepository.getSubscriptionByUserId(userId);
-
-        if (
-            existingSubscription &&
-            existingSubscription.stripe_subscription_id.startsWith(
-                "pending_",
-            )
-        ) {
-            // Update the pending subscription with real Stripe data
-            await subscriptionsRepository.updateSubscription(
-                existingSubscription.id,
-                {
-                    plan: plan,
-                    status: "active",
-                    current_period_start: new Date(
-                        (stripeSubscription.current_period_start ||
-                            Date.now() / 1000) * 1000,
-                    ),
-                    current_period_end: new Date(
-                        (stripeSubscription.current_period_end ||
-                            Date.now() / 1000) * 1000,
-                    ),
-                    stripe_subscription_id: subscriptionId,
-                    stripe_payment_method_id:
-                        (stripeSubscription.default_payment_method as string) ||
-                        "unknown",
-                    price: String(amount / 100),
-                    auto_renew: !stripeSubscription.cancel_at_period_end,
-                    commitment_end_date: commitmentEndDate,
-                },
-            );
-            console.log("Pending subscription activated for user:", userId);
-        } else {
-            // Create new subscription in our database
-            await subscriptionsRepository.createSubscription({
-                user_id: userId,
-                plan: plan,
-                status: "active",
-                current_period_start: new Date(
-                    (stripeSubscription.current_period_start ||
-                        Date.now() / 1000) * 1000,
-                ),
-                current_period_end: new Date(
-                    (stripeSubscription.current_period_end ||
-                        Date.now() / 1000) * 1000,
-                ),
-                stripe_subscription_id: subscriptionId,
-                stripe_payment_method_id:
-                    (stripeSubscription.default_payment_method as string) ||
-                    "unknown",
-                price: String(amount / 100),
-                auto_renew: !stripeSubscription.cancel_at_period_end,
-                commitment_end_date: commitmentEndDate,
-            });
-            console.log("Subscription created for user:", userId);
-        }
-    }
-
-    await maybeConvertReferral(userId, "checkout.session.completed");
-}
-
-/**
- * Handle invoice.paid
- * Updates subscription period and creates invoice record
- */
-async function handleInvoicePaid(invoice: any) {
-    console.log("Processing invoice.paid:", invoice.id);
-
-    const syncedCommissionInvoice = await commissionBillingService.syncCommissionInvoiceFromStripeInvoice(invoice, "webhook");
-    if (syncedCommissionInvoice) {
-        console.log(`Commission invoice synced from invoice.paid: ${invoice.id}`);
-        return;
-    }
-
-    const subscriptionId = invoice.subscription as string;
-    if (!subscriptionId) return;
-
-    const subscription =
-        await subscriptionsRepository.getSubscriptionByStripeId(
-            subscriptionId,
-        );
-    if (!subscription) {
-        console.log("Subscription not found for invoice:", subscriptionId);
-        return;
-    }
-
-    // Get fresh subscription data from Stripe
-    const stripeSubscription = (await stripe.subscriptions.retrieve(
-        subscriptionId,
-    )) as any;
-
-    // Update subscription period
-    await subscriptionsRepository.updateSubscriptionByStripeId(
-        subscriptionId,
-        {
-            status: "active",
-            current_period_start: new Date(
-                (stripeSubscription.current_period_start ||
-                    Date.now() / 1000) * 1000,
-            ),
-            current_period_end: new Date(
-                (stripeSubscription.current_period_end ||
-                    Date.now() / 1000) * 1000,
-            ),
-        },
-    );
-
-    // Create invoice record
-    const invoiceNumber =
-        await subscriptionsRepository.generateInvoiceNumber();
-    const today = new Date().toISOString().split("T")[0]!;
-    await subscriptionsRepository.createInvoice({
-        user_id: subscription.user_id,
-        invoice_number: invoiceNumber,
-        status: "paid",
-        issue_date: today,
-        due_date: today,
-        paid_date: today,
-        subtotal: String((invoice.subtotal || 0) / 100),
-        tax: String((invoice.tax || 0) / 100),
-        total: String((invoice.total || 0) / 100),
-        description: `Subscription payment - ${invoice.lines?.data?.[0]?.description || "Match subscription"}`,
-        pdf_url: invoice.invoice_pdf || null,
-    });
-
-    console.log("Invoice recorded for subscription:", subscriptionId);
-    await maybeConvertReferral(subscription.user_id, "invoice.paid");
+    console.log(`[Stripe Worker] Ignoring non-setup checkout session ${session.id} (mode=${session.mode || "unknown"}).`);
 }
 
 async function handleCommissionInvoiceLifecycle(invoice: Stripe.Invoice, eventType: string) {
     const synced = await commissionBillingService.syncCommissionInvoiceFromStripeInvoice(invoice, "webhook");
     if (synced) {
-        console.log(`Commission invoice synced from ${eventType}: ${invoice.id}`);
-    }
-}
-
-/**
- * Handle invoice.payment_failed
- * Marks subscription as past_due
- */
-async function handleInvoicePaymentFailed(invoice: any) {
-    console.log("Processing invoice.payment_failed:", invoice.id);
-
-    const subscriptionId = invoice.subscription as string;
-    if (!subscriptionId) return;
-
-    await subscriptionsRepository.updateSubscriptionByStripeId(
-        subscriptionId,
-        {
-            status: "past_due",
-        },
-    );
-
-    console.log("Subscription marked past_due:", subscriptionId);
-}
-
-/**
- * Handle customer.subscription.updated
- * Syncs subscription changes (plan changes, cancellation scheduled, etc.)
- */
-async function handleSubscriptionUpdated(subscription: any) {
-    console.log(
-        "Processing customer.subscription.updated:",
-        subscription.id,
-    );
-
-    const existingSubscription =
-        await subscriptionsRepository.getSubscriptionByStripeId(
-            subscription.id,
-        );
-    if (!existingSubscription) {
-        console.log("Subscription not found:", subscription.id);
-        return;
-    }
-    const willRenew = !(
-        subscription.cancel_at_period_end ||
-        subscription.cancel_at ||
-        subscription.canceled_at ||
-        subscription.status === "canceled"
-    );
-
-    // Map Stripe status to our status
-    let status: "active" | "trialing" | "past_due" | "canceled" = "active";
-    if (subscription.status === "past_due") status = "past_due";
-    else if (subscription.status === "canceled") status = "canceled";
-    else if (subscription.status === "trialing") status = "trialing";
-
-    await subscriptionsRepository.updateSubscriptionByStripeId(
-        subscription.id,
-        {
-            status: status,
-            current_period_start: new Date(
-                (subscription.current_period_start || Date.now() / 1000) *
-                    1000,
-            ),
-            current_period_end: new Date(
-                (subscription.current_period_end || Date.now() / 1000) *
-                    1000,
-            ),
-            auto_renew: willRenew,
-            canceled_at: subscription.canceled_at
-                ? new Date(subscription.canceled_at * 1000)
-                : null,
-        },
-    );
-
-    if (subscription.cancel_at_period_end) {
-        await new PartnerRepository().updateVenueSubscriptionState(existingSubscription.id, {
-            subscription_status: status,
-        });
-    } else {
-        await new PartnerRepository().updateVenueSubscriptionState(existingSubscription.id, {
-            subscription_status: status,
-            is_active: true,
-            status: "approved",
-        });
-    }
-
-    console.log("Subscription updated:", subscription.id);
-}
-
-/**
- * Handle customer.subscription.deleted
- * Marks subscription as canceled
- */
-async function handleSubscriptionDeleted(subscription: any) {
-    console.log(
-        "Processing customer.subscription.deleted:",
-        subscription.id,
-    );
-
-    const existingSubscription =
-        await subscriptionsRepository.getSubscriptionByStripeId(
-            subscription.id,
-        );
-    if (!existingSubscription) {
-        console.log("Subscription not found:", subscription.id);
+        console.log(`[Stripe Worker] Commission invoice synced from ${eventType}: ${invoice.id}`);
         return;
     }
 
-    await subscriptionsRepository.updateSubscriptionByStripeId(
-        subscription.id,
-        {
-            status: "canceled",
-            canceled_at: new Date(),
-            auto_renew: false,
-        },
-    );
-
-    await new PartnerRepository().updateVenueSubscriptionState(existingSubscription.id, {
-        subscription_status: "canceled",
-        is_active: false,
-        status: "suspended",
-    });
-
-    console.log("Subscription canceled:", subscription.id);
+    console.log(`[Stripe Worker] Ignoring ${eventType} for non-commission invoice ${invoice.id}.`);
 }
 
-/**
- * Handle boost purchase checkout completed
- * Creates boost records after successful payment
- */
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+    const synced = await commissionBillingService.syncCommissionInvoiceFromStripeInvoice(invoice, "webhook");
+    if (synced) {
+        console.log(`[Stripe Worker] Commission invoice payment failed synced: ${invoice.id}`);
+        return;
+    }
+
+    console.log(`[Stripe Worker] Ignoring invoice.payment_failed for non-commission invoice ${invoice.id}.`);
+}
+
 async function handleBoostPurchaseCompleted(session: Stripe.Checkout.Session) {
     console.log("Processing boost purchase:", session.id);
 
     const purchaseId = session.metadata?.purchase_id;
     const userId = session.metadata?.user_id;
-    const packType = session.metadata?.pack_type;
 
     if (!purchaseId || !userId) {
         console.error("Missing purchase_id or user_id in boost checkout session");
         return;
     }
 
-    // Get the purchase record
     const purchase = await boostRepository.getPurchaseById(purchaseId);
     if (!purchase) {
         console.error("Purchase not found:", purchaseId);
         return;
     }
 
-    // Check if already processed (idempotency)
-    if (purchase.payment_status === 'paid') {
+    if (purchase.payment_status === "paid") {
         console.log("Boost purchase already processed:", purchaseId);
         return;
     }
 
-    // Update the purchase record
     await boostRepository.updatePurchase(purchaseId, {
-        payment_status: 'paid',
+        payment_status: "paid",
         payment_intent_id: session.payment_intent as string,
         stripe_customer_id: session.customer as string,
         paid_at: new Date(),
     });
 
-    // Create the boosts
     const boostIds = await boostRepository.createBoostsFromPurchase(
         purchaseId,
         userId,
         purchase.quantity,
-        'stripe_payment',
+        "stripe_payment",
     );
 
     console.log(`Created ${boostIds.length} boosts for user ${userId} from purchase ${purchaseId}`);
 }
-
-export {
-    stripeWorker,
-};
