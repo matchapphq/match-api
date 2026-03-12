@@ -74,6 +74,7 @@ export const leaguesTable = pgTable(
         description: text('description'),
         logo_url: text('logo_url'),
 
+        is_major: boolean('is_major').default(false),
         is_active: boolean('is_active').default(true),
         display_order: integer('display_order').default(0),
 

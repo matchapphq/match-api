@@ -18,6 +18,8 @@ import { analyticsTable, auditLogsTable, bannedUsersTable } from './admin.table'
 import { referralCodesTable, referralsTable, referralStatsTable, boostsTable } from './referral.table';
 import { boostPurchasesTable, boostPricesTable, boostAnalyticsTable } from './boost.table';
 
+import { userVenueHistoryTable } from './user-history.table';
+
 export const usersRelations = relations(usersTable, ({ one, many }) => ({
     preferences: one(userPreferencesTable, {
         fields: [usersTable.id],
@@ -25,10 +27,22 @@ export const usersRelations = relations(usersTable, ({ one, many }) => ({
     }),
     addresses: many(userAddressesTable),
     favorites: many(userFavoriteVenuesTable),
+    venueHistory: many(userVenueHistoryTable),
     venues: many(venuesTable), // Owned venues
     reservations: many(reservationsTable),
     notifications: many(notificationsTable),
     paymentMethods: many(paymentMethodsTable),
+}));
+
+export const userVenueHistoryRelations = relations(userVenueHistoryTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [userVenueHistoryTable.user_id],
+        references: [usersTable.id],
+    }),
+    venue: one(venuesTable, {
+        fields: [userVenueHistoryTable.venue_id],
+        references: [venuesTable.id],
+    }),
 }));
 
 export const userPreferencesRelations = relations(userPreferencesTable, ({ one }) => ({
@@ -78,8 +92,31 @@ export const countriesRelations = relations(countriesTable, ({ many }) => ({
     teams: many(teamsTable),
 }));
 
+import { tournamentsTable, heroBannersTable } from './curation.table';
+
 export const sportsRelations = relations(sportsTable, ({ many }) => ({
     leagues: many(leaguesTable),
+    tournaments: many(tournamentsTable),
+    heroBanners: many(heroBannersTable),
+}));
+
+export const tournamentsRelations = relations(tournamentsTable, ({ one, many }) => ({
+    sport: one(sportsTable, {
+        fields: [tournamentsTable.sport_id],
+        references: [sportsTable.id],
+    }),
+    banners: many(heroBannersTable),
+}));
+
+export const heroBannersRelations = relations(heroBannersTable, ({ one }) => ({
+    sport: one(sportsTable, {
+        fields: [heroBannersTable.sport_id],
+        references: [sportsTable.id],
+    }),
+    tournament: one(tournamentsTable, {
+        fields: [heroBannersTable.tournament_id],
+        references: [tournamentsTable.id],
+    }),
 }));
 
 export const leaguesRelations = relations(leaguesTable, ({ one, many }) => ({
