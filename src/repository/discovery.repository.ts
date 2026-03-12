@@ -4,7 +4,7 @@ import { venuesTable } from "../config/db/venues.table";
 import { heroBannersTable, tournamentsTable } from "../config/db/curation.table";
 import { sportsTable, leaguesTable } from "../config/db/sports.table";
 import { matchesTable } from "../config/db/matches.table";
-import { eq, and, desc, sql, isNull, inArray, gte, asc } from "drizzle-orm";
+import { eq, and, or, desc, sql, isNull, inArray, gte, asc } from "drizzle-orm";
 
 export class DiscoveryRepository {
     /**
@@ -85,12 +85,37 @@ export class DiscoveryRepository {
 
     /**
      * Get active hero banners filtered by user's favorite sports.
+     * Supports both UUIDs and slugs for sport identification.
      */
-    async getActiveBanners(favSportIds: string[] = []) {
+    async getActiveBanners(favSportIdentifiers: string[] = []) {
         const conditions = [eq(heroBannersTable.is_active, true)];
         
-        if (favSportIds.length > 0) {
-            conditions.push(inArray(heroBannersTable.sport_id, favSportIds));
+        if (favSportIdentifiers.length > 0) {
+            // Check if identifiers are UUIDs or slugs
+            const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+            const uuids = favSportIdentifiers.filter(isUuid);
+            const slugs = favSportIdentifiers.filter(s => !isUuid(s));
+
+            const sportFilterConditions = [];
+            if (uuids.length > 0) {
+                sportFilterConditions.push(inArray(heroBannersTable.sport_id, uuids));
+            }
+            
+            if (slugs.length > 0) {
+                // To filter by slug, we need to join with sportsTable
+                const matchingSports = await db.query.sportsTable.findMany({
+                    where: inArray(sportsTable.slug, slugs),
+                    columns: { id: true }
+                });
+                const slugBasedIds = matchingSports.map(s => s.id);
+                if (slugBasedIds.length > 0) {
+                    sportFilterConditions.push(inArray(heroBannersTable.sport_id, slugBasedIds));
+                }
+            }
+
+            if (sportFilterConditions.length > 0) {
+                conditions.push(or(...sportFilterConditions)!);
+            }
         }
 
         return await db.query.heroBannersTable.findMany({
