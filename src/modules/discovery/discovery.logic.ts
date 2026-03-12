@@ -303,6 +303,64 @@ export class DiscoveryLogic {
     }
 
     /**
+     * Get prioritized upcoming matches for discovery.
+     * 1. Matches involving followed teams.
+     * 2. Matches from major leagues.
+     * Limited to 5 matches total.
+     */
+    async getPrioritizedMatches(userId: string, teamIds: string[]) {
+        const now = new Date();
+        const limit = 5;
+
+        let prioritizedMatches: any[] = [];
+
+        // 1. Get matches for followed teams
+        if (teamIds.length > 0) {
+            prioritizedMatches = await db.query.matchesTable.findMany({
+                where: and(
+                    gte(matchesTable.scheduled_at, now),
+                    or(
+                        inArray(matchesTable.home_team_id, teamIds),
+                        inArray(matchesTable.away_team_id, teamIds)
+                    )
+                ),
+                with: {
+                    homeTeam: true,
+                    awayTeam: true,
+                    league: true,
+                },
+                orderBy: [asc(matchesTable.scheduled_at)],
+                limit: limit,
+            });
+        }
+
+        // 2. If we need more matches, fill with major leagues
+        if (prioritizedMatches.length < limit) {
+            const remainingLimit = limit - prioritizedMatches.length;
+            const existingIds = prioritizedMatches.map(m => m.id);
+
+            const majorLeagueMatches = await db.query.matchesTable.findMany({
+                where: and(
+                    gte(matchesTable.scheduled_at, now),
+                    sql`EXISTS (SELECT 1 FROM leagues l WHERE l.id = ${matchesTable.league_id} AND l.is_major = true)`,
+                    existingIds.length > 0 ? sql`${matchesTable.id} NOT IN (${sql.join(existingIds.map(id => sql`${id}`), sql`, `)})` : undefined
+                ),
+                with: {
+                    homeTeam: true,
+                    awayTeam: true,
+                    league: true,
+                },
+                orderBy: [asc(matchesTable.scheduled_at)],
+                limit: remainingLimit,
+            });
+
+            prioritizedMatches = [...prioritizedMatches, ...majorLeagueMatches];
+        }
+
+        return prioritizedMatches;
+    }
+
+    /**
      * Aggregate data for the Discover Home screen.
      */
     async getHomeData(userId: string, lat?: number, lng?: number) {
@@ -311,6 +369,7 @@ export class DiscoveryLogic {
         });
 
         const favSportIds = (prefs?.fav_sports || []) as string[];
+        const favTeamIds = (prefs?.fav_team_ids || []) as string[];
 
         // Parallel fetch for all sections
         const [banners, followedTeams, popularCompetitions, recentlyViewed, upcomingMatches] = await Promise.all([
@@ -318,7 +377,7 @@ export class DiscoveryLogic {
             this.getFollowedTeams(userId),
             this.discoveryRepository.getPopularCompetitions(),
             this.discoveryRepository.getVenueHistory(userId, 10),
-            this.matchesLogic.getMatches(undefined, 10, 0),
+            this.getPrioritizedMatches(userId, favTeamIds),
         ]);
 
         return {
