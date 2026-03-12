@@ -19,7 +19,16 @@ export const CreateVenueSchema = z.object({
     })).optional(),
 });
 
-export const UpdateVenueSchema = CreateVenueSchema.partial();
+const OpeningHoursDaySchema = z.object({
+    open: z.string().regex(/^\d{2}:\d{2}$/),
+    close: z.string().regex(/^\d{2}:\d{2}$/),
+    closed: z.boolean(),
+});
+
+export const UpdateVenueSchema = CreateVenueSchema.partial().extend({
+    booking_mode: z.enum(["INSTANT", "REQUEST"]).optional(),
+    opening_hours: z.record(z.string(), OpeningHoursDaySchema).optional(),
+});
 
 export const GetVenuesSchema = z.object({
     page: z.coerce.number().int().positive().default(1),
