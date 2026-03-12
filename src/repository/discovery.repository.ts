@@ -129,31 +129,33 @@ export class DiscoveryRepository {
     }
 
     /**
-     * Get popular sports/competitions that have active matches in the next 7 days.
+     * Get popular competitions (leagues) limited to 3 per sport.
+     * Prioritizes major leagues within each sport.
      */
     async getPopularCompetitions() {
-        const now = new Date();
-        const nextWeek = new Date();
-        nextWeek.setDate(now.getDate() + 7);
-
-        // This query finds sports that have at least one match scheduled in the next week
-        return await db.select({
-            id: sportsTable.id,
-            name: sportsTable.name,
-            slug: sportsTable.slug,
-            icon_url: sportsTable.icon_url,
+        // Use a CTE with ROW_NUMBER to limit results per sport_id
+        const sq = db.select({
+            id: leaguesTable.id,
+            name: leaguesTable.name,
+            slug: leaguesTable.slug,
+            logo_url: leaguesTable.logo_url,
+            is_major: leaguesTable.is_major,
+            sport_id: leaguesTable.sport_id,
+            row_number: sql<number>`ROW_NUMBER() OVER(PARTITION BY ${leaguesTable.sport_id} ORDER BY ${leaguesTable.is_major} DESC, ${leaguesTable.display_order} ASC, ${leaguesTable.name} ASC)`.as('rn')
         })
-        .from(sportsTable)
-        .where(and(
-            eq(sportsTable.is_active, true),
-            sql`EXISTS (
-                SELECT 1 FROM ${leaguesTable} l
-                JOIN ${matchesTable} m ON m.league_id = l.id
-                WHERE l.sport_id = ${sportsTable.id}
-                AND m.scheduled_at >= ${now}
-                AND m.scheduled_at <= ${nextWeek}
-            )`
-        ))
-        .orderBy(asc(sportsTable.display_order));
+        .from(leaguesTable)
+        .where(eq(leaguesTable.is_active, true))
+        .as('sq');
+
+        return await db.select({
+            id: sq.id,
+            name: sq.name,
+            slug: sq.slug,
+            logo_url: sq.logo_url,
+            is_major: sq.is_major,
+        })
+        .from(sq)
+        .where(sql`${sq.row_number} <= 3`)
+        .orderBy(desc(sq.is_major), asc(sq.name));
     }
 }

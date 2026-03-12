@@ -13,7 +13,7 @@ export class DiscoveryLogic {
         private readonly matchesLogic: MatchesLogic = new MatchesLogic(),
     ) {}
 
-    async search(params: any) {
+    public async search(params: any) {
         const {
             q = "",
             type = "all",
@@ -175,7 +175,7 @@ export class DiscoveryLogic {
         };
     }
 
-    async getNearby(lat: number, lng: number, radiusKm: number = 10) {
+    public async getNearby(lat: number, lng: number, radiusKm: number = 10) {
         const distanceMeters = radiusKm * 1000;
         
         const venueConditions = [
@@ -210,7 +210,7 @@ export class DiscoveryLogic {
         }));
     }
 
-    async getVenueDetails(venueId: string, userId?: string) {
+    public async getVenueDetails(venueId: string, userId?: string) {
         const venue = await db.query.venuesTable.findFirst({
             where: and(
                 eq(venuesTable.id, venueId),
@@ -263,14 +263,14 @@ export class DiscoveryLogic {
         return await this.discoveryRepository.getVenueHistory(userId, limit);
     }
 
-    async clearVenueHistory(userId: string) {
+    public async clearVenueHistory(userId: string) {
         return await this.discoveryRepository.clearVenueHistory(userId);
     }
 
     /**
      * Get details for teams followed by the user, including live status.
      */
-    async getFollowedTeams(userId: string) {
+    public async getFollowedTeams(userId: string) {
         const prefs = await db.query.userPreferencesTable.findFirst({
             where: eq(userPreferencesTable.user_id, userId),
             columns: {
@@ -308,7 +308,7 @@ export class DiscoveryLogic {
      * 2. Matches from major leagues.
      * Limited to 5 matches total.
      */
-    async getPrioritizedMatches(userId: string, teamIds: string[]) {
+    public async getPrioritizedMatches(userId: string, teamIds: string[]) {
         const now = new Date();
         const limit = 5;
 
