@@ -32,6 +32,9 @@ class DiscoveryService {
         
         // Home aggregate endpoint
         this.router.get("/home", authMiddleware, ...this.controller.getHomeData);
+
+        // Competition details
+        this.router.get("/competition/:competitionId", authMiddleware, ...this.controller.getCompetitionDetails);
         
         // History routes
         this.router.get("/history", authMiddleware, ...this.controller.getVenueHistory);

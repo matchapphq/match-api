@@ -1,12 +1,13 @@
 import { createFactory } from "hono/factory";
 import { DiscoveryLogic } from "./discovery.logic";
+import type { HonoEnv } from "../../types/hono.types";
 
 /**
  * Controller for Discovery and Map operations.
  * Handles searching for venues, getting nearby places, and venue details for the map view.
  */
 class DiscoveryController {
-    private readonly factory = createFactory();
+    private readonly factory = createFactory<HonoEnv>();
 
     constructor(private readonly discoveryLogic: DiscoveryLogic) {}
 
@@ -96,6 +97,19 @@ class DiscoveryController {
         } catch (error: any) {
             console.error("Error clearing venue history:", error);
             return ctx.json({ error: "Failed to clear venue history" }, 500);
+        }
+    });
+
+    readonly getCompetitionDetails = this.factory.createHandlers(async (ctx) => {
+        const competitionId = ctx.req.param("competitionId") as string;
+        const userId = ctx.get("user")?.id;
+        try {
+            const result = await this.discoveryLogic.getCompetitionDetails(competitionId, userId);
+            return ctx.json(result);
+        } catch (error: any) {
+            if (error.message === "COMPETITION_NOT_FOUND") return ctx.json({ error: "Competition not found" }, 404);
+            console.error("Error fetching competition details:", error);
+            return ctx.json({ error: "Failed to fetch competition details" }, 500);
         }
     });
 

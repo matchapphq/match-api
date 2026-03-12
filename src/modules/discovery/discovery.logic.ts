@@ -1,7 +1,7 @@
 import { db } from "../../config/config.db";
 import { venuesTable } from "../../config/db/venues.table";
 import { matchesTable, venueMatchesTable } from "../../config/db/matches.table";
-import { teamsTable, userPreferencesTable, openingHoursExceptionsTable } from "../../config/db/schema";
+import { teamsTable, userPreferencesTable, openingHoursExceptionsTable, leaguesTable } from "../../config/db/schema";
 import { eq, and, gte, lte, ilike, or, isNull, asc, desc, sql, inArray } from "drizzle-orm";
 
 import { DiscoveryRepository } from "../../repository/discovery.repository";
@@ -358,6 +358,77 @@ export class DiscoveryLogic {
         }
 
         return prioritizedMatches;
+    }
+
+    /**
+     * Get competition details including info, matches, and popular bars.
+     */
+    public async getCompetitionDetails(competitionId: string, userId?: string) {
+        // 1. Get competition info (League)
+        const competition = await db.query.leaguesTable.findFirst({
+            where: eq(leaguesTable.id, competitionId),
+            with: {
+                sport: true,
+            },
+        });
+
+        if (!competition) {
+            throw new Error("COMPETITION_NOT_FOUND");
+        }
+
+        // 2. Get upcoming matches for this competition (next 7 days)
+        const now = new Date();
+        const nextWeek = new Date();
+        nextWeek.setDate(now.getDate() + 7);
+
+        const upcomingMatches = await db.query.matchesTable.findMany({
+            where: and(
+                eq(matchesTable.league_id, competitionId),
+                gte(matchesTable.scheduled_at, now),
+            ),
+            with: {
+                homeTeam: true,
+                awayTeam: true,
+            },
+            orderBy: [asc(matchesTable.scheduled_at)],
+            limit: 10,
+        });
+
+        // 3. Get best bars showing matches for this competition
+        // We'll look for venues that have at least one venue_match for this league
+        const bestBars = await db.select({
+            id: venuesTable.id,
+            name: venuesTable.name,
+            type: venuesTable.type,
+            city: venuesTable.city,
+            average_rating: venuesTable.average_rating,
+            cover_image_url: venuesTable.cover_image_url,
+            latitude: venuesTable.latitude,
+            longitude: venuesTable.longitude,
+        })
+        .from(venuesTable)
+        .where(and(
+            isNull(venuesTable.deleted_at),
+            sql`EXISTS (
+                SELECT 1 FROM ${venueMatchesTable} vm
+                JOIN ${matchesTable} m ON m.id = vm.match_id
+                WHERE vm.venue_id = ${venuesTable.id}
+                AND m.league_id = ${competitionId}
+                AND m.scheduled_at >= ${now}
+            )`
+        ))
+        .orderBy(desc(venuesTable.average_rating))
+        .limit(10);
+
+        return {
+            competition,
+            upcoming_matches: upcomingMatches,
+            best_bars: bestBars,
+            stats: {
+                matches_left: upcomingMatches.length,
+                partner_bars: bestBars.length,
+            }
+        };
     }
 
     /**
