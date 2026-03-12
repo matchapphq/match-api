@@ -39,13 +39,63 @@ class DiscoveryController {
 
     readonly getVenueDetails = this.factory.createHandlers(async (ctx) => {
         const venueId = ctx.req.param("venueId");
+        const userId = ctx.get("user")?.id;
         try {
-            const result = await this.discoveryLogic.getVenueDetails(venueId);
+            const result = await this.discoveryLogic.getVenueDetails(venueId, userId);
             return ctx.json(result);
         } catch (error: any) {
             if (error.message === "VENUE_NOT_FOUND") return ctx.json({ error: "Venue not found" }, 404);
             console.error("Error fetching venue details:", error);
             return ctx.json({ error: "Failed to fetch venue details" }, 500);
+        }
+    });
+
+    readonly getVenueHistory = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get("user")?.id;
+        if (!userId) return ctx.json({ error: "Unauthorized" }, 401);
+
+        try {
+            const { limit } = ctx.req.query();
+            const result = await this.discoveryLogic.getVenueHistory(
+                userId, 
+                limit ? parseInt(limit) : 10
+            );
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error fetching venue history:", error);
+            return ctx.json({ error: "Failed to fetch venue history" }, 500);
+        }
+    });
+
+    readonly getHomeData = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get("user")?.id;
+        if (!userId) return ctx.json({ error: "Unauthorized" }, 401);
+
+        const { lat, lng } = ctx.req.query();
+
+        try {
+            const result = await this.discoveryLogic.getHomeData(
+                userId,
+                lat ? parseFloat(lat) : undefined,
+                lng ? parseFloat(lng) : undefined
+            );
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error fetching discovery home data:", error);
+            return ctx.json({ error: "Failed to fetch discovery home data" }, 500);
+        }
+    });
+
+    readonly clearVenueHistory = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get("user")?.id;
+        if (!userId) return ctx.json({ error: "Unauthorized" }, 401);
+
+        try {
+            await this.discoveryLogic.clearVenueHistory(userId);
+            return ctx.json({ success: true });
+        } catch (error: any) {
+            console.error("Error clearing venue history:", error);
+            return ctx.json({ error: "Failed to clear venue history" }, 500);
         }
     });
 

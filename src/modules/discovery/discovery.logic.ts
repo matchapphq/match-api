@@ -1,9 +1,18 @@
 import { db } from "../../config/config.db";
 import { venuesTable } from "../../config/db/venues.table";
-import { matchesTable } from "../../config/db/matches.table";
-import { eq, and, gte, lte, ilike, or, isNull, asc, desc, sql } from "drizzle-orm";
+import { matchesTable, venueMatchesTable } from "../../config/db/matches.table";
+import { teamsTable, userPreferencesTable, openingHoursExceptionsTable } from "../../config/db/schema";
+import { eq, and, gte, lte, ilike, or, isNull, asc, desc, sql, inArray } from "drizzle-orm";
+
+import { DiscoveryRepository } from "../../repository/discovery.repository";
+import { MatchesLogic } from "../matches/matches.logic";
 
 export class DiscoveryLogic {
+    constructor(
+        private readonly discoveryRepository: DiscoveryRepository = new DiscoveryRepository(),
+        private readonly matchesLogic: MatchesLogic = new MatchesLogic(),
+    ) {}
+
     async search(params: any) {
         const {
             q = "",
@@ -201,7 +210,7 @@ export class DiscoveryLogic {
         }));
     }
 
-    async getVenueDetails(venueId: string) {
+    async getVenueDetails(venueId: string, userId?: string) {
         const venue = await db.query.venuesTable.findFirst({
             where: and(
                 eq(venuesTable.id, venueId),
@@ -214,6 +223,11 @@ export class DiscoveryLogic {
 
         if (!venue) {
             throw new Error("VENUE_NOT_FOUND");
+        }
+
+        // Record view in history if userId provided
+        if (userId) {
+            await this.discoveryRepository.recordVenueView(userId, venueId);
         }
 
         // Fetch matches for this venue
@@ -242,6 +256,77 @@ export class DiscoveryLogic {
                 availableCapacity: vm.available_capacity,
                 totalCapacity: vm.total_capacity,
             })),
+        };
+    }
+
+    async getVenueHistory(userId: string, limit: number = 10) {
+        return await this.discoveryRepository.getVenueHistory(userId, limit);
+    }
+
+    async clearVenueHistory(userId: string) {
+        return await this.discoveryRepository.clearVenueHistory(userId);
+    }
+
+    /**
+     * Get details for teams followed by the user, including live status.
+     */
+    async getFollowedTeams(userId: string) {
+        const prefs = await db.query.userPreferencesTable.findFirst({
+            where: eq(userPreferencesTable.user_id, userId),
+            columns: {
+                fav_team_ids: true,
+            }
+        });
+
+        const teamIds = prefs?.fav_team_ids || [];
+        if (teamIds.length === 0) return [];
+
+        // Fetch team details
+        const teams = await db.query.teamsTable.findMany({
+            where: inArray(teamsTable.id, teamIds),
+        });
+
+        // Check for live matches for these teams
+        const liveMatches = await this.matchesLogic.getMatches('live');
+        
+        return teams.map(team => {
+            const liveMatch = liveMatches.find(m => 
+                m.home_team_id === team.id || m.away_team_id === team.id
+            );
+
+            return {
+                ...team,
+                is_live: !!liveMatch,
+                live_match_id: liveMatch?.id || null,
+            };
+        });
+    }
+
+    /**
+     * Aggregate data for the Discover Home screen.
+     */
+    async getHomeData(userId: string, lat?: number, lng?: number) {
+        const prefs = await db.query.userPreferencesTable.findFirst({
+            where: eq(userPreferencesTable.user_id, userId),
+        });
+
+        const favSportIds = (prefs?.fav_sports || []) as string[];
+
+        // Parallel fetch for all sections
+        const [banners, followedTeams, popularCompetitions, recentlyViewed, upcomingMatches] = await Promise.all([
+            this.discoveryRepository.getActiveBanners(favSportIds),
+            this.getFollowedTeams(userId),
+            this.discoveryRepository.getPopularCompetitions(),
+            this.discoveryRepository.getVenueHistory(userId, 10),
+            this.matchesLogic.getMatches(undefined, 10, 0),
+        ]);
+
+        return {
+            banners,
+            followed_teams: followedTeams,
+            popular_competitions: popularCompetitions,
+            recently_viewed: recentlyViewed,
+            upcoming_matches: upcomingMatches,
         };
     }
 
