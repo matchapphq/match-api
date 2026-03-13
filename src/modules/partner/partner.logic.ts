@@ -47,7 +47,7 @@ export class PartnerLogic {
             throw new Error("PAYMENT_METHOD_REQUIRED");
         }
 
-        const requiresPaymentSetup = !hasPaymentMethod;
+        const requiresPaymentSetup = !hasPaymentMethod && process.env.NODE_ENV !== "development";
         const venue = await this.partnerRepo.createVenue({
             name: data.name,
             owner_id: userId,

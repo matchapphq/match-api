@@ -79,7 +79,7 @@ export const venuesTable = pgTable('venues', {
         country: varchar('country', { length: 100 }).notNull(),
 
         // PostGIS
-        location: geometry('location', { mode: 'xy' }).notNull(),
+        location: geometry('location', { type: 'point', srid: 4326 }).notNull(),
         latitude: doublePrecision('latitude'),
         longitude: doublePrecision('longitude'),
 

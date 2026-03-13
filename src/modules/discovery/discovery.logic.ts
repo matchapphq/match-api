@@ -28,9 +28,11 @@ export class DiscoveryLogic {
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
         const offset = (pageNum - 1) * limitNum;
-        const userLat = lat ? parseFloat(lat) : null;
-        const userLng = lng ? parseFloat(lng) : null;
-        const radiusKm = parseFloat(radius_km);
+        
+        // Use a more robust check for coordinates
+        const userLat = lat && !isNaN(parseFloat(lat)) ? parseFloat(lat) : null;
+        const userLng = lng && !isNaN(parseFloat(lng)) ? parseFloat(lng) : null;
+        const radiusKm = !isNaN(parseFloat(radius_km)) ? parseFloat(radius_km) : 500000;
         const searchQuery = q.trim().toLowerCase();
 
         let venues: any[] = [];
@@ -52,10 +54,12 @@ export class DiscoveryLogic {
                 )!);
             }
 
-            if (userLat && userLng) {
+            // Only apply spatial filter if coordinates are valid and radius is reasonable
+            // If radius is "gigantic" (>= 20,000km), we skip the filter to show all venues
+            if (userLat !== null && userLng !== null && radiusKm < 20000) {
                 const distanceMeters = radiusKm * 1000;
                 venueConditions.push(sql`ST_DWithin(
-                    ${venuesTable.location}::geography, 
+                    ST_SetSRID(${venuesTable.location}, 4326)::geography, 
                     ST_SetSRID(ST_MakePoint(${userLng}, ${userLat}), 4326)::geography, 
                     ${distanceMeters}
                 )`);
@@ -69,9 +73,9 @@ export class DiscoveryLogic {
             totalVenues = Number(venueCount?.count ?? 0);
 
             let orderBy: any = desc(venuesTable.created_at);
-            if (userLat && userLng) {
+            if (userLat !== null && userLng !== null) {
                 orderBy = sql`ST_Distance(
-                    ${venuesTable.location}::geography, 
+                    ST_SetSRID(${venuesTable.location}, 4326)::geography, 
                     ST_SetSRID(ST_MakePoint(${userLng}, ${userLat}), 4326)::geography
                 )`;
             }
@@ -84,7 +88,7 @@ export class DiscoveryLogic {
                 with: { photos: true },
             });
 
-            if (userLat && userLng) {
+            if (userLat !== null && userLng !== null) {
                 venues = venues.map(v => ({
                     ...v,
                     distance: v.latitude && v.longitude
@@ -183,7 +187,7 @@ export class DiscoveryLogic {
             eq(venuesTable.is_active, true),
             sql`ST_DWithin(
                 ${venuesTable.location}::geography, 
-                ST_SetSRID(ST_MakePoint(${userLng}, ${userLat}), 4326)::geography, 
+                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography, 
                 ${distanceMeters}
             )`,
         ];
