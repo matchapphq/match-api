@@ -5,22 +5,22 @@ import { eq, and, desc, sql, isNull, avg, count } from "drizzle-orm";
 
 export class ReviewsRepository {
     async create(data: any) {
-        return await db.transaction(async (tx) => {
-            const [newReview] = await tx.insert(reviewsTable).values({
-                user_id: data.user_id,
-                venue_id: data.venue_id,
-                rating: data.rating,
-                content: data.content,
-                tags: data.tags || [],
-                title: data.title || "",
-                atmosphere_rating: data.atmosphere_rating,
-                food_rating: data.food_rating,
-                service_rating: data.service_rating,
-                value_rating: data.value_rating,
-            }).returning();
+        const [newReview] = await db.insert(reviewsTable).values({
+            user_id: data.user_id,
+            venue_id: data.venue_id,
+            rating: data.rating,
+            content: data.content,
+            tags: data.tags || [],
+            title: data.title || "",
+            atmosphere_rating: data.atmosphere_rating,
+            food_rating: data.food_rating,
+            service_rating: data.service_rating,
+            value_rating: data.value_rating,
+        }).returning();
 
-            // Update venue average rating and total reviews
-            const [stats] = await tx.select({
+        if (newReview) {
+            // Update venue average rating and total reviews (sequentially since transactions are not supported in neon-http)
+            const [stats] = await db.select({
                 avgRating: avg(reviewsTable.rating),
                 avgAtmosphere: avg(reviewsTable.atmosphere_rating),
                 avgFood: avg(reviewsTable.food_rating),
@@ -35,7 +35,7 @@ export class ReviewsRepository {
             ));
 
             if (stats) {
-                await tx.update(venuesTable)
+                await db.update(venuesTable)
                     .set({
                         average_rating: stats.avgRating?.toString() || "0.00",
                         average_atmosphere_rating: stats.avgAtmosphere?.toString() || "0.00",
@@ -46,9 +46,9 @@ export class ReviewsRepository {
                     })
                     .where(eq(venuesTable.id, data.venue_id));
             }
+        }
 
-            return newReview;
-        });
+        return newReview;
     }
 
     async findByVenueId(venueId: string, limit: number = 20, offset: number = 0) {
@@ -156,42 +156,40 @@ export class ReviewsRepository {
     }
 
     async markHelpful(reviewId: string, userId: string, isHelpful: boolean) {
-        return await db.transaction(async (tx) => {
-            // Upsert helpful vote
-            await tx.insert(reviewHelpfulTable)
-                .values({
-                    review_id: reviewId,
-                    user_id: userId,
-                    is_helpful: isHelpful,
-                })
-                .onConflictDoUpdate({
-                    target: [reviewHelpfulTable.review_id, reviewHelpfulTable.user_id],
-                    set: { is_helpful: isHelpful }
-                });
+        // Upsert helpful vote
+        await db.insert(reviewHelpfulTable)
+            .values({
+                review_id: reviewId,
+                user_id: userId,
+                is_helpful: isHelpful,
+            })
+            .onConflictDoUpdate({
+                target: [reviewHelpfulTable.review_id, reviewHelpfulTable.user_id],
+                set: { is_helpful: isHelpful }
+            });
 
-            // Recalculate helpful counts
-            const [helpfulCount] = await tx.select({ count: count() })
-                .from(reviewHelpfulTable)
-                .where(and(
-                    eq(reviewHelpfulTable.review_id, reviewId),
-                    eq(reviewHelpfulTable.is_helpful, true)
-                ));
+        // Recalculate helpful counts
+        const [helpfulCount] = await db.select({ count: count() })
+            .from(reviewHelpfulTable)
+            .where(and(
+                eq(reviewHelpfulTable.review_id, reviewId),
+                eq(reviewHelpfulTable.is_helpful, true)
+            ));
 
-            const [unhelpfulCount] = await tx.select({ count: count() })
-                .from(reviewHelpfulTable)
-                .where(and(
-                    eq(reviewHelpfulTable.review_id, reviewId),
-                    eq(reviewHelpfulTable.is_helpful, false)
-                ));
+        const [unhelpfulCount] = await db.select({ count: count() })
+            .from(reviewHelpfulTable)
+            .where(and(
+                eq(reviewHelpfulTable.review_id, reviewId),
+                eq(reviewHelpfulTable.is_helpful, false)
+            ));
 
-            await tx.update(reviewsTable)
-                .set({
-                    helpful_count: Number(helpfulCount?.count || 0),
-                    unhelpful_count: Number(unhelpfulCount?.count || 0),
-                })
-                .where(eq(reviewsTable.id, reviewId));
+        await db.update(reviewsTable)
+            .set({
+                helpful_count: Number(helpfulCount?.count || 0),
+                unhelpful_count: Number(unhelpfulCount?.count || 0),
+            })
+            .where(eq(reviewsTable.id, reviewId));
 
-            return true;
-        });
+        return true;
     }
 }
