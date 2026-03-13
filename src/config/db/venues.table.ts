@@ -120,6 +120,10 @@ export const venuesTable = pgTable('venues', {
 
         // Stats
         average_rating: numeric('average_rating', { precision: 3, scale: 2 }).default('0.00'),
+        average_atmosphere_rating: numeric('average_atmosphere_rating', { precision: 3, scale: 2 }).default('0.00'),
+        average_food_rating: numeric('average_food_rating', { precision: 3, scale: 2 }).default('0.00'),
+        average_service_rating: numeric('average_service_rating', { precision: 3, scale: 2 }).default('0.00'),
+        average_value_rating: numeric('average_value_rating', { precision: 3, scale: 2 }).default('0.00'),
         total_reviews: integer('total_reviews').default(0),
         total_reservations: integer('total_reservations').default(0),
 
