@@ -43,6 +43,7 @@ class DiscoveryService {
         // History routes
         this.router.get("/history", authMiddleware, ...this.controller.getVenueHistory);
         this.router.delete("/history/clear", authMiddleware, ...this.controller.clearVenueHistory);
+        this.router.post("/history/clear", authMiddleware, ...this.controller.clearVenueHistory);
     }
 }
 
