@@ -1,7 +1,7 @@
 import { db } from "../../config/config.db";
 import { venuesTable } from "../../config/db/venues.table";
 import { matchesTable, venueMatchesTable } from "../../config/db/matches.table";
-import { teamsTable, userPreferencesTable, openingHoursExceptionsTable, leaguesTable } from "../../config/db/schema";
+import { teamsTable, userPreferencesTable, openingHoursExceptionsTable, leaguesTable, userLeagueFollowsTable } from "../../config/db/schema";
 import { eq, and, gte, lte, ilike, or, isNull, asc, desc, sql, inArray } from "drizzle-orm";
 
 import { DiscoveryRepository } from "../../repository/discovery.repository";
@@ -183,7 +183,7 @@ export class DiscoveryLogic {
             eq(venuesTable.is_active, true),
             sql`ST_DWithin(
                 ${venuesTable.location}::geography, 
-                ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography, 
+                ST_SetSRID(ST_MakePoint(${userLng}, ${userLat}), 4326)::geography, 
                 ${distanceMeters}
             )`,
         ];
@@ -265,6 +265,30 @@ export class DiscoveryLogic {
 
     public async clearVenueHistory(userId: string) {
         return await this.discoveryRepository.clearVenueHistory(userId);
+    }
+
+    /**
+     * Toggle league follow status for a user.
+     */
+    async toggleLeagueFollow(userId: string, leagueId: string) {
+        const existing = await db.query.userLeagueFollowsTable.findFirst({
+            where: and(
+                eq(userLeagueFollowsTable.user_id, userId),
+                eq(userLeagueFollowsTable.league_id, leagueId)
+            )
+        });
+
+        if (existing) {
+            await db.delete(userLeagueFollowsTable)
+                .where(eq(userLeagueFollowsTable.id, existing.id));
+            return { followed: false };
+        } else {
+            await db.insert(userLeagueFollowsTable).values({
+                user_id: userId,
+                league_id: leagueId,
+            }).onConflictDoNothing();
+            return { followed: true };
+        }
     }
 
     /**
@@ -376,7 +400,19 @@ export class DiscoveryLogic {
             throw new Error("COMPETITION_NOT_FOUND");
         }
 
-        // 2. Get upcoming matches for this competition (next 7 days)
+        // 2. Check if user follows this competition
+        let is_followed = false;
+        if (userId) {
+            const follow = await db.query.userLeagueFollowsTable.findFirst({
+                where: and(
+                    eq(userLeagueFollowsTable.user_id, userId),
+                    eq(userLeagueFollowsTable.league_id, competitionId)
+                )
+            });
+            is_followed = !!follow;
+        }
+
+        // 3. Get upcoming matches for this competition (next 7 days)
         const now = new Date();
         const nextWeek = new Date();
         nextWeek.setDate(now.getDate() + 7);
@@ -394,8 +430,7 @@ export class DiscoveryLogic {
             limit: 10,
         });
 
-        // 3. Get best bars showing matches for this competition
-        // We'll look for venues that have at least one venue_match for this league
+        // 4. Get best bars showing matches for this competition
         const bestBars = await db.select({
             id: venuesTable.id,
             name: venuesTable.name,
@@ -421,7 +456,10 @@ export class DiscoveryLogic {
         .limit(10);
 
         return {
-            competition,
+            competition: {
+                ...competition,
+                is_followed,
+            },
             upcoming_matches: upcomingMatches,
             best_bars: bestBars,
             stats: {

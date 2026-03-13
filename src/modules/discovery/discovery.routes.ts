@@ -35,6 +35,7 @@ class DiscoveryService {
 
         // Competition details
         this.router.get("/competition/:competitionId", authMiddleware, ...this.controller.getCompetitionDetails);
+        this.router.post("/competition/:leagueId/follow", authMiddleware, ...this.controller.toggleLeagueFollow);
         
         // History routes
         this.router.get("/history", authMiddleware, ...this.controller.getVenueHistory);

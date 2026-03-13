@@ -100,6 +100,20 @@ class DiscoveryController {
         }
     });
 
+    readonly toggleLeagueFollow = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get("user")?.id;
+        if (!userId) return ctx.json({ error: "Unauthorized" }, 401);
+
+        const leagueId = ctx.req.param("leagueId");
+        try {
+            const result = await this.discoveryLogic.toggleLeagueFollow(userId, leagueId);
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error toggling league follow:", error);
+            return ctx.json({ error: "Failed to toggle league follow" }, 500);
+        }
+    });
+
     readonly getCompetitionDetails = this.factory.createHandlers(async (ctx) => {
         const competitionId = ctx.req.param("competitionId") as string;
         const userId = ctx.get("user")?.id;
