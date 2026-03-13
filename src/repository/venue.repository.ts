@@ -126,7 +126,7 @@ export class VenueRepository {
             search,
             lat,
             lng,
-            distance_km = 10,
+            distance_km,
             sort = 'newest',
         } = query;
 
