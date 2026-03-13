@@ -47,6 +47,9 @@ class VenueController {
         async (ctx) => {
             try {
                 const query = ctx.req.valid("query");
+                if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "staging") {
+                    query["distance_km"] = 50000;
+                }
                 const result = await this.venuesLogic.findAll(query);
                 return ctx.json(result);
             } catch (error) {

@@ -2,6 +2,8 @@ import { relations } from 'drizzle-orm';
 import { usersTable, userPreferencesTable } from './user.table';
 import { userAddressesTable } from './user-addresses.table';
 import { userFavoriteVenuesTable } from './user-favorites.table';
+import { userLeagueFollowsTable } from './user-league-follows.table';
+import { userTeamFollowsTable } from './user-team-follows.table';
 import { venuesTable } from './venues.table';
 import { venuePhotosTable } from './venue-photos.table';
 import { countriesTable, sportsTable, leaguesTable, teamsTable } from './sports.table';
@@ -18,6 +20,8 @@ import { analyticsTable, auditLogsTable, bannedUsersTable } from './admin.table'
 import { referralCodesTable, referralsTable, referralStatsTable, boostsTable } from './referral.table';
 import { boostPurchasesTable, boostPricesTable, boostAnalyticsTable } from './boost.table';
 
+import { userVenueHistoryTable } from './user-history.table';
+
 export const usersRelations = relations(usersTable, ({ one, many }) => ({
     preferences: one(userPreferencesTable, {
         fields: [usersTable.id],
@@ -25,10 +29,24 @@ export const usersRelations = relations(usersTable, ({ one, many }) => ({
     }),
     addresses: many(userAddressesTable),
     favorites: many(userFavoriteVenuesTable),
+    leagueFollows: many(userLeagueFollowsTable),
+    teamFollows: many(userTeamFollowsTable),
+    venueHistory: many(userVenueHistoryTable),
     venues: many(venuesTable), // Owned venues
     reservations: many(reservationsTable),
     notifications: many(notificationsTable),
     paymentMethods: many(paymentMethodsTable),
+}));
+
+export const userVenueHistoryRelations = relations(userVenueHistoryTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [userVenueHistoryTable.user_id],
+        references: [usersTable.id],
+    }),
+    venue: one(venuesTable, {
+        fields: [userVenueHistoryTable.venue_id],
+        references: [venuesTable.id],
+    }),
 }));
 
 export const userPreferencesRelations = relations(userPreferencesTable, ({ one }) => ({
@@ -56,6 +74,28 @@ export const userFavoriteVenuesRelations = relations(userFavoriteVenuesTable, ({
     }),
 }));
 
+export const userLeagueFollowsRelations = relations(userLeagueFollowsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [userLeagueFollowsTable.user_id],
+        references: [usersTable.id],
+    }),
+    league: one(leaguesTable, {
+        fields: [userLeagueFollowsTable.league_id],
+        references: [leaguesTable.id],
+    }),
+}));
+
+export const userTeamFollowsRelations = relations(userTeamFollowsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [userTeamFollowsTable.user_id],
+        references: [usersTable.id],
+    }),
+    team: one(teamsTable, {
+        fields: [userTeamFollowsTable.team_id],
+        references: [teamsTable.id],
+    }),
+}));
+
 export const venuesRelations = relations(venuesTable, ({ one, many }) => ({
     owner: one(usersTable, {
         fields: [venuesTable.owner_id],
@@ -78,8 +118,31 @@ export const countriesRelations = relations(countriesTable, ({ many }) => ({
     teams: many(teamsTable),
 }));
 
+import { tournamentsTable, heroBannersTable } from './curation.table';
+
 export const sportsRelations = relations(sportsTable, ({ many }) => ({
     leagues: many(leaguesTable),
+    tournaments: many(tournamentsTable),
+    heroBanners: many(heroBannersTable),
+}));
+
+export const tournamentsRelations = relations(tournamentsTable, ({ one, many }) => ({
+    sport: one(sportsTable, {
+        fields: [tournamentsTable.sport_id],
+        references: [sportsTable.id],
+    }),
+    banners: many(heroBannersTable),
+}));
+
+export const heroBannersRelations = relations(heroBannersTable, ({ one }) => ({
+    sport: one(sportsTable, {
+        fields: [heroBannersTable.sport_id],
+        references: [sportsTable.id],
+    }),
+    tournament: one(tournamentsTable, {
+        fields: [heroBannersTable.tournament_id],
+        references: [tournamentsTable.id],
+    }),
 }));
 
 export const leaguesRelations = relations(leaguesTable, ({ one, many }) => ({
@@ -92,9 +155,10 @@ export const leaguesRelations = relations(leaguesTable, ({ one, many }) => ({
         references: [countriesTable.id],
     }),
     teams: many(teamsTable),
+    follows: many(userLeagueFollowsTable),
 }));
 
-export const teamsRelations = relations(teamsTable, ({ one }) => ({
+export const teamsRelations = relations(teamsTable, ({ one, many }) => ({
     league: one(leaguesTable, {
         fields: [teamsTable.league_id],
         references: [leaguesTable.id],
@@ -103,6 +167,7 @@ export const teamsRelations = relations(teamsTable, ({ one }) => ({
         fields: [teamsTable.country_id],
         references: [countriesTable.id],
     }),
+    follows: many(userTeamFollowsTable),
 }));
 
 export const matchesRelations = relations(matchesTable, ({ one, many }) => ({
@@ -155,8 +220,6 @@ export const seatsRelations = relations(seatsTable, ({ one }) => ({
         references: [venueMatchesTable.id],
     }),
 }));
-
-// ... existing relations ...
 
 export const tablesRelations = relations(tablesTable, ({ one, many }) => ({
     venue: one(venuesTable, {

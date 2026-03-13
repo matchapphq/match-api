@@ -442,7 +442,7 @@ export class SportsRepository {
      * Creates or updates based on api_id.
      * Automatically upserts the country and links via country_id.
      */
-    async upsertLeagueFromApi(sportId: string, data: ApiLeagueResponse): Promise<string> {
+    async upsertLeagueFromApi(sportId: string, data: ApiLeagueResponse, isMajor: boolean = false): Promise<string> {
         const slug = data.league.name
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
@@ -465,6 +465,7 @@ export class SportsRepository {
                     logo_url: data.league.logo,
                     country: data.country.name,
                     country_id: countryId,
+                    is_major: isMajor || existing.is_major,
                     updated_at: new Date(),
                 })
                 .where(eq(leaguesTable.id, existing.id));
@@ -480,6 +481,7 @@ export class SportsRepository {
             type: data.league.type,
             country: data.country.name,
             logo_url: data.league.logo,
+            is_major: isMajor,
             is_active: true,
         }).returning();
 

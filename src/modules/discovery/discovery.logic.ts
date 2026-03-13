@@ -1,10 +1,19 @@
 import { db } from "../../config/config.db";
 import { venuesTable } from "../../config/db/venues.table";
-import { matchesTable } from "../../config/db/matches.table";
-import { eq, and, gte, lte, ilike, or, isNull, asc, desc, sql } from "drizzle-orm";
+import { matchesTable, venueMatchesTable } from "../../config/db/matches.table";
+import { teamsTable, userPreferencesTable, openingHoursExceptionsTable, leaguesTable, userLeagueFollowsTable } from "../../config/db/schema";
+import { eq, and, gte, lte, ilike, or, isNull, asc, desc, sql, inArray } from "drizzle-orm";
+
+import { DiscoveryRepository } from "../../repository/discovery.repository";
+import { MatchesLogic } from "../matches/matches.logic";
 
 export class DiscoveryLogic {
-    async search(params: any) {
+    constructor(
+        private readonly discoveryRepository: DiscoveryRepository = new DiscoveryRepository(),
+        private readonly matchesLogic: MatchesLogic = new MatchesLogic(),
+    ) {}
+
+    public async search(params: any) {
         const {
             q = "",
             type = "all",
@@ -19,9 +28,11 @@ export class DiscoveryLogic {
         const pageNum = Math.max(1, parseInt(page));
         const limitNum = Math.min(50, Math.max(1, parseInt(limit)));
         const offset = (pageNum - 1) * limitNum;
-        const userLat = lat ? parseFloat(lat) : null;
-        const userLng = lng ? parseFloat(lng) : null;
-        const radiusKm = parseFloat(radius_km);
+        
+        // Use a more robust check for coordinates
+        const userLat = lat && !isNaN(parseFloat(lat)) ? parseFloat(lat) : null;
+        const userLng = lng && !isNaN(parseFloat(lng)) ? parseFloat(lng) : null;
+        const radiusKm = !isNaN(parseFloat(radius_km)) ? parseFloat(radius_km) : 500000;
         const searchQuery = q.trim().toLowerCase();
 
         let venues: any[] = [];
@@ -43,10 +54,12 @@ export class DiscoveryLogic {
                 )!);
             }
 
-            if (userLat && userLng) {
+            // Only apply spatial filter if coordinates are valid and radius is reasonable
+            // If radius is "gigantic" (>= 20,000km), we skip the filter to show all venues
+            if (userLat !== null && userLng !== null && radiusKm < 20000) {
                 const distanceMeters = radiusKm * 1000;
                 venueConditions.push(sql`ST_DWithin(
-                    ${venuesTable.location}::geography, 
+                    ST_SetSRID(${venuesTable.location}, 4326)::geography, 
                     ST_SetSRID(ST_MakePoint(${userLng}, ${userLat}), 4326)::geography, 
                     ${distanceMeters}
                 )`);
@@ -60,9 +73,9 @@ export class DiscoveryLogic {
             totalVenues = Number(venueCount?.count ?? 0);
 
             let orderBy: any = desc(venuesTable.created_at);
-            if (userLat && userLng) {
+            if (userLat !== null && userLng !== null) {
                 orderBy = sql`ST_Distance(
-                    ${venuesTable.location}::geography, 
+                    ST_SetSRID(${venuesTable.location}, 4326)::geography, 
                     ST_SetSRID(ST_MakePoint(${userLng}, ${userLat}), 4326)::geography
                 )`;
             }
@@ -75,7 +88,7 @@ export class DiscoveryLogic {
                 with: { photos: true },
             });
 
-            if (userLat && userLng) {
+            if (userLat !== null && userLng !== null) {
                 venues = venues.map(v => ({
                     ...v,
                     distance: v.latitude && v.longitude
@@ -166,7 +179,7 @@ export class DiscoveryLogic {
         };
     }
 
-    async getNearby(lat: number, lng: number, radiusKm: number = 10) {
+    public async getNearby(lat: number, lng: number, radiusKm: number = 10) {
         const distanceMeters = radiusKm * 1000;
         
         const venueConditions = [
@@ -201,7 +214,7 @@ export class DiscoveryLogic {
         }));
     }
 
-    async getVenueDetails(venueId: string) {
+    public async getVenueDetails(venueId: string, userId?: string) {
         const venue = await db.query.venuesTable.findFirst({
             where: and(
                 eq(venuesTable.id, venueId),
@@ -214,6 +227,11 @@ export class DiscoveryLogic {
 
         if (!venue) {
             throw new Error("VENUE_NOT_FOUND");
+        }
+
+        // Record view in history if userId provided
+        if (userId) {
+            await this.discoveryRepository.recordVenueView(userId, venueId);
         }
 
         // Fetch matches for this venue
@@ -242,6 +260,287 @@ export class DiscoveryLogic {
                 availableCapacity: vm.available_capacity,
                 totalCapacity: vm.total_capacity,
             })),
+        };
+    }
+
+    async getVenueHistory(userId: string, limit: number = 10) {
+        return await this.discoveryRepository.getVenueHistory(userId, limit);
+    }
+
+    public async clearVenueHistory(userId: string) {
+        return await this.discoveryRepository.clearVenueHistory(userId);
+    }
+
+    /**
+     * Toggle league follow status for a user.
+     */
+    async toggleLeagueFollow(userId: string, leagueId: string) {
+        const existing = await db.query.userLeagueFollowsTable.findFirst({
+            where: and(
+                eq(userLeagueFollowsTable.user_id, userId),
+                eq(userLeagueFollowsTable.league_id, leagueId)
+            )
+        });
+
+        if (existing) {
+            await db.delete(userLeagueFollowsTable)
+                .where(eq(userLeagueFollowsTable.id, existing.id));
+            return { followed: false };
+        } else {
+            await db.insert(userLeagueFollowsTable).values({
+                user_id: userId,
+                league_id: leagueId,
+            }).onConflictDoNothing();
+            return { followed: true };
+        }
+    }
+
+    /**
+     * Toggle team follow status for a user.
+     */
+    async toggleTeamFollow(userId: string, teamId: string) {
+        const existing = await db.query.userTeamFollowsTable.findFirst({
+            where: and(
+                eq(userTeamFollowsTable.user_id, userId),
+                eq(userTeamFollowsTable.team_id, teamId)
+            )
+        });
+
+        if (existing) {
+            await db.delete(userTeamFollowsTable)
+                .where(eq(userTeamFollowsTable.id, existing.id));
+            return { followed: false };
+        } else {
+            await db.insert(userTeamFollowsTable).values({
+                user_id: userId,
+                team_id: teamId,
+            }).onConflictDoNothing();
+            return { followed: true };
+        }
+    }
+
+    /**
+     * Get leagues followed by the user.
+     */
+    public async getFollowedLeagues(userId: string) {
+        const follows = await db.query.userLeagueFollowsTable.findMany({
+            where: eq(userLeagueFollowsTable.user_id, userId),
+            with: {
+                league: {
+                    with: {
+                        sport: true
+                    }
+                }
+            }
+        });
+
+        return follows.map(f => f.league);
+    }
+
+    /**
+     * Get details for teams followed by the user, including live status.
+     */
+    public async getFollowedTeams(userId: string) {
+        const prefs = await db.query.userPreferencesTable.findFirst({
+            where: eq(userPreferencesTable.user_id, userId),
+            columns: {
+                fav_team_ids: true,
+            }
+        });
+
+        const teamIds = prefs?.fav_team_ids || [];
+        if (teamIds.length === 0) return [];
+
+        // Fetch team details
+        const teams = await db.query.teamsTable.findMany({
+            where: inArray(teamsTable.id, teamIds),
+        });
+
+        // Check for live matches for these teams
+        const liveMatches = await this.matchesLogic.getMatches('live');
+        
+        return teams.map(team => {
+            const liveMatch = liveMatches.find(m => 
+                m.home_team_id === team.id || m.away_team_id === team.id
+            );
+
+            return {
+                ...team,
+                is_live: !!liveMatch,
+                live_match_id: liveMatch?.id || null,
+            };
+        });
+    }
+
+    /**
+     * Get prioritized upcoming matches for discovery.
+     * 1. Matches involving followed teams.
+     * 2. Matches from major leagues.
+     * Limited to 5 matches total.
+     */
+    public async getPrioritizedMatches(userId: string, teamIds: string[]) {
+        const now = new Date();
+        const limit = 5;
+
+        let prioritizedMatches: any[] = [];
+
+        // 1. Get matches for followed teams
+        if (teamIds.length > 0) {
+            prioritizedMatches = await db.query.matchesTable.findMany({
+                where: and(
+                    gte(matchesTable.scheduled_at, now),
+                    or(
+                        inArray(matchesTable.home_team_id, teamIds),
+                        inArray(matchesTable.away_team_id, teamIds)
+                    )
+                ),
+                with: {
+                    homeTeam: true,
+                    awayTeam: true,
+                    league: true,
+                },
+                orderBy: [asc(matchesTable.scheduled_at)],
+                limit: limit,
+            });
+        }
+
+        // 2. If we need more matches, fill with major leagues
+        if (prioritizedMatches.length < limit) {
+            const remainingLimit = limit - prioritizedMatches.length;
+            const existingIds = prioritizedMatches.map(m => m.id);
+
+            const majorLeagueMatches = await db.query.matchesTable.findMany({
+                where: and(
+                    gte(matchesTable.scheduled_at, now),
+                    sql`EXISTS (SELECT 1 FROM leagues l WHERE l.id = ${matchesTable.league_id} AND l.is_major = true)`,
+                    existingIds.length > 0 ? sql`${matchesTable.id} NOT IN (${sql.join(existingIds.map(id => sql`${id}`), sql`, `)})` : undefined
+                ),
+                with: {
+                    homeTeam: true,
+                    awayTeam: true,
+                    league: true,
+                },
+                orderBy: [asc(matchesTable.scheduled_at)],
+                limit: remainingLimit,
+            });
+
+            prioritizedMatches = [...prioritizedMatches, ...majorLeagueMatches];
+        }
+
+        return prioritizedMatches;
+    }
+
+    /**
+     * Get competition details including info, matches, and popular bars.
+     */
+    public async getCompetitionDetails(competitionId: string, userId?: string) {
+        // 1. Get competition info (League)
+        const competition = await db.query.leaguesTable.findFirst({
+            where: eq(leaguesTable.id, competitionId),
+            with: {
+                sport: true,
+            },
+        });
+
+        if (!competition) {
+            throw new Error("COMPETITION_NOT_FOUND");
+        }
+
+        // 2. Check if user follows this competition
+        let is_followed = false;
+        if (userId) {
+            const follow = await db.query.userLeagueFollowsTable.findFirst({
+                where: and(
+                    eq(userLeagueFollowsTable.user_id, userId),
+                    eq(userLeagueFollowsTable.league_id, competitionId)
+                )
+            });
+            is_followed = !!follow;
+        }
+
+        // 3. Get upcoming matches for this competition (next 7 days)
+        const now = new Date();
+        const nextWeek = new Date();
+        nextWeek.setDate(now.getDate() + 7);
+
+        const upcomingMatches = await db.query.matchesTable.findMany({
+            where: and(
+                eq(matchesTable.league_id, competitionId),
+                gte(matchesTable.scheduled_at, now),
+            ),
+            with: {
+                homeTeam: true,
+                awayTeam: true,
+            },
+            orderBy: [asc(matchesTable.scheduled_at)],
+            limit: 10,
+        });
+
+        // 4. Get best bars showing matches for this competition
+        const bestBars = await db.select({
+            id: venuesTable.id,
+            name: venuesTable.name,
+            type: venuesTable.type,
+            city: venuesTable.city,
+            average_rating: venuesTable.average_rating,
+            cover_image_url: venuesTable.cover_image_url,
+            latitude: venuesTable.latitude,
+            longitude: venuesTable.longitude,
+        })
+        .from(venuesTable)
+        .where(and(
+            isNull(venuesTable.deleted_at),
+            sql`EXISTS (
+                SELECT 1 FROM ${venueMatchesTable} vm
+                JOIN ${matchesTable} m ON m.id = vm.match_id
+                WHERE vm.venue_id = ${venuesTable.id}
+                AND m.league_id = ${competitionId}
+                AND m.scheduled_at >= ${now}
+            )`
+        ))
+        .orderBy(desc(venuesTable.average_rating))
+        .limit(10);
+
+        return {
+            competition: {
+                ...competition,
+                is_followed,
+            },
+            upcoming_matches: upcomingMatches,
+            best_bars: bestBars,
+            stats: {
+                matches_left: upcomingMatches.length,
+                partner_bars: bestBars.length,
+            }
+        };
+    }
+
+    /**
+     * Aggregate data for the Discover Home screen.
+     */
+    async getHomeData(userId: string, lat?: number, lng?: number) {
+        const prefs = await db.query.userPreferencesTable.findFirst({
+            where: eq(userPreferencesTable.user_id, userId),
+        });
+
+        const favSportIds = (prefs?.fav_sports || []) as string[];
+        const favTeamIds = (prefs?.fav_team_ids || []) as string[];
+
+        // Parallel fetch for all sections
+        const [banners, followedTeams, popularCompetitions, recentlyViewed, upcomingMatches] = await Promise.all([
+            this.discoveryRepository.getActiveBanners(favSportIds),
+            this.getFollowedTeams(userId),
+            this.discoveryRepository.getPopularCompetitions(favSportIds),
+            this.discoveryRepository.getVenueHistory(userId, 10),
+            this.getPrioritizedMatches(userId, favTeamIds),
+        ]);
+
+        return {
+            banners,
+            followed_teams: followedTeams,
+            popular_competitions: popularCompetitions,
+            recently_viewed: recentlyViewed,
+            upcoming_matches: upcomingMatches,
         };
     }
 

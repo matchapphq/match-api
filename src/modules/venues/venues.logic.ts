@@ -77,7 +77,7 @@ export class VenuesLogic {
         return await this.venueRepository.softDelete(venueId);
     }
 
-    async getDetails(venueId: string, userId?: string, ip?: string, userAgent?: string) {
+    public async getDetails(venueId: string, userId?: string, ip?: string, userAgent?: string) {
         const venue = await this.venueRepository.findById(venueId);
         if (!venue) throw new Error("VENUE_NOT_FOUND");
 
