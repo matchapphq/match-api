@@ -316,6 +316,24 @@ export class DiscoveryLogic {
     }
 
     /**
+     * Get leagues followed by the user.
+     */
+    public async getFollowedLeagues(userId: string) {
+        const follows = await db.query.userLeagueFollowsTable.findMany({
+            where: eq(userLeagueFollowsTable.user_id, userId),
+            with: {
+                league: {
+                    with: {
+                        sport: true
+                    }
+                }
+            }
+        });
+
+        return follows.map(f => f.league);
+    }
+
+    /**
      * Get details for teams followed by the user, including live status.
      */
     public async getFollowedTeams(userId: string) {

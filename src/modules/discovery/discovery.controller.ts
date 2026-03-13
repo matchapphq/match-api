@@ -128,6 +128,32 @@ class DiscoveryController {
         }
     });
 
+    readonly getFollowedTeams = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get("user")?.id;
+        if (!userId) return ctx.json({ error: "Unauthorized" }, 401);
+
+        try {
+            const result = await this.discoveryLogic.getFollowedTeams(userId);
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error fetching followed teams:", error);
+            return ctx.json({ error: "Failed to fetch followed teams" }, 500);
+        }
+    });
+
+    readonly getFollowedLeagues = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get("user")?.id;
+        if (!userId) return ctx.json({ error: "Unauthorized" }, 401);
+
+        try {
+            const result = await this.discoveryLogic.getFollowedLeagues(userId);
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error fetching followed leagues:", error);
+            return ctx.json({ error: "Failed to fetch followed leagues" }, 500);
+        }
+    });
+
     readonly getCompetitionDetails = this.factory.createHandlers(async (ctx) => {
         const competitionId = ctx.req.param("competitionId") as string;
         const userId = ctx.get("user")?.id;
