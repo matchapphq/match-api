@@ -118,6 +118,43 @@ export class ReviewsRepository {
         return true;
     }
 
+    async getRatingDistribution(venueId: string) {
+        const stats = await db.select({
+            rating: reviewsTable.rating,
+            count: count(),
+        })
+        .from(reviewsTable)
+        .where(and(
+            eq(reviewsTable.venue_id, venueId),
+            isNull(reviewsTable.deleted_at)
+        ))
+        .groupBy(reviewsTable.rating);
+
+        // Convert to a fixed 1-5 distribution
+        const distribution = [
+            { stars: 5, count: 0 },
+            { stars: 4, count: 0 },
+            { stars: 3, count: 0 },
+            { stars: 2, count: 0 },
+            { stars: 1, count: 0 },
+        ];
+
+        let total = 0;
+        stats.forEach(s => {
+            const item = distribution.find(d => d.stars === s.rating);
+            if (item) {
+                item.count = Number(s.count);
+                total += item.count;
+            }
+        });
+
+        return distribution.map(d => ({
+            stars: d.stars,
+            count: d.count,
+            percentage: total > 0 ? Math.round((d.count / total) * 100) : 0
+        }));
+    }
+
     async markHelpful(reviewId: string, userId: string, isHelpful: boolean) {
         return await db.transaction(async (tx) => {
             // Upsert helpful vote

@@ -32,12 +32,15 @@ class ReviewsController {
         const { page, limit } = ctx.req.query();
 
         try {
-            const reviews = await this.reviewsLogic.getVenueReviews(
-                venueId, 
-                page ? parseInt(page) : 1, 
-                limit ? parseInt(limit) : 20
-            );
-            return ctx.json(reviews);
+            const [reviews, stats] = await Promise.all([
+                this.reviewsLogic.getVenueReviews(
+                    venueId, 
+                    page ? parseInt(page) : 1, 
+                    limit ? parseInt(limit) : 20
+                ),
+                this.reviewsLogic.getVenueReviewStats(venueId)
+            ]);
+            return ctx.json({ reviews, stats });
         } catch (error: any) {
             console.error("Error fetching reviews:", error);
             return ctx.json({ error: "Failed to fetch reviews" }, 500);

@@ -20,6 +20,10 @@ export class ReviewsLogic {
         return await this.repository.findByVenueId(venueId, limit, offset);
     }
 
+    async getVenueReviewStats(venueId: string) {
+        return await this.repository.getRatingDistribution(venueId);
+    }
+
     async deleteReview(reviewId: string, userId: string) {
         const result = await this.repository.delete(reviewId, userId);
         if (!result) {
