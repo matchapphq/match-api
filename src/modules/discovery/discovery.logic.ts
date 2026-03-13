@@ -292,6 +292,30 @@ export class DiscoveryLogic {
     }
 
     /**
+     * Toggle team follow status for a user.
+     */
+    async toggleTeamFollow(userId: string, teamId: string) {
+        const existing = await db.query.userTeamFollowsTable.findFirst({
+            where: and(
+                eq(userTeamFollowsTable.user_id, userId),
+                eq(userTeamFollowsTable.team_id, teamId)
+            )
+        });
+
+        if (existing) {
+            await db.delete(userTeamFollowsTable)
+                .where(eq(userTeamFollowsTable.id, existing.id));
+            return { followed: false };
+        } else {
+            await db.insert(userTeamFollowsTable).values({
+                user_id: userId,
+                team_id: teamId,
+            }).onConflictDoNothing();
+            return { followed: true };
+        }
+    }
+
+    /**
      * Get details for teams followed by the user, including live status.
      */
     public async getFollowedTeams(userId: string) {
