@@ -130,9 +130,27 @@ export class DiscoveryRepository {
 
     /**
      * Get popular competitions (leagues) limited to 3 per sport.
-     * Prioritizes major leagues within each sport.
+     * Prioritizes major leagues within each sport and sorts sports by user preference.
      */
-    async getPopularCompetitions() {
+    async getPopularCompetitions(favSportIdentifiers: string[] = []) {
+        // Resolve identifiers (could be UUIDs or slugs) to UUIDs
+        let resolvedSportIds: string[] = [];
+        if (favSportIdentifiers.length > 0) {
+            const isUuid = (str: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+            const uuids = favSportIdentifiers.filter(isUuid);
+            const slugs = favSportIdentifiers.filter(s => !isUuid(s));
+
+            resolvedSportIds = [...uuids];
+
+            if (slugs.length > 0) {
+                const matchingSports = await db.query.sportsTable.findMany({
+                    where: inArray(sportsTable.slug, slugs),
+                    columns: { id: true }
+                });
+                resolvedSportIds.push(...matchingSports.map(s => s.id));
+            }
+        }
+
         // Use a CTE with ROW_NUMBER to limit results per sport_id
         const sq = db.select({
             id: leaguesTable.id,
@@ -147,15 +165,29 @@ export class DiscoveryRepository {
         .where(eq(leaguesTable.is_active, true))
         .as('sq');
 
-        return await db.select({
+        const query = db.select({
             id: sq.id,
             name: sq.name,
             slug: sq.slug,
             logo_url: sq.logo_url,
             is_major: sq.is_major,
+            sport_id: sq.sport_id,
         })
         .from(sq)
-        .where(sql`${sq.row_number} <= 3`)
-        .orderBy(desc(sq.is_major), asc(sq.name));
+        .where(sql`${sq.row_number} <= 3`);
+
+        // Order by: 
+        // 1. Is it a favorite sport?
+        // 2. Is it a major competition?
+        // 3. Name
+        const orderBy = [];
+        
+        if (resolvedSportIds.length > 0) {
+            orderBy.push(sql`CASE WHEN ${sq.sport_id} IN (${sql.join(resolvedSportIds.map(id => sql`${id}`), sql`, `)}) THEN 0 ELSE 1 END`);
+        }
+        
+        orderBy.push(desc(sq.is_major), asc(sq.name));
+
+        return await query.orderBy(...orderBy);
     }
 }

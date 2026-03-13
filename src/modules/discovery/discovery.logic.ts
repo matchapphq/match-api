@@ -530,7 +530,7 @@ export class DiscoveryLogic {
         const [banners, followedTeams, popularCompetitions, recentlyViewed, upcomingMatches] = await Promise.all([
             this.discoveryRepository.getActiveBanners(favSportIds),
             this.getFollowedTeams(userId),
-            this.discoveryRepository.getPopularCompetitions(),
+            this.discoveryRepository.getPopularCompetitions(favSportIds),
             this.discoveryRepository.getVenueHistory(userId, 10),
             this.getPrioritizedMatches(userId, favTeamIds),
         ]);
