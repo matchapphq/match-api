@@ -2,6 +2,7 @@ import { relations } from 'drizzle-orm';
 import { usersTable, userPreferencesTable } from './user.table';
 import { userAddressesTable } from './user-addresses.table';
 import { userFavoriteVenuesTable } from './user-favorites.table';
+import { userLeagueFollowsTable } from './user-league-follows.table';
 import { venuesTable } from './venues.table';
 import { venuePhotosTable } from './venue-photos.table';
 import { countriesTable, sportsTable, leaguesTable, teamsTable } from './sports.table';
@@ -27,6 +28,7 @@ export const usersRelations = relations(usersTable, ({ one, many }) => ({
     }),
     addresses: many(userAddressesTable),
     favorites: many(userFavoriteVenuesTable),
+    leagueFollows: many(userLeagueFollowsTable),
     venueHistory: many(userVenueHistoryTable),
     venues: many(venuesTable), // Owned venues
     reservations: many(reservationsTable),
@@ -67,6 +69,17 @@ export const userFavoriteVenuesRelations = relations(userFavoriteVenuesTable, ({
     venue: one(venuesTable, {
         fields: [userFavoriteVenuesTable.venue_id],
         references: [venuesTable.id],
+    }),
+}));
+
+export const userLeagueFollowsRelations = relations(userLeagueFollowsTable, ({ one }) => ({
+    user: one(usersTable, {
+        fields: [userLeagueFollowsTable.user_id],
+        references: [usersTable.id],
+    }),
+    league: one(leaguesTable, {
+        fields: [userLeagueFollowsTable.league_id],
+        references: [leaguesTable.id],
     }),
 }));
 
@@ -129,6 +142,7 @@ export const leaguesRelations = relations(leaguesTable, ({ one, many }) => ({
         references: [countriesTable.id],
     }),
     teams: many(teamsTable),
+    follows: many(userLeagueFollowsTable),
 }));
 
 export const teamsRelations = relations(teamsTable, ({ one }) => ({
@@ -193,8 +207,6 @@ export const seatsRelations = relations(seatsTable, ({ one }) => ({
     }),
 }));
 
-// ... existing relations ...
-
 export const tablesRelations = relations(tablesTable, ({ one, many }) => ({
     venue: one(venuesTable, {
         fields: [tablesTable.venue_id],
@@ -219,7 +231,6 @@ export const tableHoldsRelations = relations(tableHoldsTable, ({ one }) => ({
     }),
 }));
 
-// Update reservationsRelations
 export const reservationsRelations = relations(reservationsTable, ({ one, many }) => ({
     user: one(usersTable, {
         fields: [reservationsTable.user_id],
@@ -303,7 +314,6 @@ export const invoicesRelations = relations(invoicesTable, ({ one }) => ({
     }),
 }));
 
-// Transactions are for venue owner billing (commission model) - users don't pay for reservations
 export const transactionsRelations = relations(transactionsTable, ({ one }) => ({
     user: one(usersTable, {
         fields: [transactionsTable.user_id],
@@ -344,10 +354,6 @@ export const bannedUsersRelations = relations(bannedUsersTable, ({ one }) => ({
     }),
 }));
 
-// ============================================
-// WAITLIST RELATIONS
-// ============================================
-
 export const waitlistRelations = relations(waitlistTable, ({ one }) => ({
     user: one(usersTable, {
         fields: [waitlistTable.user_id],
@@ -358,10 +364,6 @@ export const waitlistRelations = relations(waitlistTable, ({ one }) => ({
         references: [venueMatchesTable.id],
     }),
 }));
-
-// ============================================
-// REFERRAL RELATIONS
-// ============================================
 
 export const referralCodesRelations = relations(referralCodesTable, ({ one }) => ({
     user: one(usersTable, {

@@ -2,6 +2,7 @@ export * from "./enums";
 export * from "./user.table";
 export * from "./user-addresses.table";
 export * from "./user-favorites.table";
+export * from "./user-league-follows.table";
 export * from "./venues.table";
 export * from "./venue-photos.table";
 export * from "./venue-amenities.table";
