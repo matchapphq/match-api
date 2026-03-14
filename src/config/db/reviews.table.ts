@@ -1,5 +1,4 @@
-import { pgTable, varchar, boolean, timestamp, uuid, index, foreignKey, integer, text, unique, jsonb } from 'drizzle-orm/pg-core';
-import { sql as drizzleSql } from 'drizzle-orm';
+import { pgTable, varchar, boolean, timestamp, uuid, index, foreignKey, integer, text, unique } from 'drizzle-orm/pg-core';
 import { usersTable } from './user.table';
 import { venuesTable } from './venues.table';
 
@@ -17,9 +16,6 @@ export const reviewsTable = pgTable(
         rating: integer('rating').notNull(),
         title: varchar('title', { length: 200 }), // Optional title
         content: text('content').notNull(),
-
-        // Selected tags from user feedback
-        tags: jsonb('tags').default(drizzleSql`'[]'::jsonb`),
 
         // Review aspects
         atmosphere_rating: integer('atmosphere_rating'),

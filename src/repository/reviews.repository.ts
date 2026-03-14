@@ -10,7 +10,6 @@ export class ReviewsRepository {
             venue_id: data.venue_id,
             rating: data.rating,
             content: data.content,
-            tags: data.tags || [],
             title: data.title || "",
             atmosphere_rating: data.atmosphere_rating,
             food_rating: data.food_rating,
@@ -68,7 +67,7 @@ export class ReviewsRepository {
                         id: true,
                         first_name: true,
                         last_name: true,
-                        avatar: true,
+                        avatar_url: true,
                     }
                 }
             }

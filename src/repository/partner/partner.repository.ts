@@ -119,9 +119,85 @@ export class PartnerRepository {
      * Get all venues owned by a user
      */
     async getVenuesByOwnerId(ownerId: string) {
-        return await db.select()
-            .from(venuesTable)
-            .where(eq(venuesTable.owner_id, ownerId));
+        const venues = await db.query.venuesTable.findMany({
+            where: eq(venuesTable.owner_id, ownerId),
+            with: {
+                photos: true,
+            },
+        });
+
+        if (venues.length === 0) {
+            return venues;
+        }
+
+        const venueIds = venues.map((venue) => venue.id);
+
+        const now = new Date();
+        const currentStart = new Date(now);
+        currentStart.setDate(now.getDate() - 30);
+        const previousStart = new Date(now);
+        previousStart.setDate(now.getDate() - 60);
+
+        const matchStats = await db.select({
+            venue_id: venueMatchesTable.venue_id,
+            matches_count: sql<number>`COUNT(*)::int`,
+            current_30d: sql<number>`
+                COUNT(*) FILTER (
+                    WHERE ${matchesTable.scheduled_at} >= ${currentStart}
+                      AND ${matchesTable.scheduled_at} < ${now}
+                )::int
+            `,
+            previous_30d: sql<number>`
+                COUNT(*) FILTER (
+                    WHERE ${matchesTable.scheduled_at} >= ${previousStart}
+                      AND ${matchesTable.scheduled_at} < ${currentStart}
+                )::int
+            `,
+        })
+            .from(venueMatchesTable)
+            .innerJoin(matchesTable, eq(matchesTable.id, venueMatchesTable.match_id))
+            .where(and(
+                inArray(venueMatchesTable.venue_id, venueIds),
+                eq(venueMatchesTable.is_active, true),
+            ))
+            .groupBy(venueMatchesTable.venue_id);
+
+        const statsByVenue = new Map<string, {
+            matchesCount: number;
+            current: number;
+            previous: number;
+            growth: number | null;
+        }>();
+        for (const item of matchStats) {
+            const matchesCount = Number(item.matches_count) || 0;
+            const current = Number(item.current_30d) || 0;
+            const previous = Number(item.previous_30d) || 0;
+
+            let growth: number | null = 0;
+            if (previous === 0 && current > 0) {
+                growth = null;
+            } else if (previous > 0) {
+                growth = Math.round(((current - previous) / previous) * 100);
+            }
+
+            statsByVenue.set(item.venue_id, { matchesCount, current, previous, growth });
+        }
+
+        return venues.map((venue) => {
+            const stats = statsByVenue.get(venue.id) ?? {
+                matchesCount: 0,
+                current: 0,
+                previous: 0,
+                growth: 0,
+            };
+            return {
+                ...venue,
+                matches_count: stats.matchesCount,
+                matches_current_30d: stats.current,
+                matches_previous_30d: stats.previous,
+                matches_growth_percent: stats.growth,
+            };
+        });
     }
 
     /**
