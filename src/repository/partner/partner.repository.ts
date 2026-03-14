@@ -119,9 +119,12 @@ export class PartnerRepository {
      * Get all venues owned by a user
      */
     async getVenuesByOwnerId(ownerId: string) {
-        return await db.select()
-            .from(venuesTable)
-            .where(eq(venuesTable.owner_id, ownerId));
+        return await db.query.venuesTable.findMany({
+            where: eq(venuesTable.owner_id, ownerId),
+            with: {
+                photos: true,
+            },
+        });
     }
 
     /**
