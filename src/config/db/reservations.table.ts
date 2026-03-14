@@ -8,7 +8,7 @@ import { tablesTable } from './tables.table';
 // 15. RESERVATIONS TABLE
 // Note: Reservations are FREE for users. Users simply book a table
 // for a match, similar to a restaurant reservation. No payment required.
-// The venue owner pays for the platform subscription, not the users.
+// The venue owner is billed via commission model, not the users.
 // ============================================
 
 export const reservationsTable = pgTable(
@@ -39,6 +39,11 @@ export const reservationsTable = pgTable(
 
         // QR Code for check-in
         qr_code: text('qr_code').unique(),
+
+        // Billing info for new economic model
+        is_billed: boolean('is_billed').default(false),
+        billed_at: timestamp('billed_at', { withTimezone: true }),
+        commission_rate: numeric('commission_rate', { precision: 10, scale: 2 }),
 
         created_at: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
         updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),

@@ -14,7 +14,7 @@ export const reviewsTable = pgTable(
         venue_id: uuid('venue_id').notNull(),
 
         rating: integer('rating').notNull(),
-        title: varchar('title', { length: 200 }).notNull(),
+        title: varchar('title', { length: 200 }), // Optional title
         content: text('content').notNull(),
 
         // Review aspects

@@ -1,5 +1,7 @@
 import { db } from "../config/config.db";
 import { waitlistTable } from "../config/db/waitlist.table";
+import { venueMatchesTable } from "../config/db/matches.table";
+import { venuesTable } from "../config/db/venues.table";
 import { eq, and, asc, lte } from "drizzle-orm";
 
 export class WaitlistRepository {
@@ -259,6 +261,28 @@ export class WaitlistRepository {
         return await db.query.waitlistTable.findFirst({
             where: eq(waitlistTable.id, waitlistId),
         });
+    }
+
+    /**
+     * Resolve venue operational state for a waitlist entry owned by a specific partner.
+     * Returns null when the entry does not exist or does not belong to the owner.
+     */
+    async getVenueOperationalStateByWaitlistEntry(waitlistId: string, ownerId: string) {
+        const rows = await db.select({
+            id: venuesTable.id,
+            is_active: venuesTable.is_active,
+            status: venuesTable.status,
+        })
+            .from(waitlistTable)
+            .innerJoin(venueMatchesTable, eq(waitlistTable.venue_match_id, venueMatchesTable.id))
+            .innerJoin(venuesTable, eq(venueMatchesTable.venue_id, venuesTable.id))
+            .where(and(
+                eq(waitlistTable.id, waitlistId),
+                eq(venuesTable.owner_id, ownerId),
+            ))
+            .limit(1);
+
+        return rows[0] ?? null;
     }
 
     /**

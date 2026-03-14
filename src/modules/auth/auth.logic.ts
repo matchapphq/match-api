@@ -12,6 +12,9 @@ import { verifyGoogleIdToken } from "../../utils/googleAuth";
 import { verifyAppleIdToken } from "../../utils/appleAuth";
 import { StorageService } from "../../services/storage.service";
 import { EmailType } from "../../types/mail.types";
+import { mapToClientUserProfile } from "../../utils/user-profile";
+import type { ClientUserProfile } from "../../types/user-profile.types";
+import { resolveHasPaymentMethodLive } from "../../utils/stripe-payment-method";
 
 const parsePositiveDays = (envValue: string | undefined, defaultDays: number): number => {
     const parsed = Number(envValue);
@@ -557,10 +560,6 @@ export class AuthLogic {
         }
     }
 
-    private normalizeStringArray(value: unknown): string[] {
-        return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
-    }
-
     private resolveCurrentSessionId(
         sessions: Array<{ id: string; updated_at: Date | string }>,
         tokenIssuedAt?: number,
@@ -629,35 +628,29 @@ export class AuthLogic {
         return this.toMs(deletedAt) <= Date.now() - this.accountDeletionGraceMs;
     }
 
-    private async getClientUser(userId: string) {
+    private async getClientUser(userId: string): Promise<ClientUserProfile> {
         const rows = await this.userRepository.getMe({ id: userId });
         if (!rows || rows.length === 0) {
             throw new Error("USER_CREATION_FAILED");
         }
 
         const user = rows[0]!;
-        const authProvider = user.google_id
-            ? "google"
-            : user.apple_id
-              ? "apple"
-              : "email";
+        const baseProfile = mapToClientUserProfile(
+            user,
+            this.storageService.getFullUrl(user.avatar_url),
+        );
+
+        const hasPaymentMethod = await resolveHasPaymentMethodLive(
+            user.stripe_customer_id,
+        );
 
         return {
-            id: user.id,
-            email: user.email,
-            role: user.role,
-            first_name: user.first_name,
-            last_name: user.last_name,
-            phone: user.phone,
-            avatar: this.storageService.getFullUrl(user.avatar_url),
-            auth_provider: authProvider,
-            preferences: {
-                sports: this.normalizeStringArray(user.fav_sports),
-                ambiance: this.normalizeStringArray(user.ambiances),
-                foodTypes: this.normalizeStringArray(user.venue_types),
-                budget: user.budget || "",
-            },
-            created_at: user.created_at,
+            ...baseProfile,
+            has_payment_method: hasPaymentMethod,
+            has_completed_onboarding:
+                baseProfile.role === "venue_owner"
+                    ? hasPaymentMethod
+                    : baseProfile.has_completed_onboarding,
         };
     }
 }

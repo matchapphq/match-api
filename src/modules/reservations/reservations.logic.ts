@@ -5,6 +5,7 @@ import { createQRPayload, generateQRCodeImage, parseQRContent, verifyQRPayload }
 import { notifyNewReservation, notifyReservationCancelled } from "../../services/notifications/notification.triggers";
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailType } from "../../types/mail.types";
+import { assertVenueIsActiveForOperations } from "../../utils/venue-active.guard";
 
 export class ReservationsLogic {
     constructor(
@@ -22,7 +23,12 @@ export class ReservationsLogic {
             throw new Error("VENUE_MATCH_NOT_FOUND");
         }
 
+        assertVenueIsActiveForOperations(venueMatch.venue);
+
         const bookingMode = venueMatch.venue?.booking_mode || 'INSTANT';
+
+        // Get commission rate (default 1.50 or venue override)
+        const commissionRate = (venueMatch.venue as any)?.commission_override || "1.50";
 
         // Check availability
         const availability = await this.capacityRepo.checkAvailability(venueMatchId, partySize);
@@ -56,6 +62,7 @@ export class ReservationsLogic {
                 partySize, 
                 specialRequests || "",
                 qrPayloadString,
+                commissionRate,
             );
 
             if (!reservation) {
@@ -122,6 +129,7 @@ export class ReservationsLogic {
                 partySize,
                 specialRequests || "",
                 requiresAccessibility ?? false,
+                commissionRate,
             );
 
             if (!reservation) throw new Error("RESERVATION_CREATION_FAILED");
@@ -234,6 +242,8 @@ export class ReservationsLogic {
         const reservation = await this.reservationRepo.findById(payload.rid);
         if (!reservation) throw new Error("RESERVATION_NOT_FOUND");
 
+        assertVenueIsActiveForOperations(reservation.venueMatch?.venue);
+
         if (reservation.status === 'checked_in') {
             return {
                 valid: true,
@@ -264,9 +274,29 @@ export class ReservationsLogic {
     }
 
     async checkIn(userId: string, reservationId: string) {
-        // TODO: Verify user is venue owner
+        // 1. Fetch reservation with venue info to verify ownership
+        const reservation = await this.reservationRepo.findById(reservationId);
+        if (!reservation) throw new Error("RESERVATION_NOT_FOUND");
+
+        // Verify user is the owner of the venue for this match
+        if (reservation.venueMatch?.venue?.owner_id !== userId) {
+            throw new Error("FORBIDDEN");
+        }
+
+        assertVenueIsActiveForOperations(reservation.venueMatch?.venue);
+
+        if (reservation.status === 'checked_in') {
+            return { message: "Guest already checked in", reservation };
+        }
+
+        // 2. Mark as checked in in DB
         const checkedIn = await this.reservationRepo.checkIn(reservationId);
-        if (!checkedIn) throw new Error("RESERVATION_NOT_FOUND_OR_CHECKED_IN");
+        if (!checkedIn) throw new Error("CHECK_IN_FAILED");
+
+        // 3. Commission is accrued now and collected by the monthly billing job.
+        if (!checkedIn.is_billed) {
+            console.log(`[Reservations] Commission accrued for reservation ${reservationId}. It will be collected at month end.`);
+        }
 
         return { message: "Guest checked in successfully!", reservation: checkedIn };
     }

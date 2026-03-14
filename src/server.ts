@@ -24,10 +24,13 @@ import HealthService from "./modules/health/health.routes";
 import NotificationsService from "./modules/notifications/notifications.routes";
 import ReferralService from "./modules/referral/referral.routes";
 import ReviewsService from "./modules/reviews/reviews.routes";
-import SubscriptionsService from "./modules/subscriptions/subscriptions.routes";
 import SupportService from "./modules/support/support.routes";
 import WebhooksService from "./modules/webhooks/webhooks.routes";
 import UserRepository from "./repository/user.repository";
+
+// Initialize Workers
+import "./workers/stripe.worker";
+import "./workers/notification.worker";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -42,7 +45,6 @@ const mediaRouter = new MediaService();
 // New Service Instances
 const reviewsRouter = new ReviewsService();
 const notificationsRouter = new NotificationsService();
-const subscriptionsRouter = new SubscriptionsService();
 const billingRouter = new BillingService();
 const analyticsRouter = new AnalyticsService();
 const couponsRouter = new CouponsService();
@@ -153,9 +155,6 @@ app.route("/notifications", notificationsRouter.getRouter);
 app.route("/support", supportRouter.getRouter);
 app.route("/webhooks", webhooksRouter.getRouter);
 app.route("/coupons", couponsRouter.getRouter);
-
-// Subscriptions (Venue Owners)
-app.route("/subscriptions", subscriptionsRouter.getRouter);
 
 // Invoices & Transactions
 // Service has /invoices, /transactions

@@ -19,6 +19,8 @@ class HealthService {
     protected initRoutes() {
         this.router.get("/", ...this.healthController.health);
         this.router.get("/test", ...this.healthController.test);
+        this.router.get("/stripe-test", ...this.healthController.testStripe);
+        this.router.get("/charge-test", ...this.healthController.testCharge);
     }
 }
 

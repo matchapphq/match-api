@@ -34,6 +34,12 @@ class ReservationsController {
         } catch (error: any) {
             if (error.message === "VENUE_MATCH_NOT_FOUND") return c.json({ error: "Venue match not found" }, 404);
             if (error.message === "NO_CAPACITY") return c.json({ error: "No capacity available" }, 409);
+            if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                return c.json({
+                    error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                    message: "Venue is inactive until a valid payment method is configured.",
+                }, 403);
+            }
             console.error("Create reservation error:", error);
             return c.json({ error: error.message || "Failed to create reservation" }, 500);
         }
@@ -181,6 +187,12 @@ class ReservationsController {
             if (error.message === "INVALID_QR_FORMAT") return c.json({ valid: false, error: "Invalid QR code format" }, 400);
             if (error.message === "INVALID_QR") return c.json({ valid: false, error: "Invalid or expired QR code" }, 400);
             if (error.message === "RESERVATION_NOT_FOUND") return c.json({ valid: false, error: "Reservation not found" }, 404);
+            if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                return c.json({
+                    error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                    message: "Venue is inactive until a valid payment method is configured.",
+                }, 403);
+            }
             if (error.message?.startsWith("RESERVATION_STATUS")) return c.json({ valid: false, error: `Invalid status: ${error.message}` }, 400);
             
             console.error("Verify QR error:", error);
@@ -203,6 +215,12 @@ class ReservationsController {
             return c.json(result);
         } catch (error: any) {
             if (error.message === "RESERVATION_NOT_FOUND_OR_CHECKED_IN") return c.json({ error: "Reservation not found or already checked in" }, 404);
+            if (error.message === "VENUE_INACTIVE_PAYMENT_REQUIRED") {
+                return c.json({
+                    error: "VENUE_INACTIVE_PAYMENT_REQUIRED",
+                    message: "Venue is inactive until a valid payment method is configured.",
+                }, 403);
+            }
             console.error("Check-in error:", error);
             return c.json({ error: "Failed to check in" }, 500);
         }

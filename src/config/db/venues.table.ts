@@ -15,8 +15,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { sql as drizzleSql } from 'drizzle-orm';
 import { usersTable } from './user.table';
-import { subscriptionsTable } from './subscriptions.table';
-import { venueTypeEnum, venueStatusEnum, subscriptionLevelEnum, subscriptionStatusEnum, bookingModeEnum } from './enums';
+import { venueTypeEnum, venueStatusEnum, bookingModeEnum } from './enums';
 
 // ============================================
 // TYPES
@@ -65,7 +64,6 @@ export type VerificationDocuments = VerificationDocument[];
 export const venuesTable = pgTable('venues', {
         id: uuid('id').primaryKey().defaultRandom(),
         owner_id: uuid('owner_id').notNull(),
-        subscription_id: uuid('subscription_id').notNull(),
 
         // Basic Info
         name: varchar('name', { length: 255 }).notNull(),
@@ -81,7 +79,7 @@ export const venuesTable = pgTable('venues', {
         country: varchar('country', { length: 100 }).notNull(),
 
         // PostGIS
-        location: geometry('location', { mode: 'xy' }).notNull(),
+        location: geometry('location', { type: 'point', srid: 4326 }).notNull(),
         latitude: doublePrecision('latitude'),
         longitude: doublePrecision('longitude'),
 
@@ -108,10 +106,6 @@ export const venuesTable = pgTable('venues', {
         logo_url: text('logo_url'),
         cover_image_url: text('cover_image_url'),
 
-        // Subscription & Access
-        subscription_status: subscriptionStatusEnum('subscription_status').default('active').notNull(),
-        subscription_level: subscriptionLevelEnum('subscription_level').default('basic'),
-
         // Status
         status: venueStatusEnum('status').default('pending').notNull(),
         is_active: boolean('is_active').default(true),
@@ -121,8 +115,15 @@ export const venuesTable = pgTable('venues', {
         // Booking Mode: INSTANT = auto confirm, REQUEST = owner must confirm
         booking_mode: bookingModeEnum('booking_mode').default('INSTANT').notNull(),
 
+        // Billing
+        commission_override: numeric('commission_override', { precision: 10, scale: 2 }),
+
         // Stats
         average_rating: numeric('average_rating', { precision: 3, scale: 2 }).default('0.00'),
+        average_atmosphere_rating: numeric('average_atmosphere_rating', { precision: 3, scale: 2 }).default('0.00'),
+        average_food_rating: numeric('average_food_rating', { precision: 3, scale: 2 }).default('0.00'),
+        average_service_rating: numeric('average_service_rating', { precision: 3, scale: 2 }).default('0.00'),
+        average_value_rating: numeric('average_value_rating', { precision: 3, scale: 2 }).default('0.00'),
         total_reviews: integer('total_reviews').default(0),
         total_reservations: integer('total_reservations').default(0),
 
@@ -132,7 +133,6 @@ export const venuesTable = pgTable('venues', {
         deleted_at: timestamp('deleted_at', { withTimezone: true }),
     }, (table) => [
         index('idx_venues_owner_id').on(table.owner_id),
-        index('idx_venues_subscription_id').on(table.subscription_id),
         index('idx_venues_status').on(table.status),
         index('idx_venues_city').on(table.city),
         index('idx_venues_is_active').on(table.is_active),
@@ -141,12 +141,6 @@ export const venuesTable = pgTable('venues', {
             foreignColumns: [usersTable.id],
             name: 'fk_venues_owner_id',
         }).onDelete('cascade'),
-        foreignKey({
-            columns: [table.subscription_id],
-            foreignColumns: [subscriptionsTable.id],
-            name: 'fk_venues_subscription_id',
-            // .onDelete('restrict') might be cleaner, keeping original logic
-        }).onDelete('restrict'),
     ],
 );
 

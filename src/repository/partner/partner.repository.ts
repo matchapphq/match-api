@@ -119,9 +119,85 @@ export class PartnerRepository {
      * Get all venues owned by a user
      */
     async getVenuesByOwnerId(ownerId: string) {
-        return await db.select()
-            .from(venuesTable)
-            .where(eq(venuesTable.owner_id, ownerId));
+        const venues = await db.query.venuesTable.findMany({
+            where: eq(venuesTable.owner_id, ownerId),
+            with: {
+                photos: true,
+            },
+        });
+
+        if (venues.length === 0) {
+            return venues;
+        }
+
+        const venueIds = venues.map((venue) => venue.id);
+
+        const now = new Date();
+        const currentStart = new Date(now);
+        currentStart.setDate(now.getDate() - 30);
+        const previousStart = new Date(now);
+        previousStart.setDate(now.getDate() - 60);
+
+        const matchStats = await db.select({
+            venue_id: venueMatchesTable.venue_id,
+            matches_count: sql<number>`COUNT(*)::int`,
+            current_30d: sql<number>`
+                COUNT(*) FILTER (
+                    WHERE ${matchesTable.scheduled_at} >= ${currentStart}
+                      AND ${matchesTable.scheduled_at} < ${now}
+                )::int
+            `,
+            previous_30d: sql<number>`
+                COUNT(*) FILTER (
+                    WHERE ${matchesTable.scheduled_at} >= ${previousStart}
+                      AND ${matchesTable.scheduled_at} < ${currentStart}
+                )::int
+            `,
+        })
+            .from(venueMatchesTable)
+            .innerJoin(matchesTable, eq(matchesTable.id, venueMatchesTable.match_id))
+            .where(and(
+                inArray(venueMatchesTable.venue_id, venueIds),
+                eq(venueMatchesTable.is_active, true),
+            ))
+            .groupBy(venueMatchesTable.venue_id);
+
+        const statsByVenue = new Map<string, {
+            matchesCount: number;
+            current: number;
+            previous: number;
+            growth: number | null;
+        }>();
+        for (const item of matchStats) {
+            const matchesCount = Number(item.matches_count) || 0;
+            const current = Number(item.current_30d) || 0;
+            const previous = Number(item.previous_30d) || 0;
+
+            let growth: number | null = 0;
+            if (previous === 0 && current > 0) {
+                growth = null;
+            } else if (previous > 0) {
+                growth = Math.round(((current - previous) / previous) * 100);
+            }
+
+            statsByVenue.set(item.venue_id, { matchesCount, current, previous, growth });
+        }
+
+        return venues.map((venue) => {
+            const stats = statsByVenue.get(venue.id) ?? {
+                matchesCount: 0,
+                current: 0,
+                previous: 0,
+                growth: 0,
+            };
+            return {
+                ...venue,
+                matches_count: stats.matchesCount,
+                matches_current_30d: stats.current,
+                matches_previous_30d: stats.previous,
+                matches_growth_percent: stats.growth,
+            };
+        });
     }
 
     /**
@@ -134,32 +210,45 @@ export class PartnerRepository {
         return venues.map(v => v.id);
     }
 
-    /**
-     * Update a venue's subscription_id
-     */
-    async updateVenueSubscription(venueId: string, subscriptionId: string) {
-        const [updated] = await db.update(venuesTable)
-            .set({ subscription_id: subscriptionId })
+    async updateVenueSubscription(venueId: string, _subscriptionId: string) {
+        const [venue] = await db.select()
+            .from(venuesTable)
             .where(eq(venuesTable.id, venueId))
-            .returning();
-        return updated;
+            .limit(1);
+        return venue || null;
     }
 
-    async updateVenueSubscriptionState(subscriptionId: string, data: {
+    async updateVenueSubscriptionState(_subscriptionId: string, _data: {
         subscription_status?: 'trialing' | 'active' | 'past_due' | 'canceled';
         is_active?: boolean;
         status?: 'pending' | 'approved' | 'rejected' | 'suspended';
     }) {
-        return db.update(venuesTable)
-            .set(data)
-            .where(eq(venuesTable.subscription_id, subscriptionId))
+        return [];
+    }
+
+    async activatePendingVenuesByOwner(ownerId: string) {
+        const updatedVenues = await db
+            .update(venuesTable)
+            .set({
+                is_active: true,
+                status: "approved",
+                updated_at: new Date(),
+            })
+            .where(and(
+                eq(venuesTable.owner_id, ownerId),
+                eq(venuesTable.status, "pending"),
+            ))
             .returning();
+
+        return updatedVenues.map((venue) => ({
+            id: venue.id,
+            name: venue.name,
+        }));
     }
 
     public async createVenue(data: {
         name: string;
         owner_id: string;
-        subscription_id: string;
         description?: string | null;
         street_address: string;
         city: string;
@@ -171,6 +260,9 @@ export class PartnerRepository {
         capacity?: number;
         type?: 'bar' | 'restaurant' | 'fast_food' | 'nightclub' | 'cafe' | 'lounge' | 'pub' | 'sports_bar';
         coords?: { lat: number, lng: number };
+        commission_override?: string;
+        status?: 'pending' | 'approved' | 'rejected' | 'suspended';
+        is_active?: boolean;
     }) {
         let lat = 0;
         let lng = 0;
@@ -203,7 +295,6 @@ export class PartnerRepository {
         const [newVenue] = await db.insert(venuesTable).values({
             name: data.name,
             owner_id: data.owner_id,
-            subscription_id: data.subscription_id,
             description: data.description || null,
             street_address: data.street_address,
             city: data.city,
@@ -218,8 +309,9 @@ export class PartnerRepository {
             latitude: finalLat,
             longitude: finalLng,
             type: data.type || 'sports_bar',
-            status: 'pending',
-            is_active: true,
+            status: data.status || 'pending',
+            is_active: data.is_active ?? true,
+            commission_override: data.commission_override || "1.50",
         }).returning();
 
         return newVenue;
@@ -258,15 +350,35 @@ export class PartnerRepository {
         return venues[0] || null;
     }
 
-    /**
-     * Get venue by subscription ID
-     */
-    async getVenueBySubscriptionId(subscriptionId: string) {
-        const venues = await db.select()
-            .from(venuesTable)
-            .where(eq(venuesTable.subscription_id, subscriptionId))
-            .limit(1);
-        return venues[0] || null;
+    async getReservationVenueByOwner(reservationId: string, ownerId: string) {
+        const reservation = await db.query.reservationsTable.findFirst({
+            where: eq(reservationsTable.id, reservationId),
+            with: {
+                venueMatch: {
+                    with: {
+                        venue: {
+                            columns: {
+                                id: true,
+                                owner_id: true,
+                                is_active: true,
+                                status: true,
+                            },
+                        },
+                    },
+                },
+            },
+        });
+
+        const venue = reservation?.venueMatch?.venue;
+        if (!venue || venue.owner_id !== ownerId) {
+            return null;
+        }
+
+        return venue;
+    }
+
+    async getVenueBySubscriptionId(_subscriptionId: string) {
+        return null;
     }
 
     /**

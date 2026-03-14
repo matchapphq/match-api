@@ -1,11 +1,91 @@
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailType } from "../../types/mail.types";
+import stripe from "../../config/stripe";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 export class HealthLogic {
     async checkHealth() {
         return "OK";
+    }
+
+    /**
+     * Test redirecting to Stripe Billing Portal using a dummy customer
+     * for verification/testing purposes without database dependency.
+     */
+    async testStripePaymentMethod() {
+        // Create a temporary dummy customer for this test
+        const customer = await stripe.customers.create({
+            email: `test-${Date.now()}@example.com`,
+            name: "Test User (Health Module)",
+            metadata: {
+                is_test: "true",
+                source: "health_test_module"
+            },
+        });
+
+        // Create Billing Portal Session for the dummy customer
+        const portalSession = await stripe.billingPortal.sessions.create({
+            customer: customer.id,
+            return_url: `${FRONTEND_URL}/health`, // Redirect back to health check
+        });
+
+        return {
+            portal_url: portalSession.url,
+            customer_id: customer.id,
+        };
+    }
+
+    /**
+     * Test charging a customer off-session using a saved payment method.
+     * This simulates the monthly commission collection ($1.50 per customer).
+     */
+    async testChargeCustomer(customerId: string, amountInCents: number = 150) {
+        // 1. Find the customer's default payment method
+        const paymentMethods = await stripe.paymentMethods.list({
+            customer: customerId,
+            type: 'card',
+        });
+
+        if (paymentMethods.data.length === 0) {
+            throw new Error("No saved card found for this customer. Please add one via the portal test first.");
+        }
+
+        const defaultPaymentMethod = paymentMethods.data[0];
+        if (!defaultPaymentMethod) {
+            throw new Error("No saved card found for this customer. Please add one via the portal test first.");
+        }
+
+        const paymentMethodId = defaultPaymentMethod.id;
+
+        // 2. Create and Confirm a PaymentIntent off-session
+        try {
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amountInCents,
+                currency: 'eur',
+                customer: customerId,
+                payment_method: paymentMethodId,
+                off_session: true, // Crucial: tells Stripe the user isn't present
+                confirm: true,     // Attempt to charge immediately
+            });
+
+            return {
+                status: paymentIntent.status,
+                transaction_id: paymentIntent.id,
+                amount: `${amountInCents / 100}€`,
+                message: "Off-session charge successful",
+            };
+        } catch (err: any) {
+            if (err.code === 'authentication_required') {
+                // This happens if the bank requires 3D Secure verification
+                return {
+                    status: "requires_action",
+                    client_secret: err.raw.payment_intent.client_secret,
+                    message: "Customer must authenticate this specific high-risk transaction",
+                };
+            }
+            throw err;
+        }
     }
 
     async testEmails(email: string, type: string = "all") {

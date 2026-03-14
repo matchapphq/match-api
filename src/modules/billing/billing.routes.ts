@@ -25,6 +25,11 @@ class BillingService {
     private initRoutes() {
         this.router.use("/invoices/*", authMiddleware);
         this.router.use("/transactions/*", authMiddleware);
+
+        // Pricing
+        this.router.get("/billing/pricing", ...this.controller.getPricing);
+        this.router.post("/billing/setup-checkout", authMiddleware, ...this.controller.createSetupCheckout);
+        this.router.get("/billing/payment-method", authMiddleware, ...this.controller.getPaymentMethod);
         
         // Invoices
         this.router.get("/invoices", authMiddleware, ...this.controller.getInvoices);
@@ -34,6 +39,9 @@ class BillingService {
         // Transactions
         this.router.get("/transactions", authMiddleware, ...this.controller.getTransactions);
         this.router.get("/transactions/:transactionId", ...this.controller.getTransactionDetails);
+
+        // Estimates
+        this.router.get("/accrued-commission", authMiddleware, ...this.controller.getAccruedCommission);
     }
 }
 

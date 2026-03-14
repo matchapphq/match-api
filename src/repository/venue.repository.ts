@@ -10,7 +10,7 @@ import { geocodeAddress } from "../utils/geocoding";
 
 export class VenueRepository {
 
-    public async create(userId: string, subscriptionId: string, input: CreateVenueInput) {
+    public async create(userId: string, input: CreateVenueInput) {
         return await db.transaction(async (tx) => {
             if (input.address && input.city && input.country && input.postalCode) {
                 try {
@@ -32,7 +32,6 @@ export class VenueRepository {
 
             const [newVenue] = await tx.insert(venuesTable).values({
                 owner_id: userId,
-                subscription_id: subscriptionId,
                 name: input.name,
                 street_address: input.address,
                 city: input.city ?? "Unknown",
@@ -127,7 +126,7 @@ export class VenueRepository {
             search,
             lat,
             lng,
-            distance_km = 10,
+            distance_km,
             sort = 'newest',
         } = query;
 
