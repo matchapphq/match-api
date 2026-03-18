@@ -552,9 +552,10 @@ export class DiscoveryLogic {
         const favTeamIds = teamFollows.map(f => f.team_id);
 
         // Parallel fetch for all sections
-        const [banners, followedTeams, popularCompetitions, recentlyViewed, upcomingMatches] = await Promise.all([
+        const [banners, followedTeams, followedLeagues, popularCompetitions, recentlyViewed, upcomingMatches] = await Promise.all([
             this.discoveryRepository.getActiveBanners(favSportIds),
             this.getFollowedTeams(userId),
+            this.getFollowedLeagues(userId),
             this.discoveryRepository.getPopularCompetitions(favSportIds),
             this.discoveryRepository.getVenueHistory(userId, 10),
             this.getPrioritizedMatches(userId, favTeamIds),
@@ -563,6 +564,7 @@ export class DiscoveryLogic {
         return {
             banners,
             followed_teams: followedTeams,
+            followed_leagues: followedLeagues,
             popular_competitions: popularCompetitions,
             recently_viewed: recentlyViewed,
             upcoming_matches: upcomingMatches,
