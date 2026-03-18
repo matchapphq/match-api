@@ -116,6 +116,7 @@ class UserController {
             const updateData = {
                 first_name: body.first_name,
                 last_name: body.last_name,
+                username: body.username,
                 email: body.email,
                 phone: body.phone,
                 bio: body.bio,
