@@ -30,7 +30,7 @@ export class ReviewsRepository {
             .from(reviewsTable)
             .where(and(
                 eq(reviewsTable.venue_id, data.venue_id),
-                isNull(reviewsTable.deleted_at)
+                isNull(reviewsTable.deleted_at),
             ));
 
             if (stats) {
@@ -54,7 +54,7 @@ export class ReviewsRepository {
         return await db.query.reviewsTable.findMany({
             where: and(
                 eq(reviewsTable.venue_id, venueId),
-                isNull(reviewsTable.deleted_at)
+                isNull(reviewsTable.deleted_at),
             ),
             orderBy: [desc(reviewsTable.created_at)],
             limit,
@@ -68,9 +68,9 @@ export class ReviewsRepository {
                         first_name: true,
                         last_name: true,
                         avatar_url: true,
-                    }
-                }
-            }
+                    },
+                },
+            },
         });
     }
 
@@ -79,7 +79,7 @@ export class ReviewsRepository {
             .from(reviewsTable)
             .where(and(
                 eq(reviewsTable.id, reviewId),
-                eq(reviewsTable.user_id, userId)
+                eq(reviewsTable.user_id, userId),
             ));
 
         if (!review) return null;
@@ -100,7 +100,7 @@ export class ReviewsRepository {
         .from(reviewsTable)
         .where(and(
             eq(reviewsTable.venue_id, review.venue_id),
-            isNull(reviewsTable.deleted_at)
+            isNull(reviewsTable.deleted_at),
         ));
 
         await db.update(venuesTable)
@@ -125,7 +125,7 @@ export class ReviewsRepository {
         .from(reviewsTable)
         .where(and(
             eq(reviewsTable.venue_id, venueId),
-            isNull(reviewsTable.deleted_at)
+            isNull(reviewsTable.deleted_at),
         ))
         .groupBy(reviewsTable.rating);
 
@@ -150,7 +150,7 @@ export class ReviewsRepository {
         return distribution.map(d => ({
             stars: d.stars,
             count: d.count,
-            percentage: total > 0 ? Math.round((d.count / total) * 100) : 0
+            percentage: total > 0 ? Math.round((d.count / total) * 100) : 0,
         }));
     }
 
@@ -164,7 +164,7 @@ export class ReviewsRepository {
             })
             .onConflictDoUpdate({
                 target: [reviewHelpfulTable.review_id, reviewHelpfulTable.user_id],
-                set: { is_helpful: isHelpful }
+                set: { is_helpful: isHelpful },
             });
 
         // Recalculate helpful counts
@@ -172,14 +172,14 @@ export class ReviewsRepository {
             .from(reviewHelpfulTable)
             .where(and(
                 eq(reviewHelpfulTable.review_id, reviewId),
-                eq(reviewHelpfulTable.is_helpful, true)
+                eq(reviewHelpfulTable.is_helpful, true),
             ));
 
         const [unhelpfulCount] = await db.select({ count: count() })
             .from(reviewHelpfulTable)
             .where(and(
                 eq(reviewHelpfulTable.review_id, reviewId),
-                eq(reviewHelpfulTable.is_helpful, false)
+                eq(reviewHelpfulTable.is_helpful, false),
             ));
 
         await db.update(reviewsTable)

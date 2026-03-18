@@ -11,7 +11,7 @@ export class ReviewsLogic {
         return await this.repository.create({
             user_id: userId,
             venue_id: venueId,
-            ...data
+            ...data,
         });
     }
 

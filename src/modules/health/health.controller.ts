@@ -26,7 +26,7 @@ class HealthController {
         } catch (error: any) {
             return ctx.json({ 
                 error: error.message,
-                hint: "Ensure your STRIPE_SECRET_KEY is valid and allows creating customers/portal sessions."
+                hint: "Ensure your STRIPE_SECRET_KEY is valid and allows creating customers/portal sessions.",
             }, 500);
         }
     });

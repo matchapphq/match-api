@@ -1,7 +1,7 @@
 import { db } from "../../config/config.db";
 import { venuesTable } from "../../config/db/venues.table";
 import { matchesTable, venueMatchesTable } from "../../config/db/matches.table";
-import { teamsTable, userPreferencesTable, openingHoursExceptionsTable, leaguesTable, userLeagueFollowsTable } from "../../config/db/schema";
+import { teamsTable, userPreferencesTable, openingHoursExceptionsTable, leaguesTable, userLeagueFollowsTable, sportsTable, countriesTable, userTeamFollowsTable } from "../../config/db/schema";
 import { eq, and, gte, lte, ilike, or, isNull, asc, desc, sql, inArray } from "drizzle-orm";
 
 import { DiscoveryRepository } from "../../repository/discovery.repository";
@@ -278,8 +278,8 @@ export class DiscoveryLogic {
         const existing = await db.query.userLeagueFollowsTable.findFirst({
             where: and(
                 eq(userLeagueFollowsTable.user_id, userId),
-                eq(userLeagueFollowsTable.league_id, leagueId)
-            )
+                eq(userLeagueFollowsTable.league_id, leagueId),
+            ),
         });
 
         if (existing) {
@@ -302,21 +302,41 @@ export class DiscoveryLogic {
         const existing = await db.query.userTeamFollowsTable.findFirst({
             where: and(
                 eq(userTeamFollowsTable.user_id, userId),
-                eq(userTeamFollowsTable.team_id, teamId)
-            )
+                eq(userTeamFollowsTable.team_id, teamId),
+            ),
         });
 
+        let isFollowed = false;
         if (existing) {
             await db.delete(userTeamFollowsTable)
                 .where(eq(userTeamFollowsTable.id, existing.id));
-            return { followed: false };
+            isFollowed = false;
         } else {
             await db.insert(userTeamFollowsTable).values({
                 user_id: userId,
                 team_id: teamId,
             }).onConflictDoNothing();
-            return { followed: true };
+            isFollowed = true;
         }
+
+        // Keep userPreferencesTable in sync for backward compatibility and aggregation
+        const allFollows = await db.query.userTeamFollowsTable.findMany({
+            where: eq(userTeamFollowsTable.user_id, userId),
+            columns: { team_id: true },
+        });
+        const teamIds = allFollows.map(f => f.team_id);
+
+        await db.insert(userPreferencesTable)
+            .values({
+                user_id: userId,
+                fav_team_ids: teamIds,
+            })
+            .onConflictDoUpdate({
+                target: userPreferencesTable.user_id,
+                set: { fav_team_ids: teamIds },
+            });
+
+        return { followed: isFollowed };
     }
 
     /**
@@ -328,10 +348,10 @@ export class DiscoveryLogic {
             with: {
                 league: {
                     with: {
-                        sport: true
-                    }
-                }
-            }
+                        sport: true,
+                    },
+                },
+            },
         });
 
         return follows.map(f => f.league);
@@ -341,27 +361,28 @@ export class DiscoveryLogic {
      * Get details for teams followed by the user, including live status.
      */
     public async getFollowedTeams(userId: string) {
-        const prefs = await db.query.userPreferencesTable.findFirst({
-            where: eq(userPreferencesTable.user_id, userId),
-            columns: {
-                fav_team_ids: true,
-            }
+        const follows = await db.query.userTeamFollowsTable.findMany({
+            where: eq(userTeamFollowsTable.user_id, userId),
         });
 
-        const teamIds = prefs?.fav_team_ids || [];
+        const teamIds = follows.map(f => f.team_id);
         if (teamIds.length === 0) return [];
 
         // Fetch team details
         const teams = await db.query.teamsTable.findMany({
             where: inArray(teamsTable.id, teamIds),
+            with: {
+                league: true,
+                country: true,
+            },
         });
 
         // Check for live matches for these teams
         const liveMatches = await this.matchesLogic.getMatches('live');
-        
+
         return teams.map(team => {
-            const liveMatch = liveMatches.find(m => 
-                m.home_team_id === team.id || m.away_team_id === team.id
+            const liveMatch = liveMatches.find(m =>
+                m.home_team_id === team.id || m.away_team_id === team.id,
             );
 
             return {
@@ -371,7 +392,6 @@ export class DiscoveryLogic {
             };
         });
     }
-
     /**
      * Get prioritized upcoming matches for discovery.
      * 1. Matches involving followed teams.
@@ -391,8 +411,8 @@ export class DiscoveryLogic {
                     gte(matchesTable.scheduled_at, now),
                     or(
                         inArray(matchesTable.home_team_id, teamIds),
-                        inArray(matchesTable.away_team_id, teamIds)
-                    )
+                        inArray(matchesTable.away_team_id, teamIds),
+                    ),
                 ),
                 with: {
                     homeTeam: true,
@@ -413,7 +433,7 @@ export class DiscoveryLogic {
                 where: and(
                     gte(matchesTable.scheduled_at, now),
                     sql`EXISTS (SELECT 1 FROM leagues l WHERE l.id = ${matchesTable.league_id} AND l.is_major = true)`,
-                    existingIds.length > 0 ? sql`${matchesTable.id} NOT IN (${sql.join(existingIds.map(id => sql`${id}`), sql`, `)})` : undefined
+                    existingIds.length > 0 ? sql`${matchesTable.id} NOT IN (${sql.join(existingIds.map(id => sql`${id}`), sql`, `)})` : undefined,
                 ),
                 with: {
                     homeTeam: true,
@@ -452,8 +472,8 @@ export class DiscoveryLogic {
             const follow = await db.query.userLeagueFollowsTable.findFirst({
                 where: and(
                     eq(userLeagueFollowsTable.user_id, userId),
-                    eq(userLeagueFollowsTable.league_id, competitionId)
-                )
+                    eq(userLeagueFollowsTable.league_id, competitionId),
+                ),
             });
             is_followed = !!follow;
         }
@@ -496,7 +516,7 @@ export class DiscoveryLogic {
                 WHERE vm.venue_id = ${venuesTable.id}
                 AND m.league_id = ${competitionId}
                 AND m.scheduled_at >= ${now}
-            )`
+            )`,
         ))
         .orderBy(desc(venuesTable.average_rating))
         .limit(10);
@@ -511,7 +531,7 @@ export class DiscoveryLogic {
             stats: {
                 matches_left: upcomingMatches.length,
                 partner_bars: bestBars.length,
-            }
+            },
         };
     }
 
@@ -519,17 +539,23 @@ export class DiscoveryLogic {
      * Aggregate data for the Discover Home screen.
      */
     async getHomeData(userId: string, lat?: number, lng?: number) {
-        const prefs = await db.query.userPreferencesTable.findFirst({
-            where: eq(userPreferencesTable.user_id, userId),
-        });
+        const [prefs, teamFollows] = await Promise.all([
+            db.query.userPreferencesTable.findFirst({
+                where: eq(userPreferencesTable.user_id, userId),
+            }),
+            db.query.userTeamFollowsTable.findMany({
+                where: eq(userTeamFollowsTable.user_id, userId),
+            }),
+        ]);
 
         const favSportIds = (prefs?.fav_sports || []) as string[];
-        const favTeamIds = (prefs?.fav_team_ids || []) as string[];
+        const favTeamIds = teamFollows.map(f => f.team_id);
 
         // Parallel fetch for all sections
-        const [banners, followedTeams, popularCompetitions, recentlyViewed, upcomingMatches] = await Promise.all([
+        const [banners, followedTeams, followedLeagues, popularCompetitions, recentlyViewed, upcomingMatches] = await Promise.all([
             this.discoveryRepository.getActiveBanners(favSportIds),
             this.getFollowedTeams(userId),
+            this.getFollowedLeagues(userId),
             this.discoveryRepository.getPopularCompetitions(favSportIds),
             this.discoveryRepository.getVenueHistory(userId, 10),
             this.getPrioritizedMatches(userId, favTeamIds),
@@ -538,6 +564,7 @@ export class DiscoveryLogic {
         return {
             banners,
             followed_teams: followedTeams,
+            followed_leagues: followedLeagues,
             popular_competitions: popularCompetitions,
             recently_viewed: recentlyViewed,
             upcoming_matches: upcomingMatches,
@@ -619,6 +646,170 @@ export class DiscoveryLogic {
             venueMatchId: item.venueMatch.id,
             availableCapacity: item.venueMatch.available_capacity,
         }));
+    }
+
+    public async getTeamDetails(teamId: string, userId?: string) {
+        // ... (existing code)
+    }
+
+    public async getFilters() {
+        const [countries, leagues] = await Promise.all([
+            db.query.countriesTable.findMany({
+                orderBy: [asc(countriesTable.name)],
+            }),
+            db.query.leaguesTable.findMany({
+                where: eq(leaguesTable.is_active, true),
+                with: {
+                    sport: true,
+                },
+                orderBy: [desc(leaguesTable.is_major), asc(leaguesTable.name)],
+            }),
+        ]);
+
+        return {
+            countries,
+            leagues,
+        };
+    }
+
+    public async getTeams(userId?: string, filters?: { sport?: string, country?: string, leagueId?: string, query?: string }) {
+        const teamConditions = [eq(teamsTable.is_active, true)];
+
+        if (filters?.sport) {
+            const sport = await db.query.sportsTable.findFirst({
+                where: ilike(sportsTable.name, `%${filters.sport}%`),
+            });
+            if (sport) {
+                const leagues = await db.query.leaguesTable.findMany({
+                    where: eq(leaguesTable.sport_id, sport.id),
+                    columns: { id: true },
+                });
+                const leagueIds = leagues.map(l => l.id);
+                if (leagueIds.length > 0) {
+                    teamConditions.push(inArray(teamsTable.league_id, leagueIds));
+                }
+            }
+        }
+
+        if (filters?.country) {
+            const country = await db.query.countriesTable.findFirst({
+                where: ilike(countriesTable.name, `%${filters.country}%`),
+            });
+            if (country) {
+                teamConditions.push(eq(teamsTable.country_id, country.id));
+            }
+        }
+
+        if (filters?.leagueId) {
+            teamConditions.push(eq(teamsTable.league_id, filters.leagueId));
+        }
+
+        if (filters?.query) {
+            teamConditions.push(ilike(teamsTable.name, `%${filters.query}%`));
+        }
+
+        const teams = await db.query.teamsTable.findMany({
+            where: and(...teamConditions),
+            with: {
+                league: true,
+                country: true,
+            },
+            orderBy: [asc(teamsTable.name)],
+            limit: 50,
+        });
+
+        if (!userId) {
+            return teams.map(t => ({ ...t, is_followed: false }));
+        }
+
+        const followed = await db.query.userTeamFollowsTable.findMany({
+            where: eq(userTeamFollowsTable.user_id, userId),
+        });
+        const followedIds = new Set(followed.map(f => f.team_id));
+
+        return teams.map(team => ({
+            ...team,
+            is_followed: followedIds.has(team.id),
+        }));
+    }
+
+    public async getTeamDetails(teamId: string, userId?: string) {
+        // 1. Get team info
+        const team = await db.query.teamsTable.findFirst({
+            where: eq(teamsTable.id, teamId),
+            with: {
+                league: true,
+                country: true,
+            },
+        });
+
+        if (!team) {
+            throw new Error("TEAM_NOT_FOUND");
+        }
+
+        // 2. Check if user follows this team
+        let is_followed = false;
+        if (userId) {
+            const follow = await db.query.userTeamFollowsTable.findFirst({
+                where: and(
+                    eq(userTeamFollowsTable.user_id, userId),
+                    eq(userTeamFollowsTable.team_id, teamId),
+                ),
+            });
+            is_followed = !!follow;
+        }
+
+        // 3. Get upcoming matches for this team
+        const now = new Date();
+        const upcomingMatches = await db.query.matchesTable.findMany({
+            where: and(
+                or(
+                    eq(matchesTable.home_team_id, teamId),
+                    eq(matchesTable.away_team_id, teamId),
+                ),
+                gte(matchesTable.scheduled_at, now),
+            ),
+            with: {
+                homeTeam: true,
+                awayTeam: true,
+                league: true,
+            },
+            orderBy: [asc(matchesTable.scheduled_at)],
+            limit: 10,
+        });
+
+        // 4. Get best bars showing matches for this team
+        const bestBars = await db.select({
+            id: venuesTable.id,
+            name: venuesTable.name,
+            type: venuesTable.type,
+            city: venuesTable.city,
+            average_rating: venuesTable.average_rating,
+            cover_image_url: venuesTable.cover_image_url,
+            latitude: venuesTable.latitude,
+            longitude: venuesTable.longitude,
+        })
+        .from(venuesTable)
+        .where(and(
+            isNull(venuesTable.deleted_at),
+            sql`EXISTS (
+                SELECT 1 FROM ${venueMatchesTable} vm
+                JOIN ${matchesTable} m ON m.id = vm.match_id
+                WHERE vm.venue_id = ${venuesTable.id}
+                AND (m.home_team_id = ${teamId} OR m.away_team_id = ${teamId})
+                AND m.scheduled_at >= ${now}
+            )`,
+        ))
+        .limit(10);
+
+        return {
+            team: {
+                ...team,
+                is_followed,
+            },
+            upcoming_matches: upcomingMatches,
+            best_bars: bestBars,
+        };
     }
 
     private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {

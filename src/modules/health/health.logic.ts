@@ -20,7 +20,7 @@ export class HealthLogic {
             name: "Test User (Health Module)",
             metadata: {
                 is_test: "true",
-                source: "health_test_module"
+                source: "health_test_module",
             },
         });
 

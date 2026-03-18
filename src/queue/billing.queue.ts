@@ -10,5 +10,5 @@ export const billingQueue = new Queue("billing-aggregation", {
             delay: 1000,
         },
         removeOnComplete: true,
-    }
+    },
 });
