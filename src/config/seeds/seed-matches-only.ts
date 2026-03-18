@@ -13,6 +13,49 @@
 import { SportsRepository } from "../../repository/sports.repository";
 import { apiSports } from "../../lib/api-sports";
 
+// Mapping of API-Sports league IDs allowed for match seeding
+// Strictly limited to top 2 leagues and major domestic cups for top 6 countries + World/Euro/CL/EL/ECL
+const MAJOR_LEAGUE_IDS = new Set([
+    // World / Continental
+    1,   // World Cup
+    2,   // Champions League
+    3,   // Europa League
+    4,   // Euro Championship
+    848, // Conference League
+
+    // England
+    39,  // Premier League
+    40,  // Championship
+    45,  // FA Cup
+    48,  // EFL Cup
+
+    // Italy
+    135, // Serie A
+    136, // Serie B
+    137, // Coppa Italia
+
+    // Spain
+    140, // La Liga
+    141, // La Liga 2
+    143, // Copa del Rey
+
+    // Germany
+    78,  // Bundesliga
+    79,  // 2. Bundesliga
+    81,  // DFB Pokal
+
+    // France
+    61,  // Ligue 1
+    62,  // Ligue 2
+    66,  // Coupe de France
+    65,  // Coupe de la Ligue
+
+    // Netherlands
+    88,  // Eredivisie
+    89,  // Eerste Divisie
+    90,  // KNVB Beker
+]);
+
 function parseArgs() {
     const args = process.argv.slice(2);
     const parsed: Record<string, string> = {};
@@ -70,6 +113,12 @@ async function seed() {
 
             for (const fixture of result.response) {
                 try {
+                    // 0. Filter by Major League IDs (Strict mode)
+                    if (!MAJOR_LEAGUE_IDS.has(fixture.league.id)) {
+                        skippedCount++;
+                        continue;
+                    }
+
                     // 1. Resolve League ID (check if it's a league we track in DB)
                     let leagueId = leagueMap.get(fixture.league.id);
                     if (!leagueId) {
