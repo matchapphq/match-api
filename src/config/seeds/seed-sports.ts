@@ -21,6 +21,7 @@ const sportsData = [
         icon_url: "https://cdn.example.com/icons/football.svg",
         display_order: 1,
         leagues: [
+            // England
             {
                 name: "Premier League",
                 slug: "premier-league",
@@ -28,14 +29,34 @@ const sportsData = [
                 description: "Top tier of English football",
                 is_major: true,
                 teams: [
-                    { name: "Manchester United", slug: "manchester-united", city: "Manchester", country: "England", founded_year: 1878 },
-                    { name: "Liverpool FC", slug: "liverpool-fc", city: "Liverpool", country: "England", founded_year: 1892 },
-                    { name: "Arsenal FC", slug: "arsenal-fc", city: "London", country: "England", founded_year: 1886 },
-                    { name: "Chelsea FC", slug: "chelsea-fc", city: "London", country: "England", founded_year: 1905 },
+                    { name: "Arsenal", slug: "arsenal", city: "London", country: "England", founded_year: 1886 },
                     { name: "Manchester City", slug: "manchester-city", city: "Manchester", country: "England", founded_year: 1880 },
-                    { name: "Tottenham Hotspur", slug: "tottenham-hotspur", city: "London", country: "England", founded_year: 1882 },
+                    { name: "Liverpool", slug: "liverpool", city: "Liverpool", country: "England", founded_year: 1892 },
+                    { name: "Aston Villa", slug: "aston-villa", city: "Birmingham", country: "England", founded_year: 1874 },
+                    { name: "Tottenham", slug: "tottenham", city: "London", country: "England", founded_year: 1882 },
+                    { name: "Chelsea", slug: "chelsea", city: "London", country: "England", founded_year: 1905 },
+                    { name: "Manchester United", slug: "manchester-united", city: "Manchester", country: "England", founded_year: 1878 },
+                    { name: "Newcastle", slug: "newcastle", city: "Newcastle", country: "England", founded_year: 1892 },
+                    { name: "West Ham", slug: "west-ham", city: "London", country: "England", founded_year: 1895 },
+                    { name: "Brighton", slug: "brighton", city: "Brighton", country: "England", founded_year: 1901 },
                 ],
             },
+            {
+                name: "EFL Championship",
+                slug: "championship",
+                country: "England",
+                description: "Second tier of English football",
+                is_major: false,
+                teams: [
+                    { name: "Leicester", slug: "leicester", city: "Leicester", country: "England", founded_year: 1884 },
+                    { name: "Leeds", slug: "leeds", city: "Leeds", country: "England", founded_year: 1919 },
+                    { name: "Southampton", slug: "southampton", city: "Southampton", country: "England", founded_year: 1885 },
+                ],
+            },
+            { name: "FA Cup", slug: "fa-cup", country: "England", description: "The oldest national football competition in the world", is_major: true, teams: [] },
+            { name: "EFL Cup", slug: "efl-cup", country: "England", description: "League Cup", is_major: false, teams: [] },
+
+            // Spain
             {
                 name: "La Liga",
                 slug: "la-liga",
@@ -46,9 +67,15 @@ const sportsData = [
                     { name: "Real Madrid", slug: "real-madrid", city: "Madrid", country: "Spain", founded_year: 1902 },
                     { name: "FC Barcelona", slug: "fc-barcelona", city: "Barcelona", country: "Spain", founded_year: 1899 },
                     { name: "Atletico Madrid", slug: "atletico-madrid", city: "Madrid", country: "Spain", founded_year: 1903 },
-                    { name: "Sevilla FC", slug: "sevilla-fc", city: "Seville", country: "Spain", founded_year: 1890 },
+                    { name: "Girona", slug: "girona", city: "Girona", country: "Spain", founded_year: 1930 },
+                    { name: "Athletic Club", slug: "athletic-club", city: "Bilbao", country: "Spain", founded_year: 1898 },
+                    { name: "Real Sociedad", slug: "real-sociedad", city: "San Sebastian", country: "Spain", founded_year: 1909 },
                 ],
             },
+            { name: "La Liga 2", slug: "la-liga-2", country: "Spain", is_major: false, teams: [] },
+            { name: "Copa del Rey", slug: "copa-del-rey", country: "Spain", is_major: true, teams: [] },
+
+            // Italy
             {
                 name: "Serie A",
                 slug: "serie-a",
@@ -56,12 +83,18 @@ const sportsData = [
                 description: "Top tier of Italian football",
                 is_major: true,
                 teams: [
-                    { name: "Juventus FC", slug: "juventus-fc", city: "Turin", country: "Italy", founded_year: 1897 },
-                    { name: "AC Milan", slug: "ac-milan", city: "Milan", country: "Italy", founded_year: 1899 },
                     { name: "Inter Milan", slug: "inter-milan", city: "Milan", country: "Italy", founded_year: 1908 },
+                    { name: "AC Milan", slug: "ac-milan", city: "Milan", country: "Italy", founded_year: 1899 },
+                    { name: "Juventus", slug: "juventus", city: "Turin", country: "Italy", founded_year: 1897 },
+                    { name: "Atalanta", slug: "atalanta", city: "Bergamo", country: "Italy", founded_year: 1907 },
                     { name: "AS Roma", slug: "as-roma", city: "Rome", country: "Italy", founded_year: 1927 },
+                    { name: "Napoli", slug: "napoli", city: "Naples", country: "Italy", founded_year: 1926 },
                 ],
             },
+            { name: "Serie B", slug: "serie-b", country: "Italy", is_major: false, teams: [] },
+            { name: "Coppa Italia", slug: "coppa-italia", country: "Italy", is_major: true, teams: [] },
+
+            // Germany
             {
                 name: "Bundesliga",
                 slug: "bundesliga",
@@ -69,11 +102,17 @@ const sportsData = [
                 description: "Top tier of German football",
                 is_major: true,
                 teams: [
+                    { name: "Bayer Leverkusen", slug: "bayer-leverkusen", city: "Leverkusen", country: "Germany", founded_year: 1904 },
                     { name: "Bayern Munich", slug: "bayern-munich", city: "Munich", country: "Germany", founded_year: 1900 },
+                    { name: "VfB Stuttgart", slug: "vfb-stuttgart", city: "Stuttgart", country: "Germany", founded_year: 1893 },
                     { name: "Borussia Dortmund", slug: "borussia-dortmund", city: "Dortmund", country: "Germany", founded_year: 1909 },
                     { name: "RB Leipzig", slug: "rb-leipzig", city: "Leipzig", country: "Germany", founded_year: 2009 },
                 ],
             },
+            { name: "2. Bundesliga", slug: "2-bundesliga", country: "Germany", is_major: false, teams: [] },
+            { name: "DFB-Pokal", slug: "dfb-pokal", country: "Germany", is_major: true, teams: [] },
+
+            // France
             {
                 name: "Ligue 1",
                 slug: "ligue-1",
@@ -82,26 +121,37 @@ const sportsData = [
                 is_major: true,
                 teams: [
                     { name: "Paris Saint-Germain", slug: "paris-saint-germain", city: "Paris", country: "France", founded_year: 1970 },
-                    { name: "Olympique Marseille", slug: "olympique-marseille", city: "Marseille", country: "France", founded_year: 1899 },
                     { name: "AS Monaco", slug: "as-monaco", city: "Monaco", country: "Monaco", founded_year: 1924 },
+                    { name: "Olympique Marseille", slug: "olympique-marseille", city: "Marseille", country: "France", founded_year: 1899 },
+                    { name: "Lille OSC", slug: "lille", city: "Lille", country: "France", founded_year: 1944 },
                 ],
             },
+            { name: "Ligue 2", slug: "ligue-2", country: "France", is_major: false, teams: [] },
+            { name: "Coupe de France", slug: "coupe-de-france", country: "France", is_major: true, teams: [] },
+
+            // Netherlands
             {
-                name: "UEFA Champions League",
-                slug: "champions-league",
-                country: "World",
-                description: "Premier European club competition",
+                name: "Eredivisie",
+                slug: "eredivisie",
+                country: "Netherlands",
+                description: "Top tier of Dutch football",
                 is_major: true,
-                teams: [],
+                teams: [
+                    { name: "PSV Eindhoven", slug: "psv", city: "Eindhoven", country: "Netherlands", founded_year: 1913 },
+                    { name: "Feyenoord", slug: "feyenoord", city: "Rotterdam", country: "Netherlands", founded_year: 1908 },
+                    { name: "Ajax", slug: "ajax", city: "Amsterdam", country: "Netherlands", founded_year: 1900 },
+                    { name: "AZ Alkmaar", slug: "az", city: "Alkmaar", country: "Netherlands", founded_year: 1967 },
+                ],
             },
-            {
-                name: "FIFA World Cup",
-                slug: "world-cup",
-                country: "World",
-                description: "The biggest football tournament in the world",
-                is_major: true,
-                teams: [],
-            },
+            { name: "Eerste Divisie", slug: "eerste-divisie", country: "Netherlands", is_major: false, teams: [] },
+            { name: "KNVB Beker", slug: "knvb-beker", country: "Netherlands", is_major: true, teams: [] },
+
+            // International
+            { name: "UEFA Champions League", slug: "champions-league", country: "World", description: "Premier European club competition", is_major: true, teams: [] },
+            { name: "UEFA Europa League", slug: "europa-league", country: "World", is_major: true, teams: [] },
+            { name: "UEFA Conference League", slug: "conference-league", country: "World", is_major: true, teams: [] },
+            { name: "FIFA World Cup", slug: "world-cup", country: "World", is_major: true, teams: [] },
+            { name: "Euro Championship", slug: "euro-championship", country: "World", is_major: true, teams: [] },
         ],
     },
     {

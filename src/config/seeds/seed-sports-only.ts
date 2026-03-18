@@ -19,20 +19,50 @@ import { apiSports } from "../../lib/api-sports";
 // Target Countries for the Major Competitions
 // ============================================
 const TARGET_COUNTRIES = new Set([
-    "England", "Spain", "France", "Italy", "Germany", "World"
+    "England", "Italy", "Spain", "Germany", "France", "Netherlands", "World"
 ]);
 
 // Mapping of API-Sports league IDs to is_major flag
+// Strictly limited to top 2 leagues and major domestic cups for top 6 countries + World/Euro/CL/EL/ECL
 const MAJOR_LEAGUE_IDS = new Set([
+    // World / Continental
     1,   // World Cup
     2,   // Champions League
     3,   // Europa League
     4,   // Euro Championship
+    848, // Conference League
+
+    // England
     39,  // Premier League
-    140, // La Liga
-    61,  // Ligue 1
+    40,  // Championship
+    45,  // FA Cup
+    48,  // EFL Cup
+
+    // Italy
     135, // Serie A
+    136, // Serie B
+    137, // Coppa Italia
+
+    // Spain
+    140, // La Liga
+    141, // La Liga 2
+    143, // Copa del Rey
+
+    // Germany
     78,  // Bundesliga
+    79,  // 2. Bundesliga
+    81,  // DFB Pokal
+
+    // France
+    61,  // Ligue 1
+    62,  // Ligue 2
+    66,  // Coupe de France
+    65,  // Coupe de la Ligue
+
+    // Netherlands
+    88,  // Eredivisie
+    89,  // Eerste Divisie
+    90,  // KNVB Beker
 ]);
 
 function parseArgs() {
@@ -126,13 +156,13 @@ async function seed() {
     const leagueInternalIds = new Map<number, string>(); // api_id → internal UUID
     let leagueCount = 0;
 
-    // Fetching ALL leagues to avoid missing tournaments that might not be marked as 'current' in a specific way
+    // Fetching leagues and strictly filtering to our major competition IDs
     const leaguesResult = await apiSports.getLeagues();
     const targetLeagues = leaguesResult.response.filter(item => 
-        MAJOR_LEAGUE_IDS.has(item.league.id) || TARGET_COUNTRIES.has(item.country.name)
+        MAJOR_LEAGUE_IDS.has(item.league.id)
     );
 
-    console.log(`  ${targetLeagues.length} target leagues filtered from ${leaguesResult.response.length} total leagues`);
+    console.log(`  ${targetLeagues.length} target leagues filtered (Strict mode: top 2 leagues + major cups only)`);
 
     // To avoid hitting API limits too fast, we might want to prioritize top tiers
     // For now, let's take all leagues from target countries but we'll be careful in next steps
@@ -173,9 +203,20 @@ async function seed() {
             const result = await apiSports.getTeams({ league: String(leagueData.league.id), season });
             apiCallCount++;
             
-            console.log(`    Found ${result.results} teams`);
+            // Limit to top 10 most relevant teams
+            let teamsToProcess = result.response;
 
-            for (const teamData of result.response) {
+            // For international competitions, only include teams from our target countries
+            const isInternational = [1, 2, 3, 4, 848].includes(leagueData.league.id);
+            if (isInternational) {
+                teamsToProcess = teamsToProcess.filter(t => TARGET_COUNTRIES.has(t.team.country));
+            }
+
+            // Strictly limit to Top 10
+            teamsToProcess = teamsToProcess.slice(0, 10);
+            console.log(`    Found ${result.results} teams, processing top ${teamsToProcess.length}`);
+
+            for (const teamData of teamsToProcess) {
                 try {
                     await repo.upsertTeamFromApi(leagueId, teamData);
                     teamCount++;
