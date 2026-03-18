@@ -229,6 +229,41 @@ class DiscoveryController {
             return ctx.json({ error: "Search failed" }, 500);
         }
     });
+
+    public readonly getTeams = this.factory.createHandlers(async (ctx) => {
+        const userId = ctx.get("user")?.id;
+        const { sport, country, leagueId, query } = ctx.req.query();
+        try {
+            const result = await this.discoveryLogic.getTeams(userId, { sport, country, leagueId, query });
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error fetching teams:", error);
+            return ctx.json({ error: "Failed to fetch teams" }, 500);
+        }
+    });
+
+    public readonly getFilters = this.factory.createHandlers(async (ctx) => {
+        try {
+            const result = await this.discoveryLogic.getFilters();
+            return ctx.json(result);
+        } catch (error: any) {
+            console.error("Error fetching discovery filters:", error);
+            return ctx.json({ error: "Failed to fetch filters" }, 500);
+        }
+    });
+
+    public readonly getTeamDetails = this.factory.createHandlers(async (ctx) => {
+        const teamId = ctx.req.param("teamId") as string;
+        const userId = ctx.get("user")?.id;
+        try {
+            const result = await this.discoveryLogic.getTeamDetails(teamId, userId);
+            return ctx.json(result);
+        } catch (error: any) {
+            if (error.message === "TEAM_NOT_FOUND") return ctx.json({ error: "Team not found" }, 404);
+            console.error("Error fetching team details:", error);
+            return ctx.json({ error: "Failed to fetch team details" }, 500);
+        }
+    });
 }
 
 export default DiscoveryController;
