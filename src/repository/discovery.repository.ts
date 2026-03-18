@@ -16,9 +16,9 @@ export class DiscoveryRepository {
         const venue = await db.query.venuesTable.findFirst({
             where: and(
                 eq(venuesTable.id, venueId),
-                isNull(venuesTable.deleted_at)
+                isNull(venuesTable.deleted_at),
             ),
-            columns: { id: true }
+            columns: { id: true },
         });
 
         if (!venue) return null;
@@ -28,7 +28,7 @@ export class DiscoveryRepository {
         await db.delete(userVenueHistoryTable)
             .where(and(
                 eq(userVenueHistoryTable.user_id, userId),
-                eq(userVenueHistoryTable.venue_id, venueId)
+                eq(userVenueHistoryTable.venue_id, venueId),
             ));
 
         const [history] = await db.insert(userVenueHistoryTable)
@@ -63,13 +63,13 @@ export class DiscoveryRepository {
                 cover_image_url: venuesTable.cover_image_url,
                 average_rating: venuesTable.average_rating,
                 total_reviews: venuesTable.total_reviews,
-            }
+            },
         })
         .from(userVenueHistoryTable)
         .innerJoin(venuesTable, eq(userVenueHistoryTable.venue_id, venuesTable.id))
         .where(and(
             eq(userVenueHistoryTable.user_id, userId),
-            isNull(venuesTable.deleted_at)
+            isNull(venuesTable.deleted_at),
         ))
         .orderBy(desc(userVenueHistoryTable.viewed_at))
         .limit(limit);
@@ -105,7 +105,7 @@ export class DiscoveryRepository {
                 // To filter by slug, we need to join with sportsTable
                 const matchingSports = await db.query.sportsTable.findMany({
                     where: inArray(sportsTable.slug, slugs),
-                    columns: { id: true }
+                    columns: { id: true },
                 });
                 const slugBasedIds = matchingSports.map(s => s.id);
                 if (slugBasedIds.length > 0) {
@@ -124,7 +124,7 @@ export class DiscoveryRepository {
             with: {
                 sport: true,
                 tournament: true,
-            }
+            },
         });
     }
 
@@ -145,7 +145,7 @@ export class DiscoveryRepository {
             if (slugs.length > 0) {
                 const matchingSports = await db.query.sportsTable.findMany({
                     where: inArray(sportsTable.slug, slugs),
-                    columns: { id: true }
+                    columns: { id: true },
                 });
                 resolvedSportIds.push(...matchingSports.map(s => s.id));
             }
@@ -159,7 +159,7 @@ export class DiscoveryRepository {
             logo_url: leaguesTable.logo_url,
             is_major: leaguesTable.is_major,
             sport_id: leaguesTable.sport_id,
-            row_number: sql<number>`ROW_NUMBER() OVER(PARTITION BY ${leaguesTable.sport_id} ORDER BY ${leaguesTable.is_major} DESC, ${leaguesTable.display_order} ASC, ${leaguesTable.name} ASC)`.as('rn')
+            row_number: sql<number>`ROW_NUMBER() OVER(PARTITION BY ${leaguesTable.sport_id} ORDER BY ${leaguesTable.is_major} DESC, ${leaguesTable.display_order} ASC, ${leaguesTable.name} ASC)`.as('rn'),
         })
         .from(leaguesTable)
         .where(eq(leaguesTable.is_active, true))

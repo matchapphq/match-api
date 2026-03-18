@@ -36,9 +36,9 @@ class ReviewsController {
                 this.reviewsLogic.getVenueReviews(
                     venueId, 
                     page ? parseInt(page) : 1, 
-                    limit ? parseInt(limit) : 20
+                    limit ? parseInt(limit) : 20,
                 ),
-                this.reviewsLogic.getVenueReviewStats(venueId)
+                this.reviewsLogic.getVenueReviewStats(venueId),
             ]);
             return ctx.json({ reviews, stats });
         } catch (error: any) {

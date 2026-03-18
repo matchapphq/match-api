@@ -1,4 +1,4 @@
-import { boolean, doublePrecision, index, jsonb, pgTable, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { boolean, doublePrecision, index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 import { userRoleEnum } from './enums';
 
 // ============================================
@@ -57,7 +57,7 @@ export const userPreferencesTable = pgTable(
     'user_preferences',
     {
         id: uuid('id').primaryKey().defaultRandom(),
-        user_id: uuid('user_id').notNull().references(() => usersTable.id, { onDelete: 'cascade' }),
+        user_id: uuid('user_id').notNull().unique().references(() => usersTable.id, { onDelete: 'cascade' }),
 
         // Settings
         language: varchar('language', { length: 10 }).default('en'),
@@ -93,7 +93,7 @@ export const userPreferencesTable = pgTable(
         updated_at: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
     },
     (table) => [
-        index('idx_user_preferences_user_id').on(table.user_id),
+        uniqueIndex('idx_user_preferences_user_id').on(table.user_id),
     ],
 );
 

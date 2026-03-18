@@ -278,8 +278,8 @@ export class DiscoveryLogic {
         const existing = await db.query.userLeagueFollowsTable.findFirst({
             where: and(
                 eq(userLeagueFollowsTable.user_id, userId),
-                eq(userLeagueFollowsTable.league_id, leagueId)
-            )
+                eq(userLeagueFollowsTable.league_id, leagueId),
+            ),
         });
 
         if (existing) {
@@ -302,8 +302,8 @@ export class DiscoveryLogic {
         const existing = await db.query.userTeamFollowsTable.findFirst({
             where: and(
                 eq(userTeamFollowsTable.user_id, userId),
-                eq(userTeamFollowsTable.team_id, teamId)
-            )
+                eq(userTeamFollowsTable.team_id, teamId),
+            ),
         });
 
         let isFollowed = false;
@@ -322,7 +322,7 @@ export class DiscoveryLogic {
         // Keep userPreferencesTable in sync for backward compatibility and aggregation
         const allFollows = await db.query.userTeamFollowsTable.findMany({
             where: eq(userTeamFollowsTable.user_id, userId),
-            columns: { team_id: true }
+            columns: { team_id: true },
         });
         const teamIds = allFollows.map(f => f.team_id);
 
@@ -333,7 +333,7 @@ export class DiscoveryLogic {
             })
             .onConflictDoUpdate({
                 target: userPreferencesTable.user_id,
-                set: { fav_team_ids: teamIds }
+                set: { fav_team_ids: teamIds },
             });
 
         return { followed: isFollowed };
@@ -348,10 +348,10 @@ export class DiscoveryLogic {
             with: {
                 league: {
                     with: {
-                        sport: true
-                    }
-                }
-            }
+                        sport: true,
+                    },
+                },
+            },
         });
 
         return follows.map(f => f.league);
@@ -374,7 +374,7 @@ export class DiscoveryLogic {
             with: {
                 league: true,
                 country: true,
-            }
+            },
         });
 
         // Check for live matches for these teams
@@ -382,7 +382,7 @@ export class DiscoveryLogic {
 
         return teams.map(team => {
             const liveMatch = liveMatches.find(m =>
-                m.home_team_id === team.id || m.away_team_id === team.id
+                m.home_team_id === team.id || m.away_team_id === team.id,
             );
 
             return {
@@ -411,8 +411,8 @@ export class DiscoveryLogic {
                     gte(matchesTable.scheduled_at, now),
                     or(
                         inArray(matchesTable.home_team_id, teamIds),
-                        inArray(matchesTable.away_team_id, teamIds)
-                    )
+                        inArray(matchesTable.away_team_id, teamIds),
+                    ),
                 ),
                 with: {
                     homeTeam: true,
@@ -433,7 +433,7 @@ export class DiscoveryLogic {
                 where: and(
                     gte(matchesTable.scheduled_at, now),
                     sql`EXISTS (SELECT 1 FROM leagues l WHERE l.id = ${matchesTable.league_id} AND l.is_major = true)`,
-                    existingIds.length > 0 ? sql`${matchesTable.id} NOT IN (${sql.join(existingIds.map(id => sql`${id}`), sql`, `)})` : undefined
+                    existingIds.length > 0 ? sql`${matchesTable.id} NOT IN (${sql.join(existingIds.map(id => sql`${id}`), sql`, `)})` : undefined,
                 ),
                 with: {
                     homeTeam: true,
@@ -472,8 +472,8 @@ export class DiscoveryLogic {
             const follow = await db.query.userLeagueFollowsTable.findFirst({
                 where: and(
                     eq(userLeagueFollowsTable.user_id, userId),
-                    eq(userLeagueFollowsTable.league_id, competitionId)
-                )
+                    eq(userLeagueFollowsTable.league_id, competitionId),
+                ),
             });
             is_followed = !!follow;
         }
@@ -516,7 +516,7 @@ export class DiscoveryLogic {
                 WHERE vm.venue_id = ${venuesTable.id}
                 AND m.league_id = ${competitionId}
                 AND m.scheduled_at >= ${now}
-            )`
+            )`,
         ))
         .orderBy(desc(venuesTable.average_rating))
         .limit(10);
@@ -531,7 +531,7 @@ export class DiscoveryLogic {
             stats: {
                 matches_left: upcomingMatches.length,
                 partner_bars: bestBars.length,
-            }
+            },
         };
     }
 
@@ -545,7 +545,7 @@ export class DiscoveryLogic {
             }),
             db.query.userTeamFollowsTable.findMany({
                 where: eq(userTeamFollowsTable.user_id, userId),
-            })
+            }),
         ]);
 
         const favSportIds = (prefs?.fav_sports || []) as string[];
@@ -680,7 +680,7 @@ export class DiscoveryLogic {
             if (sport) {
                 const leagues = await db.query.leaguesTable.findMany({
                     where: eq(leaguesTable.sport_id, sport.id),
-                    columns: { id: true }
+                    columns: { id: true },
                 });
                 const leagueIds = leagues.map(l => l.id);
                 if (leagueIds.length > 0) {
@@ -751,8 +751,8 @@ export class DiscoveryLogic {
             const follow = await db.query.userTeamFollowsTable.findFirst({
                 where: and(
                     eq(userTeamFollowsTable.user_id, userId),
-                    eq(userTeamFollowsTable.team_id, teamId)
-                )
+                    eq(userTeamFollowsTable.team_id, teamId),
+                ),
             });
             is_followed = !!follow;
         }
@@ -763,7 +763,7 @@ export class DiscoveryLogic {
             where: and(
                 or(
                     eq(matchesTable.home_team_id, teamId),
-                    eq(matchesTable.away_team_id, teamId)
+                    eq(matchesTable.away_team_id, teamId),
                 ),
                 gte(matchesTable.scheduled_at, now),
             ),
@@ -796,7 +796,7 @@ export class DiscoveryLogic {
                 WHERE vm.venue_id = ${venuesTable.id}
                 AND (m.home_team_id = ${teamId} OR m.away_team_id = ${teamId})
                 AND m.scheduled_at >= ${now}
-            )`
+            )`,
         ))
         .limit(10);
 

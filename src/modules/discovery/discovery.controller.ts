@@ -59,7 +59,7 @@ class DiscoveryController {
             const { limit } = ctx.req.query();
             const result = await this.discoveryLogic.getVenueHistory(
                 userId, 
-                limit ? parseInt(limit) : 10
+                limit ? parseInt(limit) : 10,
             );
             return ctx.json(result);
         } catch (error: any) {
@@ -78,7 +78,7 @@ class DiscoveryController {
             const result = await this.discoveryLogic.getHomeData(
                 userId,
                 lat ? parseFloat(lat) : undefined,
-                lng ? parseFloat(lng) : undefined
+                lng ? parseFloat(lng) : undefined,
             );
             return ctx.json(result);
         } catch (error: any) {

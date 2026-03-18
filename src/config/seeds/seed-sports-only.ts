@@ -19,7 +19,7 @@ import { apiSports } from "../../lib/api-sports";
 // Target Countries for the Major Competitions
 // ============================================
 const TARGET_COUNTRIES = new Set([
-    "England", "Italy", "Spain", "Germany", "France", "Netherlands", "World"
+    "England", "Italy", "Spain", "Germany", "France", "Netherlands", "World",
 ]);
 
 // Mapping of API-Sports league IDs to is_major flag
@@ -159,7 +159,7 @@ async function seed() {
     // Fetching leagues and strictly filtering to our major competition IDs
     const leaguesResult = await apiSports.getLeagues();
     const targetLeagues = leaguesResult.response.filter(item => 
-        MAJOR_LEAGUE_IDS.has(item.league.id)
+        MAJOR_LEAGUE_IDS.has(item.league.id),
     );
 
     console.log(`  ${targetLeagues.length} target leagues filtered (Strict mode: top 2 leagues + major cups only)`);
