@@ -191,17 +191,17 @@ export class ReviewsRepository {
     }
 
     async markHelpful(reviewId: string, userId: string, isHelpful: boolean) {
+        // Only allow marking as helpful (true) to ensure "like only once"
+        if (!isHelpful) return true;
+
         // Upsert helpful vote
         await db.insert(reviewHelpfulTable)
             .values({
                 review_id: reviewId,
                 user_id: userId,
-                is_helpful: isHelpful,
+                is_helpful: true,
             })
-            .onConflictDoUpdate({
-                target: [reviewHelpfulTable.review_id, reviewHelpfulTable.user_id],
-                set: { is_helpful: isHelpful },
-            });
+            .onConflictDoNothing(); // Once liked, it stays liked
 
         // Recalculate helpful counts
         const [helpfulCount] = await db.select({ count: count() })
@@ -211,17 +211,9 @@ export class ReviewsRepository {
                 eq(reviewHelpfulTable.is_helpful, true),
             ));
 
-        const [unhelpfulCount] = await db.select({ count: count() })
-            .from(reviewHelpfulTable)
-            .where(and(
-                eq(reviewHelpfulTable.review_id, reviewId),
-                eq(reviewHelpfulTable.is_helpful, false),
-            ));
-
         await db.update(reviewsTable)
             .set({
                 helpful_count: Number(helpfulCount?.count || 0),
-                unhelpful_count: Number(unhelpfulCount?.count || 0),
             })
             .where(eq(reviewsTable.id, reviewId));
 
