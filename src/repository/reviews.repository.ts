@@ -71,12 +71,13 @@ export class ReviewsRepository {
             value_rating: reviewsTable.value_rating,
             // Check if current user found this review helpful
             is_helpful: currentUserId 
-                ? sql<boolean>`EXISTS (
-                    SELECT 1 FROM ${reviewHelpfulTable} 
-                    WHERE ${reviewHelpfulTable.review_id} = ${reviewsTable.id} 
-                    AND ${reviewHelpfulTable.user_id} = ${currentUserId} 
-                    AND ${reviewHelpfulTable.is_helpful} = true
-                )`
+                ? sql<boolean>`COALESCE((
+                    SELECT true FROM review_helpful rh 
+                    WHERE rh.review_id = ${reviewsTable.id} 
+                    AND rh.user_id = ${currentUserId} 
+                    AND rh.is_helpful = true
+                    LIMIT 1
+                ), false)`
                 : sql<boolean>`false`,
         })
         .from(reviewsTable)

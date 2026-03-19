@@ -32,6 +32,12 @@ class ReviewsController {
         const { page, limit } = ctx.req.query();
         const user = ctx.get("user"); // Might be set by optionalAuthMiddleware
 
+        if (user) {
+            console.log(`[REVIEWS] Fetching reviews for venue ${venueId} with user ${user.id}`);
+        } else {
+            console.log(`[REVIEWS] Fetching reviews for venue ${venueId} (Guest)`);
+        }
+
         try {
             const [reviews, stats] = await Promise.all([
                 this.reviewsLogic.getVenueReviews(
