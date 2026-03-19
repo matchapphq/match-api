@@ -1,7 +1,8 @@
 import { db } from "../config/config.db";
 import { reviewsTable, reviewHelpfulTable } from "../config/db/reviews.table";
 import { venuesTable } from "../config/db/venues.table";
-import { eq, and, desc, sql, isNull, avg, count } from "drizzle-orm";
+import { usersTable } from "../config/db/user.table";
+import { eq, and, desc, sql, isNull, avg, count, inArray } from "drizzle-orm";
 
 export class ReviewsRepository {
     async create(data: any) {
@@ -51,28 +52,62 @@ export class ReviewsRepository {
         return newReview;
     }
 
-    async findByVenueId(venueId: string, limit: number = 20, offset: number = 0) {
-        return await db.query.reviewsTable.findMany({
-            where: and(
-                eq(reviewsTable.venue_id, venueId),
-                isNull(reviewsTable.deleted_at),
-            ),
-            orderBy: [desc(reviewsTable.created_at)],
-            limit,
-            offset,
-            with: {
-                // Assuming relations are defined in relations.ts
-                // @ts-ignore
-                user: {
-                    columns: {
-                        id: true,
-                        first_name: true,
-                        last_name: true,
-                        avatar_url: true,
-                    },
-                },
-            },
-        });
+    async findByVenueId(venueId: string, limit: number = 20, offset: number = 0, currentUserId?: string) {
+        // Query reviews with optional is_helpful join if currentUserId is provided
+        const reviews = await db.select({
+            id: reviewsTable.id,
+            user_id: reviewsTable.user_id,
+            venue_id: reviewsTable.venue_id,
+            rating: reviewsTable.rating,
+            title: reviewsTable.title,
+            content: reviewsTable.content,
+            photos_urls: reviewsTable.photos_urls,
+            helpful_count: reviewsTable.helpful_count,
+            unhelpful_count: reviewsTable.unhelpful_count,
+            created_at: reviewsTable.created_at,
+            atmosphere_rating: reviewsTable.atmosphere_rating,
+            food_rating: reviewsTable.food_rating,
+            service_rating: reviewsTable.service_rating,
+            value_rating: reviewsTable.value_rating,
+            // Check if current user found this review helpful
+            is_helpful: currentUserId 
+                ? sql<boolean>`EXISTS (
+                    SELECT 1 FROM ${reviewHelpfulTable} 
+                    WHERE ${reviewHelpfulTable.review_id} = ${reviewsTable.id} 
+                    AND ${reviewHelpfulTable.user_id} = ${currentUserId} 
+                    AND ${reviewHelpfulTable.is_helpful} = true
+                )`
+                : sql<boolean>`false`,
+        })
+        .from(reviewsTable)
+        .where(and(
+            eq(reviewsTable.venue_id, venueId),
+            isNull(reviewsTable.deleted_at),
+        ))
+        .orderBy(desc(reviewsTable.created_at))
+        .limit(limit)
+        .offset(offset);
+
+        // Fetch user data for each review manually or using a join
+        // For simplicity and matching existing findMany with relations, we'll map the reviews
+        const reviewUserIds = [...new Set(reviews.map(r => r.user_id).filter(Boolean))];
+        if (reviewUserIds.length === 0) return reviews.map(r => ({ ...r, user: null }));
+
+        // Fetch users in a separate query to match findMany's with: { user: ... }
+        const users = await db.select({
+            id: usersTable.id,
+            first_name: usersTable.first_name,
+            last_name: usersTable.last_name,
+            avatar_url: usersTable.avatar_url,
+        })
+        .from(usersTable)
+        .where(inArray(usersTable.id, reviewUserIds));
+
+        // @ts-ignore - formatting to match original structure
+        return reviews.map(review => ({
+            ...review,
+            user: users.find(u => u.id === review.user_id)
+        }));
     }
 
     async delete(reviewId: string, userId: string) {

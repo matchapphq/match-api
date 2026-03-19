@@ -30,6 +30,7 @@ class ReviewsController {
     readonly getVenueReviews = this.factory.createHandlers(async (ctx) => {
         const venueId = ctx.req.param("venueId");
         const { page, limit } = ctx.req.query();
+        const user = ctx.get("user"); // Might be set by optionalAuthMiddleware
 
         try {
             const [reviews, stats] = await Promise.all([
@@ -37,6 +38,7 @@ class ReviewsController {
                     venueId, 
                     page ? parseInt(page) : 1, 
                     limit ? parseInt(limit) : 20,
+                    user?.id
                 ),
                 this.reviewsLogic.getVenueReviewStats(venueId),
             ]);
