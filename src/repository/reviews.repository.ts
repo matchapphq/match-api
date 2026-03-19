@@ -15,6 +15,7 @@ export class ReviewsRepository {
             food_rating: data.food_rating,
             service_rating: data.service_rating,
             value_rating: data.value_rating,
+            photos_urls: data.photos_urls || [],
         }).returning();
 
         if (newReview) {
