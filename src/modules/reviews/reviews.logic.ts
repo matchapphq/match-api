@@ -15,9 +15,9 @@ export class ReviewsLogic {
         });
     }
 
-    async getVenueReviews(venueId: string, page: number = 1, limit: number = 20) {
+    async getVenueReviews(venueId: string, page: number = 1, limit: number = 20, userId?: string) {
         const offset = (page - 1) * limit;
-        return await this.repository.findByVenueId(venueId, limit, offset);
+        return await this.repository.findByVenueId(venueId, limit, offset, userId);
     }
 
     async getVenueReviewStats(venueId: string) {

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import ReviewsController from "./reviews.controller";
 import { authMiddleware } from "../../middleware/auth.middleware";
+import { optionalAuthMiddleware } from "../../middleware/optional-auth.middleware";
 
 /**
  * Service for defining Reviews routes.
@@ -26,7 +27,7 @@ class ReviewsService {
         
         // Venue specific review operations (often mounted under /venues/:venueId/reviews)
         // But also defined here for direct access if needed
-        this.router.get("/venue/:venueId", ...this.controller.getVenueReviews);
+        this.router.get("/venue/:venueId", optionalAuthMiddleware, ...this.controller.getVenueReviews);
         this.router.post("/venue/:venueId", authMiddleware, ...this.controller.createReview);
     }
 }

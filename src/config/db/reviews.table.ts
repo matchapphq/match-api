@@ -1,6 +1,7 @@
 import { pgTable, varchar, boolean, timestamp, uuid, index, foreignKey, integer, text, unique } from 'drizzle-orm/pg-core';
 import { usersTable } from './user.table';
 import { venuesTable } from './venues.table';
+import { sql } from 'drizzle-orm';
 
 // ============================================
 // 16. REVIEWS TABLE
@@ -26,6 +27,7 @@ export const reviewsTable = pgTable(
         // Metadata
         helpful_count: integer('helpful_count').default(0),
         unhelpful_count: integer('unhelpful_count').default(0),
+        photos_urls: text("photos_urls").array().default(sql`'{}'::text[]`),
 
         is_verified_purchase: boolean('is_verified_purchase').default(false),
 
