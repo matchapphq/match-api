@@ -32,6 +32,7 @@ export class ReservationRepository {
             quantity: partySize,
             special_requests: specialRequests || null,
             qr_code: qrCode,
+            reservation_ref: reservationId.slice(0, 8).toUpperCase(),
             commission_rate: commissionRate,
         }).returning();
 
@@ -62,6 +63,7 @@ export class ReservationRepository {
             quantity: partySize,
             special_requests: specialRequests || null,
             qr_code: null, // No QR until confirmed by venue
+            reservation_ref: reservationId.slice(0, 8).toUpperCase(),
             commission_rate: commissionRate,
         }).returning();
 

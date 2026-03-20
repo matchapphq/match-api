@@ -14,7 +14,7 @@ const getDatabaseConfig = () => {
         database: process.env.DATABASE_NAME || 'postgres',
         port: 5432,
         ssl: { rejectUnauthorized: false },
-    };
+    }
 
     if (process.env.NODE_ENV === 'production') {
         if (!process.env.DATABASE_HOST || !process.env.DATABASE_PASSWORD) {

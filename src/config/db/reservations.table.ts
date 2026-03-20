@@ -39,6 +39,7 @@ export const reservationsTable = pgTable(
 
         // QR Code for check-in
         qr_code: text('qr_code').unique(),
+        reservation_ref: text('reservation_ref'),
 
         // Billing info for new economic model
         is_billed: boolean('is_billed').default(false),
