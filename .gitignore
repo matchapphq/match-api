@@ -48,6 +48,6 @@ scripts/
 *.txt
 INTE_PLAN.md
 API_VERIFICATION_REPORT.md
-seeds/
+#seeds/
 *.test.ts
 certs/
