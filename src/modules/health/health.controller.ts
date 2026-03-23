@@ -1,5 +1,6 @@
 import { createFactory } from "hono/factory";
 import { HealthLogic } from "./health.logic";
+import { COMMISSION_RATE_CENTS } from "../../config/billing";
 
 class HealthController {
     private readonly factory = createFactory();
@@ -33,7 +34,7 @@ class HealthController {
 
     public readonly testCharge = this.factory.createHandlers(async (ctx) => {
         const customerId = ctx.req.query("customerId");
-        const amount = Number(ctx.req.query("amount") || 150);
+        const amount = Number(ctx.req.query("amount") || COMMISSION_RATE_CENTS);
 
         if (!customerId) {
             return ctx.json({ error: "customerId query param is required" }, 400);

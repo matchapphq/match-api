@@ -6,6 +6,7 @@ import { notifyNewReservation, notifyReservationCancelled } from "../../services
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailType } from "../../types/mail.types";
 import { assertVenueIsActiveForOperations } from "../../utils/venue-active.guard";
+import { COMMISSION_RATE_DEFAULT } from "../../config/billing";
 
 export class ReservationsLogic {
     constructor(
@@ -27,8 +28,8 @@ export class ReservationsLogic {
 
         const bookingMode = venueMatch.venue?.booking_mode || 'INSTANT';
 
-        // Get commission rate (default 1.50 or venue override)
-        const commissionRate = (venueMatch.venue as any)?.commission_override || "1.50";
+        // Get commission rate (default or venue override)
+        const commissionRate = (venueMatch.venue as any)?.commission_override || COMMISSION_RATE_DEFAULT;
 
         // Check availability
         const availability = await this.capacityRepo.checkAvailability(venueMatchId, partySize);

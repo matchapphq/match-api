@@ -1,11 +1,11 @@
 # Implementation Plan: New Economic Model (Commission-Based)
 
-This document outlines the strategy and status for transitioning the Match platform from a flat subscription model to a commission-based model (€1.50 per guest).
+This document outlines the strategy and status for transitioning the Match platform from a flat subscription model to a commission-based model (€1.15 per guest).
 
 ## 1. Objective
 The goal is to align venue owner costs with the value received. Instead of a fixed monthly fee, venue owners will pay a commission for every guest who successfully checks in via the Match platform.
 
-**Rate:** €1.50 per guest (based on `party_size` of a `checked_in` reservation).
+**Rate:** €1.15 per guest (based on `party_size` of a `checked_in` reservation).
 
 ---
 
@@ -81,7 +81,7 @@ The goal is to align venue owner costs with the value received. Instead of a fix
 ## 8. Foundational Tests (Health Module)
 We have successfully validated the core Stripe mechanics in the `health` module:
 - **Payment Method Verification (`testStripePaymentMethod`)**: Validated the ability to create dummy customers and redirect them to the Stripe Billing Portal to save payment methods.
-- **Off-Session Charging (`testChargeCustomer`)**: Successfully simulated a €1.50 (150 cents) charge using a saved payment method with `off_session: true`. 
+- **Off-Session Charging (`testChargeCustomer`)**: Successfully simulated a €1.15 (115 cents) charge using a saved payment method with `off_session: true`. 
 
 ---
 

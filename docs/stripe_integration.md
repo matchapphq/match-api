@@ -137,7 +137,7 @@ The following endpoints now return `410 Gone` with an explicit commission-only m
 
 ### Commission-Based Billing (Pay-per-Guest)
 As of March 2026, subscription billing is deprecated in favor of commission-only.
-- **Rate:** €1.50 per guest check-in.
+- **Rate:** €1.15 per guest check-in.
 - **Trigger:** Guest status `checked_in`, then collected by monthly job.
 - **Mechanism:** One monthly off-session `PaymentIntent` per owner (aggregated amount), plus local commission transaction + invoice.
 

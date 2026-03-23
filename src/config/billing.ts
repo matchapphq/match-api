@@ -1,4 +1,5 @@
-const COMMISSION_RATE_DEFAULT = "1.50";
+export const COMMISSION_RATE_DEFAULT = "1.15";
+export const COMMISSION_RATE_CENTS = Math.round(Number(COMMISSION_RATE_DEFAULT) * 100);
 const COMMISSION_RATE_OVERRIDE_ENV_KEY = "BILLING_COMMISSION_DEFAULT_RATE";
 
 const BILLING_MODEL = "commission_per_checked_in_guest" as const;

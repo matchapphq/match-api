@@ -11,6 +11,7 @@ import { reservationsTable } from "../config/db/reservations.table";
 import { venueMatchesTable } from "../config/db/matches.table";
 import { venuesTable } from "../config/db/venues.table";
 import { eq, and, desc, count, sql, isNotNull } from "drizzle-orm";
+import { COMMISSION_RATE_DEFAULT } from "../config/billing";
 
 export class BillingRepository {
     /**
@@ -20,7 +21,7 @@ export class BillingRepository {
     async getUnbilledUsage(userId: string) {
         const result = await db.select({
             total_guests: sql<number>`SUM(${reservationsTable.party_size})::int`,
-            total_commission: sql<string>`SUM(${reservationsTable.party_size} * CAST(COALESCE(${reservationsTable.commission_rate}, '1.50') AS NUMERIC))`,
+            total_commission: sql<string>`SUM(${reservationsTable.party_size} * CAST(COALESCE(${reservationsTable.commission_rate}, ${COMMISSION_RATE_DEFAULT}) AS NUMERIC))`,
         })
         .from(reservationsTable)
         .innerJoin(venueMatchesTable, eq(reservationsTable.venue_match_id, venueMatchesTable.id))

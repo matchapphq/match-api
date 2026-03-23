@@ -3,7 +3,7 @@
 This document outlines the strategy for migrating the venue owner onboarding flow from the obsolete "Subscription-based" model to the new "Commission-based" model. Venue owners will no longer select a subscription plan. Instead, they will securely add a payment method to complete their registration and access the dashboard.
 
 ## 1. Objective
-To streamline the onboarding process for venue owners by removing the friction of subscription plans. To access the dashboard, venue owners simply need to attach a valid payment method to their account via Stripe (used later for the €1.50 commission per guest check-in). If an owner does not have a registered Stripe Customer ID with a saved payment method, their onboarding is considered incomplete.
+To streamline the onboarding process for venue owners by removing the friction of subscription plans. To access the dashboard, venue owners simply need to attach a valid payment method to their account via Stripe (used later for the €1.15 commission per guest check-in). If an owner does not have a registered Stripe Customer ID with a saved payment method, their onboarding is considered incomplete.
 
 ---
 
@@ -68,7 +68,7 @@ Since subscriptions are obsolete, the endpoints for creating checkouts must be a
 - If `user.role === 'venue_owner'` and `!user.stripe_customer_id` (or equivalent flag), redirect to `/onboarding/payment`.
 
 ### Payment Screen
-- Display a clear message explaining the commission model: *"L'inscription est gratuite. Ajoutez une carte pour activer votre compte. Vous ne serez facturé que 1,50€ par client ayant honoré sa réservation."*
+- Display a clear message explaining the commission model: *"L'inscription est gratuite. Ajoutez une carte pour activer votre compte. Vous ne serez facturé que 1,15€ par client ayant honoré sa réservation."*
 - Button "Ajouter une carte" -> calls the backend to get the Stripe Setup Checkout URL -> redirects to Stripe.
 
 ### Success Redirect

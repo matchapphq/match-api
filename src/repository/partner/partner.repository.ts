@@ -6,6 +6,7 @@ import { reviewsTable } from "../../config/db/reviews.table";
 import { analyticsTable } from "../../config/db/admin.table";
 import { eq, and, sql, inArray, count, countDistinct, gte, lte, sum } from "drizzle-orm";
 import { geocodeAddress } from "../../utils/geocoding";
+import { COMMISSION_RATE_DEFAULT } from "../../config/billing";
 
 export class PartnerRepository {
 
@@ -311,7 +312,7 @@ export class PartnerRepository {
             type: data.type || 'sports_bar',
             status: data.status || 'pending',
             is_active: data.is_active ?? true,
-            commission_override: data.commission_override || "1.50",
+            commission_override: data.commission_override || COMMISSION_RATE_DEFAULT,
         }).returning();
 
         return newVenue;
