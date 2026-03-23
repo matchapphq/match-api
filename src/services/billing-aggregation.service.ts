@@ -3,6 +3,7 @@ import stripe from "../config/stripe";
 import Stripe from "stripe";
 import { CommissionBillingService } from "./commission-billing.service";
 import { createHash } from "crypto";
+import { COMMISSION_RATE_DEFAULT } from "../config/billing";
 
 function isLastDayOfMonth(date: Date) {
     const nextDay = new Date(date);
@@ -111,7 +112,7 @@ export class BillingAggregationService {
             }
 
             const partySize = Number(item.party_size || 0);
-            const commissionRate = Number(item.commission_rate || "1.50");
+            const commissionRate = Number(item.commission_rate || COMMISSION_RATE_DEFAULT);
             const reservationAmountInCents = Math.round(partySize * commissionRate * 100);
 
             const group = groups.get(ownerId) || {

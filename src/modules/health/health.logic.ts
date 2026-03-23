@@ -1,6 +1,7 @@
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
 import { EmailType } from "../../types/mail.types";
 import stripe from "../../config/stripe";
+import { COMMISSION_RATE_CENTS } from "../../config/billing";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
@@ -38,9 +39,9 @@ export class HealthLogic {
 
     /**
      * Test charging a customer off-session using a saved payment method.
-     * This simulates the monthly commission collection ($1.50 per customer).
+     * This simulates the monthly commission collection (1.15€ per customer).
      */
-    async testChargeCustomer(customerId: string, amountInCents: number = 150) {
+    async testChargeCustomer(customerId: string, amountInCents: number = COMMISSION_RATE_CENTS) {
         // 1. Find the customer's default payment method
         const paymentMethods = await stripe.paymentMethods.list({
             customer: customerId,

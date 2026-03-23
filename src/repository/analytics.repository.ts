@@ -5,6 +5,7 @@ import { venuesTable } from "../config/db/venues.table";
 import { teamsTable } from "../config/db/sports.table";
 import { analyticsTable } from "../config/db/admin.table";
 import { eq, and, gte, lte, sql, count, desc, inArray } from "drizzle-orm";
+import { COMMISSION_RATE_DEFAULT } from "../config/billing";
 
 // ============================================
 // TYPES
@@ -201,7 +202,7 @@ export class AnalyticsRepository {
         // Calculate accrued commission for the period (unbilled check-ins)
         const commissionResult = await db.select({
             total_guests: sql<number>`COALESCE(SUM(${reservationsTable.party_size}), 0)::int`,
-            total_amount: sql<string>`COALESCE(SUM(${reservationsTable.party_size} * CAST(COALESCE(${reservationsTable.commission_rate}, '1.50') AS NUMERIC)), '0.00')`,
+            total_amount: sql<string>`COALESCE(SUM(${reservationsTable.party_size} * CAST(COALESCE(${reservationsTable.commission_rate}, ${COMMISSION_RATE_DEFAULT}) AS NUMERIC)), '0.00')`,
         })
         .from(reservationsTable)
         .where(and(

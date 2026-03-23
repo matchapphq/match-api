@@ -3,6 +3,7 @@ import { BillingRepository } from "../repository/billing.repository";
 import { ReservationRepository } from "../repository/reservation.repository";
 import type { Transaction } from "../config/db/billing.table";
 import stripe from "../config/stripe";
+import { COMMISSION_RATE_DEFAULT } from "../config/billing";
 
 type CommissionSource = "monthly_job" | "legacy_checkin" | "webhook";
 
@@ -249,8 +250,8 @@ export class CommissionBillingService {
 
         for (const detail of billingDetails) {
             const partySize = Math.max(Number(detail.party_size || 0), 1);
-            const commissionRate = Number(detail.commission_rate || "1.50");
-            const normalizedCommissionRate = Number.isFinite(commissionRate) ? commissionRate : 1.5;
+            const commissionRate = Number(detail.commission_rate || COMMISSION_RATE_DEFAULT);
+            const normalizedCommissionRate = Number.isFinite(commissionRate) ? commissionRate : Number(COMMISSION_RATE_DEFAULT);
             const amountForReservationInCents = Math.round(partySize * normalizedCommissionRate * 100);
             const checkInDate = detail.checked_in_at
                 ? new Date(detail.checked_in_at)
