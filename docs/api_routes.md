@@ -844,7 +844,7 @@ Rules:
 Response: 200
 {
   "model": "commission_per_checked_in_guest",
-  "default_rate": "1.50",
+  "default_rate": "1.15",
   "currency": "EUR",
   "unit": "guest_checked_in"
 }
