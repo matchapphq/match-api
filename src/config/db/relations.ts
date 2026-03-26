@@ -6,7 +6,7 @@ import { userLeagueFollowsTable } from './user-league-follows.table';
 import { userTeamFollowsTable } from './user-team-follows.table';
 import { venuesTable } from './venues.table';
 import { venuePhotosTable } from './venue-photos.table';
-import { countriesTable, sportsTable, leaguesTable, teamsTable } from './sports.table';
+import { countriesTable, sportsTable, leaguesTable, teamsTable, teamLeaguesTable } from './sports.table';
 import { matchesTable, venueMatchesTable } from './matches.table';
 import { seatsTable, seatHoldsTable } from './seats.table';
 import { reservationsTable } from './reservations.table';
@@ -154,20 +154,28 @@ export const leaguesRelations = relations(leaguesTable, ({ one, many }) => ({
         fields: [leaguesTable.country_id],
         references: [countriesTable.id],
     }),
-    teams: many(teamsTable),
+    teamLeagues: many(teamLeaguesTable),
     follows: many(userLeagueFollowsTable),
 }));
 
 export const teamsRelations = relations(teamsTable, ({ one, many }) => ({
-    league: one(leaguesTable, {
-        fields: [teamsTable.league_id],
-        references: [leaguesTable.id],
-    }),
+    teamLeagues: many(teamLeaguesTable),
     country: one(countriesTable, {
         fields: [teamsTable.country_id],
         references: [countriesTable.id],
     }),
     follows: many(userTeamFollowsTable),
+}));
+
+export const teamLeaguesRelations = relations(teamLeaguesTable, ({ one }) => ({
+    team: one(teamsTable, {
+        fields: [teamLeaguesTable.team_id],
+        references: [teamsTable.id],
+    }),
+    league: one(leaguesTable, {
+        fields: [teamLeaguesTable.league_id],
+        references: [leaguesTable.id],
+    }),
 }));
 
 export const matchesRelations = relations(matchesTable, ({ one, many }) => ({

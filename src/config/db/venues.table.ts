@@ -13,7 +13,7 @@ import {
     doublePrecision,
     geometry,
 } from 'drizzle-orm/pg-core';
-import { sql as drizzleSql } from 'drizzle-orm';
+import { sql as drizzleSql, sql } from 'drizzle-orm';
 import { usersTable } from './user.table';
 import { venueTypeEnum, venueStatusEnum, bookingModeEnum } from './enums';
 
@@ -98,6 +98,7 @@ export const venuesTable = pgTable('venues', {
         has_wifi: boolean('has_wifi').default(false),
         has_parking: boolean('has_parking').default(false),
         has_wheelchair_access: boolean('has_wheelchair_access').default(false),
+        photos_url: text("photos_url").array().default(sql`ARRAY[]::text[]`),
 
         // Menu 
         menu: jsonb('menu').default(drizzleSql`'[]'::jsonb`).$type<VenueMenu>(),

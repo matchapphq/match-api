@@ -251,11 +251,14 @@ export class VenueRepository {
         return result.length > 0;
     }
 
-    async getPhotos(venueId: string) {
-        return await db.select()
-            .from(venuePhotosTable)
+    public async getPhotos(venueId: string) {
+        const photos = await db.select({photos_url: venuesTable.photos_url}).from(venuePhotosTable)
             .where(eq(venuePhotosTable.venue_id, venueId))
             .orderBy(venuePhotosTable.display_order);
+        if (photos.length <= 0) {
+            return []
+        }
+        return photos;
     }
 
     async getPhoto(photoId: string, venueId: string) {

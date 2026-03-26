@@ -1,7 +1,7 @@
 import { db } from "../config/config.db";
-import { countriesTable, sportsTable, leaguesTable, teamsTable } from "../config/db/sports.table";
+import { countriesTable, sportsTable, leaguesTable, teamsTable, teamLeaguesTable } from "../config/db/sports.table";
 import { matchesTable } from "../config/db/matches.table";
-import { eq, and, sql, asc, desc, ilike } from "drizzle-orm";
+import { eq, and, sql, asc, desc, ilike, inArray } from "drizzle-orm";
 import type { ApiLeagueResponse, ApiTeamResponse, ApiFixtureResponse } from "../lib/api-sports";
 import { mapFixtureStatus } from "../lib/api-sports";
 
@@ -172,8 +172,8 @@ export class SportsRepository {
             limit,
             offset,
             with: {
-                teams: {
-                    columns: { id: true },
+                teamLeagues: {
+                    columns: { team_id: true },
                 },
             },
         });
@@ -181,8 +181,8 @@ export class SportsRepository {
         // Transform to include team count
         const data = leagues.map(league => ({
             ...league,
-            teamCount: league.teams?.length ?? 0,
-            teams: undefined,
+            teamCount: league.teamLeagues?.length ?? 0,
+            teamLeagues: undefined,
         }));
 
         const totalPages = Math.ceil(total / limit);
@@ -207,9 +207,10 @@ export class SportsRepository {
             where: eq(leaguesTable.id, leagueId),
             with: {
                 sport: true,
-                teams: {
-                    where: eq(teamsTable.is_active, true),
-                    orderBy: [asc(teamsTable.name)],
+                teamLeagues: {
+                    with: {
+                        team: true,
+                    },
                 },
             },
         });
@@ -218,7 +219,7 @@ export class SportsRepository {
 
         return {
             ...league,
-            teamCount: league.teams?.length ?? 0,
+            teamCount: league.teamLeagues?.length ?? 0,
         };
     }
 
@@ -230,8 +231,10 @@ export class SportsRepository {
             where: eq(leaguesTable.slug, slug),
             with: {
                 sport: true,
-                teams: {
-                    where: eq(teamsTable.is_active, true),
+                teamLeagues: {
+                    with: {
+                        team: true,
+                    },
                 },
             },
         });
@@ -250,7 +253,7 @@ export class SportsRepository {
         const offset = (page - 1) * limit;
 
         // Build where conditions
-        const conditions = [eq(teamsTable.league_id, leagueId)];
+        const conditions = [inArray(teamsTable.id, db.select({ team_id: teamLeaguesTable.team_id }).from(teamLeaguesTable).where(eq(teamLeaguesTable.league_id, leagueId)))];
         if (params.isActive !== undefined) {
             conditions.push(eq(teamsTable.is_active, params.isActive));
         }
@@ -292,9 +295,13 @@ export class SportsRepository {
         return await db.query.teamsTable.findFirst({
             where: eq(teamsTable.id, teamId),
             with: {
-                league: {
+                teamLeagues: {
                     with: {
-                        sport: true,
+                        league: {
+                            with: {
+                                sport: true,
+                            },
+                        },
                     },
                 },
             },
@@ -308,9 +315,13 @@ export class SportsRepository {
         return await db.query.teamsTable.findFirst({
             where: eq(teamsTable.slug, slug),
             with: {
-                league: {
+                teamLeagues: {
                     with: {
-                        sport: true,
+                        league: {
+                            with: {
+                                sport: true,
+                            },
+                        },
                     },
                 },
             },
@@ -504,6 +515,8 @@ export class SportsRepository {
 
         const existing = await this.findTeamByApiId(data.team.id);
 
+        let teamId: string;
+
         if (existing) {
             await db.update(teamsTable)
                 .set({
@@ -514,24 +527,29 @@ export class SportsRepository {
                     updated_at: new Date(),
                 })
                 .where(eq(teamsTable.id, existing.id));
-            return existing.id;
+            teamId = existing.id;
+        } else {
+            const [team] = await db.insert(teamsTable).values({
+                country_id: countryId,
+                api_id: data.team.id,
+                name: data.team.name,
+                slug: `${slug}-${data.team.id}`,
+                short_code: data.team.code,
+                country: data.team.country,
+                city: data.venue?.city ?? null,
+                founded_year: data.team.founded,
+                logo_url: data.team.logo,
+                is_active: true,
+            }).returning();
+            teamId = team!.id;
         }
 
-        const [team] = await db.insert(teamsTable).values({
+        await db.insert(teamLeaguesTable).values({
+            team_id: teamId,
             league_id: leagueId,
-            country_id: countryId,
-            api_id: data.team.id,
-            name: data.team.name,
-            slug: `${slug}-${data.team.id}`,
-            short_code: data.team.code,
-            country: data.team.country,
-            city: data.venue?.city ?? null,
-            founded_year: data.team.founded,
-            logo_url: data.team.logo,
-            is_active: true,
-        }).returning();
+        }).onConflictDoNothing();
 
-        return team!.id;
+        return teamId;
     }
 
     /**

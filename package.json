@@ -11,6 +11,7 @@
     "lint:commas:fix": "bun run lint:fix",
     "db:setup": "bun run src/config/setup.db.ts",
     "db:migrate": "bun run db:setup && drizzle-kit migrate",
+    "db:migrate:dev": "bun run --env-file=.env.dev db:setup && drizzle-kit migrate --config=drizzle.config.dev.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "bun run db:setup && drizzle-kit push",
     "db:push:dev": "bun run --env-file=.env.dev db:setup && drizzle-kit push --config=drizzle.config.dev.ts",

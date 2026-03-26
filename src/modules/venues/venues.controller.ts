@@ -174,7 +174,7 @@ class VenueController {
         }
     });
 
-    readonly getPhotos = this.factory.createHandlers(async (ctx) => {
+    public readonly getPhotos = this.factory.createHandlers(async (ctx) => {
         const venueId = ctx.req.param("venueId");
         if (!venueId) return ctx.json({ error: "Venue ID is required" }, 400);
 
