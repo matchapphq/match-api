@@ -129,7 +129,6 @@ export type NewLeague = typeof leaguesTable.$inferInsert;
 
 export const teamsTable = pgTable("teams", {
         id: uuid("id").primaryKey().defaultRandom(),
-        league_id: uuid("league_id").notNull(),
 
         country_id: uuid("country_id"),
 
@@ -153,14 +152,8 @@ export const teamsTable = pgTable("teams", {
             .notNull(),
     },
     (table) => [
-        index("idx_teams_league_id").on(table.league_id),
         index("idx_teams_slug").on(table.slug),
         index("idx_teams_is_active").on(table.is_active),
-        foreignKey({
-            columns: [table.league_id],
-            foreignColumns: [leaguesTable.id],
-            name: "fk_teams_league_id",
-        }).onDelete("cascade"),
         foreignKey({
             columns: [table.country_id],
             foreignColumns: [countriesTable.id],

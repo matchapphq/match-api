@@ -14,30 +14,46 @@ import { db } from "../config.db";
 import { leaguesTable, teamsTable } from "../db/sports.table";
 
 // Strictly limited to major European leagues and international competitions
-const MAJOR_LEAGUE_IDS = [
-    1,
-    2,
-    3,
-    4,
-    848, // World / Continental
-    39,
-    40,
-    45,
-    48, // England
-    135,
-    136,
-    137, // Italy
-    140,
-    141,
-    143, // Spain
-    78,
-    79,
-    81, // Germany
-    61,
-    62,
-    66,
-    65, // France
-];
+const MAJOR_LEAGUE_IDS = new Set([
+    // World / Continental
+    1,   // World Cup
+    2,   // Champions League
+    3,   // Europa League
+    4,   // Euro Championship
+    848, // Conference League
+
+    // England
+    39,  // Premier League
+    40,  // Championship
+    45,  // FA Cup
+    48,  // EFL Cup
+
+    // Italy
+    135, // Serie A
+    136, // Serie B
+    137, // Coppa Italia
+
+    // Spain
+    140, // La Liga
+    141, // La Liga 2
+    143, // Copa del Rey
+
+    // Germany
+    78,  // Bundesliga
+    79,  // 2. Bundesliga
+    81,  // DFB Pokal
+
+    // France
+    61,  // Ligue 1
+    62,  // Ligue 2
+    66,  // Coupe de France
+    65,  // Coupe de la Ligue
+
+    // Netherlands
+    88,  // Eredivisie
+    89,  // Eerste Divisie
+    90,  // KNVB Beker
+]);
 
 function getCurrentSeason(): string {
     const now = new Date();
@@ -69,7 +85,7 @@ async function sync() {
     const toDate = getToDate();
 
     console.log(`\n🚀 Optimized API-Sports Season Sync`);
-    console.log(`Season: ${season} | Leagues: ${MAJOR_LEAGUE_IDS.length}`);
+    console.log(`Season: ${season} | Leagues: ${MAJOR_LEAGUE_IDS.size}`);
     console.log(`Date Range: ${fromDate} to ${toDate}\n`);
 
     const sportId = await repo.getOrCreateFootballSport();
@@ -101,7 +117,7 @@ async function sync() {
     for (const apiLeagueId of MAJOR_LEAGUE_IDS) {
         try {
             console.log(
-                `[${++leagueCount}/${MAJOR_LEAGUE_IDS.length}] Syncing League ${apiLeagueId}...`,
+                `[${++leagueCount}/${MAJOR_LEAGUE_IDS.size}] Syncing League ${apiLeagueId}...`,
             );
 
             // 2. FETCH FIXTURES (1 call per league for the date range)
