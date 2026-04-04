@@ -63,7 +63,7 @@ export const fidelityLevelsTable = pgTable(
     },
     (table) => [
         index('idx_fidelity_levels_min_points').on(table.min_points),
-        index('idx_fidelity_levels_rank').on(table.rank),
+        uniqueIndex('idx_fidelity_levels_rank').on(table.rank),
     ],
 );
 

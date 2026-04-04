@@ -18,6 +18,8 @@
     "db:seed:sports-only:dev": "bun run --env-file=.env.dev src/config/seeds/seed-sports-only.ts",
     "db:seed:matches": "bun run src/config/seeds/seed-matches-only.ts",
     "db:seed:matches:dev": "bun run --env-file=.env.dev src/config/seeds/seed-matches-only.ts",
+    "db:seed:challenge": "bun run src/config/seeds/seed-challenge-rules.ts",
+    "db:seed:challenge:dev": "bun run --env-file=.env.dev src/config/seeds/seed-challenge-rules.ts",
     "dev": "bun --env-file=.env.dev --watch index.ts"
   },
   "devDependencies": {
