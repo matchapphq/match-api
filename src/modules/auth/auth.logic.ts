@@ -15,6 +15,7 @@ import { EmailType } from "../../types/mail.types";
 import { mapToClientUserProfile } from "../../utils/user-profile";
 import type { ClientUserProfile } from "../../types/user-profile.types";
 import { resolveHasPaymentMethodLive } from "../../utils/stripe-payment-method";
+import { FidelityLogic } from "../fidelity/fidelity.logic";
 
 const parsePositiveDays = (envValue: string | undefined, defaultDays: number): number => {
     const parsed = Number(envValue);
@@ -38,6 +39,7 @@ export class AuthLogic {
         private readonly referralRepo: typeof referralRepository,
         private readonly redis: Redis,
         private readonly storageService: StorageService,
+        private readonly fidelityLogic: FidelityLogic = new FidelityLogic(),
     ) {}
 
     /**
@@ -66,6 +68,14 @@ export class AuthLogic {
             throw new Error("USER_CREATION_FAILED");
         }
 
+        // Beta Challenge: +2 for signupé
+        await this.fidelityLogic.awardPoints({
+            userId: user.id,
+            actionKey: "BETA_SIGNUP",
+            referenceId: user.id,
+            referenceType: "user"
+        }).catch(err => console.error("[BetaChallenge] Signup points failed:", err));
+
         if (body.role === "venue_owner") {
             if (body.referralCode) {
                 await this.referralRepo.registerReferral(body.referralCode, user.id).catch(err => {
@@ -74,6 +84,21 @@ export class AuthLogic {
             }
             await this.enqueueWelcomeEmail(user, "welcome-partner", "/dashboard");
         } else if (body.role === "user") {
+            // Check for referral
+            if (body.referralCode) {
+                await this.referralRepo.registerReferral(body.referralCode, user.id).catch(err => {
+                    console.error("Referral registration failed:", err);
+                });
+
+                // Award points to the referred user (+1)
+                await this.fidelityLogic.awardPoints({
+                    userId: user.id,
+                    actionKey: "BETA_REFERRAL_SIGNUP",
+                    referenceId: body.referralCode,
+                    referenceType: "referral"
+                }).catch(err => console.error("[BetaChallenge] Referral signup points failed:", err));
+            }
+
             await userOnaboarding(body, this.authRepository, user.id);
             await this.enqueueWelcomeEmail(user, "welcome", "/discovery");
         }
@@ -106,6 +131,15 @@ export class AuthLogic {
         }
 
         const tokens = await this.generateAndStoreTokens(user, sessionDevice);
+        
+        // Beta Challenge: Daily connection
+        await this.fidelityLogic.awardPoints({
+            userId: user.id,
+            actionKey: "BETA_DAILY_CONNECTION",
+            referenceId: new Date().toISOString().split('T')[0]!,
+            referenceType: "daily_connection"
+        }).catch(err => console.error("[BetaChallenge] Daily points failed:", err));
+
         if (wasReactivated) {
             await this.enqueueWelcomeBackEmail(user);
         }
@@ -180,6 +214,15 @@ export class AuthLogic {
         if (!fullUser) throw new Error("USER_CREATION_FAILED");
 
         const tokens = await this.generateAndStoreTokens(fullUser, sessionDevice);
+
+        // Beta Challenge: Daily connection
+        await this.fidelityLogic.awardPoints({
+            userId: fullUser.id,
+            actionKey: "BETA_DAILY_CONNECTION",
+            referenceId: new Date().toISOString().split('T')[0]!,
+            referenceType: "daily_connection"
+        }).catch(err => console.error("[BetaChallenge] Daily points failed:", err));
+
         if (wasReactivated) {
             await this.enqueueWelcomeBackEmail({
                 ...user,
@@ -272,6 +315,15 @@ export class AuthLogic {
         if (!fullUser) throw new Error("USER_CREATION_FAILED");
 
         const tokens = await this.generateAndStoreTokens(fullUser, sessionDevice);
+
+        // Beta Challenge: Daily connection
+        await this.fidelityLogic.awardPoints({
+            userId: fullUser.id,
+            actionKey: "BETA_DAILY_CONNECTION",
+            referenceId: new Date().toISOString().split('T')[0]!,
+            referenceType: "daily_connection"
+        }).catch(err => console.error("[BetaChallenge] Daily points failed:", err));
+
         if (wasReactivated) {
             await this.enqueueWelcomeBackEmail({
                 ...user,

@@ -1,5 +1,5 @@
 import { createMiddleware } from "hono/factory";
-import { JwtUtils } from "../utils/jwt";
+import { JwtUtils, type TokenPayload } from "../utils/jwt";
 import { getSignedCookie } from "hono/cookie";
 import TokenRepository from "../repository/token.repository";
 
@@ -29,13 +29,14 @@ export const authMiddleware = createMiddleware(async (c, next) => {
     if (!token) {
         return c.json({ error: "Unauthorized" }, 401);
     }
-
-    let payload;
+    let payload: TokenPayload;
     try {
-        payload = await JwtUtils.verifyAccessToken(token);
-    } catch (error) {
-        console.error("[AUTH_MIDDLEWARE] Failed to verify access token:", error);
-        return c.json({ error: "Failed to verify access token" }, 500);
+        payload = await JwtUtils.verifyAccessToken(token) as TokenPayload;
+    } catch (error: any) {
+        if (error.name !== 'JwtTokenExpired') {
+            console.error("[AUTH_MIDDLEWARE] Failed to verify access token:", error);
+        }
+        return c.json({ error: "Unauthorized" }, 401);
     }
 
     if (!payload) {

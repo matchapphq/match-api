@@ -26,11 +26,13 @@ import ReferralService from "./modules/referral/referral.routes";
 import ReviewsService from "./modules/reviews/reviews.routes";
 import SupportService from "./modules/support/support.routes";
 import WebhooksService from "./modules/webhooks/webhooks.routes";
+import challengeRoutes from "./modules/challenge/challenge.routes";
 import UserRepository from "./repository/user.repository";
 
 // Initialize Workers
 import "./workers/stripe.worker";
 import "./workers/notification.worker";
+import type { HonoEnv } from "./types/hono.types";
 
 const authRouter = new AuthService();
 const userRouter = new UserService();
@@ -106,6 +108,7 @@ app.use('/partners/*', authMiddleware);
 app.use('/users/*', authMiddleware);
 app.use('/reservations/*', authMiddleware);
 app.use('/fidelity/*', authMiddleware);
+app.use("/challenge/*", authMiddleware);
 
 // Mount routes
 // Base: /api is usually handled by the entry point or Nginx, but here we assume app is mounted at /api or root. 
@@ -175,5 +178,8 @@ app.route("/boosts", boostRouter.getRouter);
 
 // Fidelity System (loyalty points, badges, challenges)
 app.route("/fidelity", fidelityRouter.getRouter);
+
+// Beta Challenge System
+app.route("/challenge", challengeRoutes);
 
 export default app;

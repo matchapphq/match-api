@@ -1,8 +1,11 @@
 import referralRepository from "../../repository/referral.repository";
+import { FidelityLogic } from "../fidelity/fidelity.logic";
 
 const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://match.app/register?ref=';
 
 export class ReferralLogic {
+    private readonly fidelityLogic: FidelityLogic = new FidelityLogic();
+
     async getCode(userId: string) {
         let referralCode = await referralRepository.getReferralCode(userId);
         
@@ -62,6 +65,22 @@ export class ReferralLogic {
 
         if (!result.success) {
             throw new Error(result.error || "REGISTRATION_FAILED");
+        }
+
+        // Beta Challenge: +10 buts for the referrer
+        const referrerId = await referralRepository.findReferrerByCode(referralCode);
+        if (referrerId) {
+            await this.fidelityLogic.awardPoints({
+                userId: referrerId,
+                actionKey: "BETA_REFERRAL_AWARD",
+                referenceId: result.referral_id!,
+                referenceType: "referral",
+                metadata: { referredUserId }
+            }).catch(err => console.error("[BetaChallenge] Referral award failed:", err));
+            
+            // Increment stat for leaderboard tie-breaker
+            await this.fidelityLogic.incrementUserStat(referrerId, "total_invites_completed")
+                .catch(err => console.error("[BetaChallenge] Stat increment failed:", err));
         }
 
         return {

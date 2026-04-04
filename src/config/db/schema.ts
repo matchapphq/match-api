@@ -21,6 +21,7 @@ export * from "./waitlist.table";
 export * from "./referral.table";
 export * from "./boost.table";
 export * from "./fidelity.table";
+export * from "./beta-challenge.table";
 export * from "./user-history.table";
 export * from "./curation.table";
 export * from "./relations";
