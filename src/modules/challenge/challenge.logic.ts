@@ -22,7 +22,7 @@ export class ChallengeLogic {
     async getStatus(userId: string): Promise<ChallengeStatus> {
         const stats = await fidelityRepository.getUserStats(userId);
         const rank = await challengeRepository.getUserRank(userId);
-        
+        console.log(stats);
         const totalButs = stats?.total_points || 0;
         
         // Milestone logic (simplified for now)

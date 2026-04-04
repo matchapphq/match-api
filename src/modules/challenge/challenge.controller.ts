@@ -11,9 +11,7 @@ class ChallengeController {
     public readonly getStatus = this.factory.createHandlers(async (c) => {
         try {
             const user = c.get("user");
-            console.log("User:", user);
             if (!user?.id) {
-                console.log("Unauthorized access attempt in this part of the code");
                 return c.json({ error: "Unauthorized" }, 401);
             }
 
