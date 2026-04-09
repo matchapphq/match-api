@@ -23,6 +23,7 @@ function buildReservationBatchHash(reservationIds: string[]) {
 
 interface MonthlyOwnerGroup {
     ownerId: string;
+    venueId: string;
     stripeCustomerId: string | null;
     reservationIds: string[];
     totalGuests: number;
@@ -102,12 +103,13 @@ export class BillingAggregationService {
             };
         }
 
-        // 2. Group by venue owner
+        // 2. Group by venue owner AND venue to keep billing separated per establishment.
         const groups = new Map<string, MonthlyOwnerGroup>();
 
         for (const item of unbilled) {
             const ownerId = item.owner_id;
-            if (!ownerId) {
+            const venueId = item.venue_id;
+            if (!ownerId || !venueId) {
                 continue;
             }
 
@@ -115,8 +117,10 @@ export class BillingAggregationService {
             const commissionRate = Number(item.commission_rate || COMMISSION_RATE_DEFAULT);
             const reservationAmountInCents = Math.round(partySize * commissionRate * 100);
 
-            const group = groups.get(ownerId) || {
+            const groupKey = `${ownerId}:${venueId}`;
+            const group = groups.get(groupKey) || {
                 ownerId,
+                venueId,
                 stripeCustomerId: item.stripe_customer_id || null,
                 reservationIds: [],
                 totalGuests: 0,
@@ -130,7 +134,7 @@ export class BillingAggregationService {
             group.reservationIds.push(item.reservation_id);
             group.totalGuests += partySize;
             group.totalAmountInCents += reservationAmountInCents;
-            groups.set(ownerId, group);
+            groups.set(groupKey, group);
         }
 
         let totalProcessed = 0;
@@ -139,17 +143,21 @@ export class BillingAggregationService {
         let pendingOwners = 0;
         let skippedOwners = 0;
 
-        // 3. Charge each owner once for the full monthly commission.
+        // 3. Charge each owner once per venue for the full monthly commission of that venue.
         for (const data of groups.values()) {
             if (!data.stripeCustomerId) {
                 skippedOwners += 1;
-                console.warn(`[BillingAggregation] Missing Stripe customer for owner ${data.ownerId}. Skipping.`);
+                console.warn(
+                    `[BillingAggregation] Missing Stripe customer for owner ${data.ownerId} venue ${data.venueId}. Skipping.`,
+                );
                 continue;
             }
 
             if (data.totalAmountInCents <= 0) {
                 skippedOwners += 1;
-                console.warn(`[BillingAggregation] Computed amount is zero for owner ${data.ownerId}. Skipping.`);
+                console.warn(
+                    `[BillingAggregation] Computed amount is zero for owner ${data.ownerId} venue ${data.venueId}. Skipping.`,
+                );
                 continue;
             }
 
@@ -157,7 +165,9 @@ export class BillingAggregationService {
                 const paymentMethodId = await this.resolvePaymentMethodId(data.stripeCustomerId);
                 if (!paymentMethodId) {
                     skippedOwners += 1;
-                    console.warn(`[BillingAggregation] No payment method found for owner ${data.ownerId}. Skipping.`);
+                    console.warn(
+                        `[BillingAggregation] No payment method found for owner ${data.ownerId} venue ${data.venueId}. Skipping.`,
+                    );
                     continue;
                 }
 
@@ -171,13 +181,14 @@ export class BillingAggregationService {
                     metadata: {
                         type: "monthly_commission",
                         venue_owner_id: data.ownerId,
+                        venue_id: data.venueId,
                         total_guests: String(data.totalGuests),
                         reservation_count: String(data.reservationIds.length),
                         billing_period: billingPeriod,
                     },
                     description: `Commission ${billingPeriod}`,
                 }, {
-                    idempotencyKey: `monthly-commission-${data.ownerId}-${billingPeriod}-${buildReservationBatchHash(data.reservationIds)}`,
+                    idempotencyKey: `monthly-commission-${data.ownerId}-${data.venueId}-${billingPeriod}-${buildReservationBatchHash(data.reservationIds)}`,
                 });
 
                 await this.commissionBillingService.recordCommissionPaymentPending({
@@ -244,7 +255,10 @@ export class BillingAggregationService {
                 }
 
                 failedOwners += 1;
-                console.error(`[BillingAggregation] Failed to charge owner ${data.ownerId}:`, error?.message || error);
+                console.error(
+                    `[BillingAggregation] Failed to charge owner ${data.ownerId} venue ${data.venueId}:`,
+                    error?.message || error,
+                );
             }
         }
 
