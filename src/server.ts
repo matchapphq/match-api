@@ -85,21 +85,25 @@ setInterval(() => {
 }, accountDeletionCleanupIntervalMs);
 
 const app = new Hono().basePath("/api");
+const allowedOrigins = [
+    "http://localhost:3000",
+    "https://matchapp.fr",
+    "http://matchapp.fr",
+    "http://localhost:5173",
+    process.env.FRONTEND_URL,
+].filter((origin): origin is string => Boolean(origin && origin.trim()));
 
 // CORS - must be first (with credentials for cookies)
 app.use('*', cors({
-    origin: [
-        'http://localhost:3000',
-        'https://matchapp.fr',
-        'http://matchapp.fr',
-        'http://localhost:5173',
-        'matchapp.fr',
-        process.env.FRONTEND_URL as string,
-    ],
+    origin: allowedOrigins,
     credentials: true,
 }));
 
 app.use(logger());
+app.use("*", async (c, next) => {
+    await next();
+    c.header("X-Robots-Tag", "noindex, nofollow");
+});
 app.route("/health", healthRouter.getRouter);
 
 // Auth Middleware for protected routes
@@ -181,5 +185,7 @@ app.route("/fidelity", fidelityRouter.getRouter);
 
 // Beta Challenge System
 app.route("/challenge", challengeRoutes);
+
+app.notFound((c) => c.json({ error: "Not found" }, 404));
 
 export default app;
