@@ -11,12 +11,15 @@
     "lint:commas:fix": "bun run lint:fix",
     "db:setup": "bun run src/config/setup.db.ts",
     "db:migrate": "bun run db:setup && drizzle-kit migrate",
+    "db:migrate:dev": "bun run --env-file=.env.dev db:setup && drizzle-kit migrate --config=drizzle.config.dev.ts",
     "db:generate": "drizzle-kit generate",
     "db:push": "bun run db:setup && drizzle-kit push",
     "db:push:dev": "bun run --env-file=.env.dev db:setup && drizzle-kit push --config=drizzle.config.dev.ts",
     "db:seed:sports-only:dev": "bun run --env-file=.env.dev src/config/seeds/seed-sports-only.ts",
     "db:seed:matches": "bun run src/config/seeds/seed-matches-only.ts",
     "db:seed:matches:dev": "bun run --env-file=.env.dev src/config/seeds/seed-matches-only.ts",
+    "db:seed:challenge": "bun run src/config/seeds/seed-challenge-rules.ts",
+    "db:seed:challenge:dev": "bun run --env-file=.env.dev src/config/seeds/seed-challenge-rules.ts",
     "dev": "bun --env-file=.env.dev --watch index.ts"
   },
   "devDependencies": {

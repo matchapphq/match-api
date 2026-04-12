@@ -6,7 +6,7 @@
  */
 
 import { db } from "../config.db";
-import { sportsTable, leaguesTable, teamsTable } from "../db/sports.table";
+import { sportsTable, leaguesTable, teamsTable, teamLeaguesTable } from "../db/sports.table";
 import { eq } from "drizzle-orm";
 
 // ============================================
@@ -486,8 +486,7 @@ async function seedSports() {
 
                 // Insert teams for this league
                 for (const teamData of leagueData.teams) {
-                    const [team] = await db.insert(teamsTable).values({
-                        league_id: league.id,
+                    let [team] = await db.insert(teamsTable).values({
                         name: teamData.name,
                         slug: teamData.slug,
                         city: teamData.city,
@@ -497,9 +496,19 @@ async function seedSports() {
                         is_active: true,
                     }).onConflictDoNothing().returning();
 
+                    if (!team) {
+                        const existing = await db.select().from(teamsTable).where(eq(teamsTable.slug, teamData.slug));
+                        team = existing[0];
+                    }
+
                     if (team) {
+                        await db.insert(teamLeaguesTable).values({
+                            team_id: team.id,
+                            league_id: league.id,
+                        }).onConflictDoNothing();
+
                         teamCount++;
-                        console.log(`    🏆 Created team: ${team.name}`);
+                        console.log(`    🏆 Processed team: ${team.name}`);
                     }
                 }
             }

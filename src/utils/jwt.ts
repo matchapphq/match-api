@@ -62,8 +62,10 @@ export class JwtUtils {
         try {
             const payload = await verify(token, Bun.env.SECRET_KEY, "HS256") as TokenPayload;
             return payload;
-        } catch (error) {
-            console.error("Error verifying access token:", error);
+        } catch (error: any) {
+            if (error.name !== 'JwtTokenExpired') {
+                console.error("Error verifying access token:", error);
+            }
             return null;
         }
     }
@@ -74,8 +76,10 @@ export class JwtUtils {
         }
         try {
             return await verify(token, Bun.env.REFRESH_SECRET_KEY, "HS256") as TokenPayload;
-        } catch (error) {
-            console.error("Error verifying refresh token:", error);
+        } catch (error: any) {
+            if (error.name !== 'JwtTokenExpired') {
+                console.error("Error verifying refresh token:", error);
+            }
             return null;
         }
     }

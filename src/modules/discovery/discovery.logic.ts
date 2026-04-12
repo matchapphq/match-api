@@ -1,7 +1,7 @@
 import { db } from "../../config/config.db";
 import { venuesTable } from "../../config/db/venues.table";
 import { matchesTable, venueMatchesTable } from "../../config/db/matches.table";
-import { teamsTable, userPreferencesTable, openingHoursExceptionsTable, leaguesTable, userLeagueFollowsTable, sportsTable, countriesTable, userTeamFollowsTable } from "../../config/db/schema";
+import { teamsTable, teamLeaguesTable, userPreferencesTable, openingHoursExceptionsTable, leaguesTable, userLeagueFollowsTable, sportsTable, countriesTable, userTeamFollowsTable } from "../../config/db/schema";
 import { eq, and, gte, lte, ilike, or, isNull, asc, desc, sql, inArray } from "drizzle-orm";
 
 import { DiscoveryRepository } from "../../repository/discovery.repository";
@@ -372,7 +372,11 @@ export class DiscoveryLogic {
         const teams = await db.query.teamsTable.findMany({
             where: inArray(teamsTable.id, teamIds),
             with: {
-                league: true,
+                teamLeagues: {
+                    with: {
+                        league: true,
+                    },
+                },
                 country: true,
             },
         });
@@ -648,10 +652,6 @@ export class DiscoveryLogic {
         }));
     }
 
-    public async getTeamDetails(teamId: string, userId?: string) {
-        // ... (existing code)
-    }
-
     public async getFilters() {
         const [countries, leagues] = await Promise.all([
             db.query.countriesTable.findMany({
@@ -686,7 +686,7 @@ export class DiscoveryLogic {
                 });
                 const leagueIds = leagues.map(l => l.id);
                 if (leagueIds.length > 0) {
-                    teamConditions.push(inArray(teamsTable.league_id, leagueIds));
+                    teamConditions.push(inArray(teamsTable.id, db.select({ team_id: teamLeaguesTable.team_id }).from(teamLeaguesTable).where(inArray(teamLeaguesTable.league_id, leagueIds))));
                 }
             }
         }
@@ -701,7 +701,7 @@ export class DiscoveryLogic {
         }
 
         if (filters?.leagueId) {
-            teamConditions.push(eq(teamsTable.league_id, filters.leagueId));
+            teamConditions.push(inArray(teamsTable.id, db.select({ team_id: teamLeaguesTable.team_id }).from(teamLeaguesTable).where(eq(teamLeaguesTable.league_id, filters.leagueId))));
         }
 
         if (filters?.query) {
@@ -711,7 +711,11 @@ export class DiscoveryLogic {
         const teams = await db.query.teamsTable.findMany({
             where: and(...teamConditions),
             with: {
-                league: true,
+                teamLeagues: {
+                    with: {
+                        league: true,
+                    },
+                },
                 country: true,
             },
             orderBy: [asc(teamsTable.name)],
@@ -738,7 +742,11 @@ export class DiscoveryLogic {
         const team = await db.query.teamsTable.findFirst({
             where: eq(teamsTable.id, teamId),
             with: {
-                league: true,
+                teamLeagues: {
+                    with: {
+                        league: true,
+                    },
+                },
                 country: true,
             },
         });

@@ -2,7 +2,8 @@ export enum NotificationType {
   EMAIL = 'send_email',
   PUSH = 'send_push',
   SMS = 'send_sms',
-  PUSH_NOTIFICATION = 'send_push_notification'
+  PUSH_NOTIFICATION = 'send_push_notification',
+  SYSTEM_UPCOMING_MATCH_CRON = 'system_upcoming_match_cron'
 }
 
 export enum EmailTemplate {
@@ -42,6 +43,7 @@ export interface PushData {
   tokens: string[]; // Expo tokens
   title: string;
   body: string;
+  data?: Record<string, unknown>;
 }
 
 // Discriminated union based on enum values
@@ -57,4 +59,8 @@ export type NotificationPayload =
   | (NotificationJobBase & {
       type: NotificationType.PUSH | NotificationType.PUSH_NOTIFICATION;
       data: PushData;
+    })
+  | (NotificationJobBase & {
+      type: NotificationType.SYSTEM_UPCOMING_MATCH_CRON;
+      data?: never;
     });

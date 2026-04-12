@@ -9,6 +9,7 @@ import { EmailType } from "../../types/mail.types";
 import { mapToClientUserProfile } from "../../utils/user-profile";
 import type { ClientUserProfile } from "../../types/user-profile.types";
 import { resolveHasPaymentMethodLive } from "../../utils/stripe-payment-method";
+import { FidelityLogic } from "../fidelity/fidelity.logic";
 
 const parsePositiveDays = (envValue: string | undefined, defaultDays: number): number => {
     const parsed = Number(envValue);
@@ -31,6 +32,7 @@ export class UserLogic {
         private readonly favoritesRepository: FavoritesRepository,
         private readonly tokenRepository: TokenRepository,
         private readonly storageService: StorageService,
+        private readonly fidelityLogic: FidelityLogic = new FidelityLogic(),
     ) {}
 
     /**
@@ -128,7 +130,20 @@ export class UserLogic {
             });
         }
 
-        return this.getUserProfile(userId);
+        const fullProfile = await this.getUserProfile(userId);
+        
+        // Beta Challenge: Profile Completed (+1 but)
+        // Requis: Bio + Avatar + Fav Sports
+        if (fullProfile.bio && fullProfile.avatar_url && fullProfile.fav_sports?.length > 0) {
+            await this.fidelityLogic.awardPoints({
+                userId,
+                actionKey: "BETA_PROFILE_COMPLETED",
+                referenceId: userId,
+                referenceType: "user"
+            }).catch(err => console.error("[BetaChallenge] Profile completion failed:", err));
+        }
+
+        return fullProfile;
     }
 
     async getNotificationPreferences(userId: string) {

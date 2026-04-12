@@ -437,6 +437,29 @@ export class ReferralRepository {
             .limit(1);
         return result.length > 0;
     }
+
+    /**
+     * Get referral by referred user ID
+     */
+    async getReferralByReferredId(referredUserId: string) {
+        const result = await db.select()
+            .from(referralsTable)
+            .where(eq(referralsTable.referred_user_id, referredUserId))
+            .limit(1);
+        return result[0] ?? null;
+    }
+
+    /**
+     * Update referral status
+     */
+    async updateReferralStatus(referralId: string, status: any) {
+        return db.update(referralsTable)
+            .set({ 
+                status,
+                updated_at: new Date()
+            })
+            .where(eq(referralsTable.id, referralId));
+    }
 }
 
 export default new ReferralRepository();
