@@ -47,7 +47,7 @@ export class ChallengeRepository {
             rank: index + 1,
             userId: row.id,
             name: row.username || [row.first_name, row.last_name].filter(Boolean).join(" ") || "Utilisateur Match",
-            avatarUrl: row.avatar_url || undefined,
+            avatar: row.avatar_url || undefined,
             buts: row.total_buts,
             visites: row.visites || 0,
             parrainages: row.parrainages || 0,
