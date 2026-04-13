@@ -40,34 +40,32 @@ async function awardRetroactiveSignupPoints() {
     let count = 0;
     for (const user of usersToAward) {
         try {
-            await db.transaction(async (tx) => {
-                // Award the points
-                await tx.insert(fidelityPointTransactionsTable).values({
-                    user_id: user.id,
-                    action_key: "BETA_SIGNUP",
-                    reference_id: user.id, // Using user ID as reference for signup
-                    reference_type: "user_signup",
-                    points: points,
-                    description: description,
-                    idempotency_key: `${user.id}:BETA_SIGNUP:${user.id}`
-                });
-
-                // Update user total stats
-                // We use a raw SQL increment to be safe with concurrent updates
-                await tx.insert(fidelityUserStatsTable)
-                    .values({
-                        user_id: user.id,
-                        total_points: points,
-                        last_activity_date: new Date()
-                    })
-                    .onConflictDoUpdate({
-                        target: fidelityUserStatsTable.user_id,
-                        set: { 
-                            total_points: sql`${fidelityUserStatsTable.total_points} + ${points}`,
-                            last_activity_date: new Date()
-                        }
-                    });
+            // Award the points
+            await db.insert(fidelityPointTransactionsTable).values({
+                user_id: user.id,
+                action_key: "BETA_SIGNUP",
+                reference_id: user.id, // Using user ID as reference for signup
+                reference_type: "user_signup",
+                points: points,
+                description: description,
+                idempotency_key: `${user.id}:BETA_SIGNUP:${user.id}`
             });
+
+            // Update user total stats
+            // We use a raw SQL increment to be safe with concurrent updates
+            await db.insert(fidelityUserStatsTable)
+                .values({
+                    user_id: user.id,
+                    total_points: points,
+                    last_activity_date: new Date()
+                })
+                .onConflictDoUpdate({
+                    target: fidelityUserStatsTable.user_id,
+                    set: { 
+                        total_points: sql`${fidelityUserStatsTable.total_points} + ${points}`,
+                        last_activity_date: new Date()
+                    }
+                });
             count++;
             if (count % 10 === 0) console.log(`Processed ${count}/${usersToAward.length}...`);
         } catch (err) {
