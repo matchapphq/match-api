@@ -233,9 +233,16 @@ Headers: Authorization: Bearer <token>
 
 Response: 200
 {
-  user: User;
+  user: {
+    // ...existing user fields
+    has_completed_onboarding: boolean;
+    onboarding_step?: "first_venue" | "paiement_method" | "paiement_method_skipped" | "done" | null;
+  };
 }
 ```
+
+> Implementation note (April 2026): `onboarding_step` for `venue_owner` is currently being rolled out.
+> Source of truth is moving from payment-method-only checks to explicit onboarding state.
 
 ### PUT /api/users/me
 **Update current user profile**
@@ -250,6 +257,7 @@ Request body:
   phone?: string;
   avatar_url?: string;
   bio?: string;
+  onboarding_step?: "first_venue" | "paiement_method" | "paiement_method_skipped" | "done";
 }
 
 Response: 200
@@ -833,6 +841,7 @@ Response: 201
 Rules:
 - First venue without payment method: created with `is_active=false`, `status='pending'`, `requires_payment_setup=true`.
 - Additional venues without payment method: `403 PAYMENT_METHOD_REQUIRED`.
+- On first venue creation, onboarding step moves to `paiement_method` (for `venue_owner`).
 
 ### POST /api/partners/venues/verify-checkout
 **Deprecated — returns `410 Gone`**
