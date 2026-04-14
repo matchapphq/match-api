@@ -57,6 +57,6 @@ export function mapToClientUserProfile(
         created_at: user.created_at,
         has_payment_method: hasPaymentMethod,
         has_completed_onboarding: hasCompletedOnboarding,
+        onboarding_step: hasCompletedOnboarding ? "done" : null,
     };
 }
-

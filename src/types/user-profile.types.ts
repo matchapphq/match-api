@@ -1,6 +1,7 @@
 export type AuthProvider = "google" | "apple" | "email";
 
 export type UserRole = "user" | "venue_owner" | "admin";
+export type PartnerOnboardingStep = "first_venue" | "paiement_method" | "paiement_method_skipped" | "done" | null;
 
 export interface UserProfileSource {
     id: string;
@@ -42,5 +43,5 @@ export interface ClientUserProfile {
     created_at: Date | string;
     has_payment_method: boolean;
     has_completed_onboarding: boolean;
+    onboarding_step: PartnerOnboardingStep;
 }
-
