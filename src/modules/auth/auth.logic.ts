@@ -1,6 +1,6 @@
 import { password, randomUUIDv7 } from "bun";
 import { JwtUtils, type TokenPayload } from "../../utils/jwt";
-import UserRepository from "../../repository/user.repository";
+import UserRepository, { type PartnerOnboardingStep } from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
 import AuthRepository from "../../repository/auth/auth.repository";
 import referralRepository, { ReferralRepository } from "../../repository/referral.repository";
@@ -77,6 +77,8 @@ export class AuthLogic {
         }).catch(err => console.error("[BetaChallenge] Signup points failed:", err));
 
         if (body.role === "venue_owner") {
+            await this.userRepository.initializePartnerOnboardingStep(user.id);
+
             if (body.referralCode) {
                 await this.referralRepo.registerReferral(body.referralCode, user.id).catch(err => {
                     console.error("Referral registration failed:", err);
@@ -680,6 +682,23 @@ export class AuthLogic {
         return this.toMs(deletedAt) <= Date.now() - this.accountDeletionGraceMs;
     }
 
+    private async resolvePartnerOnboardingStep(
+        userId: string,
+        hasPaymentMethod: boolean,
+    ): Promise<PartnerOnboardingStep> {
+        if (hasPaymentMethod) {
+            return "done";
+        }
+
+        const venueCount = await this.userRepository.getOwnedVenueCount(userId);
+        if (venueCount > 0) {
+            const savedStep = await this.userRepository.getPartnerOnboardingStep(userId);
+            return savedStep === "paiement_method_skipped" ? "paiement_method_skipped" : "paiement_method";
+        }
+
+        return "first_venue";
+    }
+
     private async getClientUser(userId: string): Promise<ClientUserProfile> {
         const rows = await this.userRepository.getMe({ id: userId });
         if (!rows || rows.length === 0) {
@@ -695,6 +714,12 @@ export class AuthLogic {
         const hasPaymentMethod = await resolveHasPaymentMethodLive(
             user.stripe_customer_id,
         );
+        const onboardingStep =
+            baseProfile.role === "venue_owner"
+                ? await this.resolvePartnerOnboardingStep(userId, hasPaymentMethod)
+                : baseProfile.has_completed_onboarding
+                    ? "done"
+                    : null;
 
         return {
             ...baseProfile,
@@ -703,6 +728,7 @@ export class AuthLogic {
                 baseProfile.role === "venue_owner"
                     ? hasPaymentMethod
                     : baseProfile.has_completed_onboarding,
+            onboarding_step: onboardingStep,
         };
     }
 }

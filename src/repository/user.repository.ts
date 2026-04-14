@@ -1,6 +1,7 @@
-import { and, eq, isNotNull, lte } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { db } from "../config/config.db";
 import { userDeleteReasonsTable, userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
+import { venuesTable } from "../config/db/venues.table";
 import type { userRegisterData } from "../utils/userData";
 import { password, randomUUIDv7 } from "bun";
 
@@ -48,6 +49,13 @@ export interface UpdatePrivacyPreferencesData {
     legal_updates_email?: boolean;
 }
 
+export type PartnerOnboardingStep =
+    | "first_venue"
+    | "paiement_method"
+    | "paiement_method_skipped"
+    | "done"
+    | null;
+
 type AuthUser = {
     id: string;
     email: string;
@@ -86,6 +94,8 @@ const DEFAULT_PRIVACY_PREFERENCES: PrivacyPreferences = {
     marketing_consent: false,
     legal_updates_email: true,
 };
+
+const PARTNER_ONBOARDING_STEP_KEY = "onboarding_step";
 
 const asRecord = (value: unknown): Record<string, unknown> => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -139,10 +149,25 @@ const normalizePrivacyPreferences = (settings: unknown): PrivacyPreferences => {
 const mergePreferenceSettings = (
     notifications: NotificationPreferences,
     privacy: PrivacyPreferences,
+    existing: Record<string, unknown> = {},
 ): Record<string, unknown> => ({
+    ...existing,
     ...notifications,
     ...privacy,
 });
+
+const normalizePartnerOnboardingStep = (value: unknown): PartnerOnboardingStep | null => {
+    if (
+        value === "first_venue" ||
+        value === "paiement_method" ||
+        value === "paiement_method_skipped" ||
+        value === "done"
+    ) {
+        return value;
+    }
+
+    return null;
+};
 
 class UserRepository {
     private async getUserPreferenceRow(userId: string) {
@@ -449,7 +474,7 @@ class UserRepository {
         );
 
         const nextPrivacy = normalizePrivacyPreferences(existingSettings);
-        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy);
+        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy, existingSettings);
         await this.upsertPreferenceSettings(userId, mergedSettings);
 
         return nextNotifications;
@@ -473,10 +498,47 @@ class UserRepository {
             updates,
         );
 
-        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy);
+        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy, existingSettings);
         await this.upsertPreferenceSettings(userId, mergedSettings);
 
         return nextPrivacy;
+    }
+
+    public async getPartnerOnboardingStep(userId: string): Promise<PartnerOnboardingStep | null> {
+        const existing = await this.getUserPreferenceRow(userId);
+        const existingSettings = asRecord(existing?.notification_settings);
+        return normalizePartnerOnboardingStep(existingSettings[PARTNER_ONBOARDING_STEP_KEY]);
+    }
+
+    public async setPartnerOnboardingStep(userId: string, step: PartnerOnboardingStep): Promise<void> {
+        const existing = await this.getUserPreferenceRow(userId);
+        const existingSettings = asRecord(existing?.notification_settings);
+
+        await this.upsertPreferenceSettings(userId, {
+            ...existingSettings,
+            [PARTNER_ONBOARDING_STEP_KEY]: step,
+        });
+    }
+
+    public async initializePartnerOnboardingStep(userId: string): Promise<void> {
+        const existing = await this.getUserPreferenceRow(userId);
+        const existingSettings = asRecord(existing?.notification_settings);
+
+        await this.upsertPreferenceSettings(userId, {
+            ...existingSettings,
+            [PARTNER_ONBOARDING_STEP_KEY]: "first_venue",
+        });
+    }
+
+    public async getOwnedVenueCount(userId: string): Promise<number> {
+        const [row] = await db.select({
+            count: count(),
+        }).from(venuesTable).where(and(
+            eq(venuesTable.owner_id, userId),
+            isNull(venuesTable.deleted_at),
+        ));
+
+        return Number(row?.count ?? 0);
     }
     
     public async doesUserExist(email: string): Promise<boolean> {

@@ -128,6 +128,13 @@ class UserController {
                 budget: typeof body.budget === "string" ? body.budget : undefined,
                 home_lat: typeof body.home_lat === "number" ? body.home_lat : undefined,
                 home_lng: typeof body.home_lng === "number" ? body.home_lng : undefined,
+                onboarding_step:
+                    body.onboarding_step === "first_venue" ||
+                    body.onboarding_step === "paiement_method" ||
+                    body.onboarding_step === "paiement_method_skipped" ||
+                    body.onboarding_step === "done"
+                        ? body.onboarding_step
+                        : undefined,
             };
 
             // Remove undefined fields
