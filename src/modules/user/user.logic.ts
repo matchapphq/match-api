@@ -164,7 +164,7 @@ export class UserLogic {
         
         // Beta Challenge: Profile Completed (+1 but)
         // Requis: Bio + Avatar + Fav Sports
-        if (fullProfile.bio && fullProfile.avatar_url && fullProfile.fav_sports?.length > 0) {
+        if (fullProfile.bio && fullProfile.avatar && fullProfile.preferences.sports.length > 0) {
             await this.fidelityLogic.awardPoints({
                 userId,
                 actionKey: "BETA_PROFILE_COMPLETED",
