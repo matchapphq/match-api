@@ -77,13 +77,17 @@ export class UserLogic {
                 : baseProfile.has_completed_onboarding
                     ? "done"
                     : null;
+        const hasCompletedVenueOwnerOnboarding =
+            hasPaymentMethod ||
+            onboardingStep === "paiement_method_skipped" ||
+            onboardingStep === "done";
 
         return {
             ...baseProfile,
             has_payment_method: hasPaymentMethod,
             has_completed_onboarding:
                 baseProfile.role === "venue_owner"
-                    ? hasPaymentMethod
+                    ? hasCompletedVenueOwnerOnboarding
                     : baseProfile.has_completed_onboarding,
             onboarding_step: onboardingStep,
         };
