@@ -7,6 +7,7 @@ import { resolveHasPaymentMethodLive } from "../../utils/stripe-payment-method";
 import { assertVenueIsActiveForOperations } from "../../utils/venue-active.guard";
 import { BillingRepository } from "../../repository/billing.repository";
 import { ReservationRepository } from "../../repository/reservation.repository";
+import UserRepository from "../../repository/user.repository";
 
 function extractReservationIdsFromBillingNotes(notes?: string | null) {
     if (!notes) return [];
@@ -30,6 +31,7 @@ export class PartnerLogic {
         private readonly waitlistRepo: WaitlistRepository,
         private readonly billingRepo: BillingRepository = new BillingRepository(),
         private readonly reservationRepo: ReservationRepository = new ReservationRepository(),
+        private readonly userRepository: UserRepository = new UserRepository(),
     ) {}
 
     async getMyVenues(userId: string) {
@@ -68,6 +70,14 @@ export class PartnerLogic {
 
         if (!venue) {
             throw new Error("VENUE_CREATION_FAILED");
+        }
+
+        if (isFirstVenue && !hasPaymentMethod) {
+            try {
+                await this.userRepository.setPartnerOnboardingStep(userId, "paiement_method");
+            } catch (error) {
+                console.warn("Unable to persist onboarding step after first venue creation:", error);
+            }
         }
 
         return {
