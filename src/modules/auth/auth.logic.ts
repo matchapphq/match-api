@@ -2,6 +2,7 @@ import { password, randomUUIDv7 } from "bun";
 import { JwtUtils, type TokenPayload } from "../../utils/jwt";
 import UserRepository, { type PartnerOnboardingStep } from "../../repository/user.repository";
 import TokenRepository from "../../repository/token.repository";
+import { PartnerRepository } from "../../repository/partner/partner.repository";
 import AuthRepository from "../../repository/auth/auth.repository";
 import referralRepository, { ReferralRepository } from "../../repository/referral.repository";
 import { userOnaboarding } from "./auth.helper";
@@ -26,6 +27,8 @@ const parsePositiveDays = (envValue: string | undefined, defaultDays: number): n
  * Service handling Pure Business Logic for Authentication.
  */
 export class AuthLogic {
+    private readonly partnerRepository = new PartnerRepository();
+
     private readonly sessionInactivityMs =
         parsePositiveDays(process.env.SESSION_INACTIVITY_DAYS, 7) * 24 * 60 * 60 * 1000;
     private readonly accountDeletionGraceDays =
@@ -714,6 +717,18 @@ export class AuthLogic {
         const hasPaymentMethod = await resolveHasPaymentMethodLive(
             user.stripe_customer_id,
         );
+
+        if (baseProfile.role === "venue_owner" && hasPaymentMethod) {
+            try {
+                await this.partnerRepository.activatePendingVenuesByOwner(userId);
+            } catch (error) {
+                console.warn(
+                    `[AuthLogic] Unable to activate pending venues for user ${userId} after payment method detection:`,
+                    error,
+                );
+            }
+        }
+
         const onboardingStep =
             baseProfile.role === "venue_owner"
                 ? await this.resolvePartnerOnboardingStep(userId, hasPaymentMethod)

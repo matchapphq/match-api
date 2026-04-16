@@ -1,6 +1,7 @@
 import UserRepository, { type PartnerOnboardingStep } from "../../repository/user.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
 import TokenRepository from "../../repository/token.repository";
+import { PartnerRepository } from "../../repository/partner/partner.repository";
 import { StorageService } from "../../services/storage.service";
 import { password as BunPassword } from "bun";
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
@@ -21,6 +22,8 @@ const parsePositiveDays = (envValue: string | undefined, defaultDays: number): n
  * No Hono/HTTP dependencies here.
  */
 export class UserLogic {
+    private readonly partnerRepository = new PartnerRepository();
+
     private readonly sessionInactivityMs =
         parsePositiveDays(process.env.SESSION_INACTIVITY_DAYS, 7) * 24 * 60 * 60 * 1000;
     private readonly accountDeletionGraceDays =
@@ -71,6 +74,18 @@ export class UserLogic {
         const hasPaymentMethod = await resolveHasPaymentMethodLive(
             userData.stripe_customer_id,
         );
+
+        if (baseProfile.role === "venue_owner" && hasPaymentMethod) {
+            try {
+                await this.partnerRepository.activatePendingVenuesByOwner(userId);
+            } catch (error) {
+                console.warn(
+                    `[UserLogic] Unable to activate pending venues for user ${userId} after payment method detection:`,
+                    error,
+                );
+            }
+        }
+
         const onboardingStep =
             baseProfile.role === "venue_owner"
                 ? await this.resolvePartnerOnboardingStep(userId, hasPaymentMethod)
