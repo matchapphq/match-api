@@ -32,6 +32,17 @@ Expected: venue is created but inactive until Stripe setup is completed.
 
 Expected: onboarding completion automatically activates all pending venues for this owner.
 
+## Scenario 2-bis — Skip payment setup (in implementation)
+1. Reach onboarding step `paiement_method` as a `venue_owner`.
+2. Click "Configurer plus tard et accéder au dashboard" in onboarding UI.
+3. Verify `onboarding_step` is persisted as `paiement_method_skipped` for the user.
+4. Logout and login again.
+5. Verify user is not forced back into onboarding/payment-required flow.
+
+Expected:
+- onboarding is considered completed for access guards,
+- payment method can still be configured later from billing flow.
+
 ## Scenario 3 — Check-in then monthly charge creates transaction + invoice
 1. Create confirmed reservation for an active venue, then call check-in endpoint.
 2. Verify reservation becomes `checked_in` and remains `is_billed = false` (accrued).

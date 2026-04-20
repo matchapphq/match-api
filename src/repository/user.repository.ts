@@ -1,6 +1,7 @@
-import { and, eq, isNotNull, lte } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { db } from "../config/config.db";
 import { userDeleteReasonsTable, userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
+import { venuesTable } from "../config/db/venues.table";
 import type { userRegisterData } from "../utils/userData";
 import { password, randomUUIDv7 } from "bun";
 
@@ -47,6 +48,13 @@ export interface UpdatePrivacyPreferencesData {
     marketing_consent?: boolean;
     legal_updates_email?: boolean;
 }
+
+export type PartnerOnboardingStep =
+    | "first_venue"
+    | "paiement_method"
+    | "paiement_method_skipped"
+    | "done"
+    | null;
 
 type AuthUser = {
     id: string;
@@ -139,10 +147,25 @@ const normalizePrivacyPreferences = (settings: unknown): PrivacyPreferences => {
 const mergePreferenceSettings = (
     notifications: NotificationPreferences,
     privacy: PrivacyPreferences,
+    existing: Record<string, unknown> = {},
 ): Record<string, unknown> => ({
+    ...existing,
     ...notifications,
     ...privacy,
 });
+
+const normalizePartnerOnboardingStep = (value: unknown): PartnerOnboardingStep | null => {
+    if (
+        value === "first_venue" ||
+        value === "paiement_method" ||
+        value === "paiement_method_skipped" ||
+        value === "done"
+    ) {
+        return value;
+    }
+
+    return null;
+};
 
 class UserRepository {
     private async getUserPreferenceRow(userId: string) {
@@ -187,6 +210,7 @@ class UserRepository {
             google_id: usersTable.google_id,
             apple_id: usersTable.apple_id,
             stripe_customer_id: usersTable.stripe_customer_id,
+            onboarding_step: usersTable.onboarding_step,
             created_at: usersTable.created_at,
             fav_sports: userPreferencesTable.fav_sports,
             fav_team_ids: userPreferencesTable.fav_team_ids,
@@ -449,7 +473,7 @@ class UserRepository {
         );
 
         const nextPrivacy = normalizePrivacyPreferences(existingSettings);
-        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy);
+        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy, existingSettings);
         await this.upsertPreferenceSettings(userId, mergedSettings);
 
         return nextNotifications;
@@ -473,10 +497,40 @@ class UserRepository {
             updates,
         );
 
-        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy);
+        const mergedSettings = mergePreferenceSettings(nextNotifications, nextPrivacy, existingSettings);
         await this.upsertPreferenceSettings(userId, mergedSettings);
 
         return nextPrivacy;
+    }
+
+    public async getPartnerOnboardingStep(userId: string): Promise<PartnerOnboardingStep | null> {
+        const [user] = await db.select({
+            onboarding_step: usersTable.onboarding_step,
+        }).from(usersTable).where(eq(usersTable.id, userId));
+
+        return normalizePartnerOnboardingStep(user?.onboarding_step ?? null);
+    }
+
+    public async setPartnerOnboardingStep(userId: string, step: PartnerOnboardingStep): Promise<void> {
+        await db.update(usersTable).set({
+            onboarding_step: step,
+            updated_at: new Date(),
+        }).where(eq(usersTable.id, userId));
+    }
+
+    public async initializePartnerOnboardingStep(userId: string): Promise<void> {
+        await this.setPartnerOnboardingStep(userId, "first_venue");
+    }
+
+    public async getOwnedVenueCount(userId: string): Promise<number> {
+        const [row] = await db.select({
+            count: count(),
+        }).from(venuesTable).where(and(
+            eq(venuesTable.owner_id, userId),
+            isNull(venuesTable.deleted_at),
+        ));
+
+        return Number(row?.count ?? 0);
     }
     
     public async doesUserExist(email: string): Promise<boolean> {

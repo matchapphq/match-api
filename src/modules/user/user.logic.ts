@@ -1,6 +1,7 @@
-import UserRepository from "../../repository/user.repository";
+import UserRepository, { type PartnerOnboardingStep } from "../../repository/user.repository";
 import { FavoritesRepository } from "../../repository/favorites.repository";
 import TokenRepository from "../../repository/token.repository";
+import { PartnerRepository } from "../../repository/partner/partner.repository";
 import { StorageService } from "../../services/storage.service";
 import { password as BunPassword } from "bun";
 import { queueEmailIfAllowed } from "../../services/mail-dispatch.service";
@@ -21,6 +22,8 @@ const parsePositiveDays = (envValue: string | undefined, defaultDays: number): n
  * No Hono/HTTP dependencies here.
  */
 export class UserLogic {
+    private readonly partnerRepository = new PartnerRepository();
+
     private readonly sessionInactivityMs =
         parsePositiveDays(process.env.SESSION_INACTIVITY_DAYS, 7) * 24 * 60 * 60 * 1000;
     private readonly accountDeletionGraceDays =
@@ -34,6 +37,23 @@ export class UserLogic {
         private readonly storageService: StorageService,
         private readonly fidelityLogic: FidelityLogic = new FidelityLogic(),
     ) {}
+
+    private async resolvePartnerOnboardingStep(
+        userId: string,
+        hasPaymentMethod: boolean,
+    ): Promise<PartnerOnboardingStep> {
+        if (hasPaymentMethod) {
+            return "done";
+        }
+
+        const venueCount = await this.userRepository.getOwnedVenueCount(userId);
+        if (venueCount > 0) {
+            const savedStep = await this.userRepository.getPartnerOnboardingStep(userId);
+            return savedStep === "paiement_method_skipped" ? "paiement_method_skipped" : "paiement_method";
+        }
+
+        return "first_venue";
+    }
 
     /**
      * Get the current user's full profile.
@@ -55,13 +75,36 @@ export class UserLogic {
             userData.stripe_customer_id,
         );
 
+        if (baseProfile.role === "venue_owner" && hasPaymentMethod) {
+            try {
+                await this.partnerRepository.activatePendingVenuesByOwner(userId);
+            } catch (error) {
+                console.warn(
+                    `[UserLogic] Unable to activate pending venues for user ${userId} after payment method detection:`,
+                    error,
+                );
+            }
+        }
+
+        const onboardingStep =
+            baseProfile.role === "venue_owner"
+                ? await this.resolvePartnerOnboardingStep(userId, hasPaymentMethod)
+                : baseProfile.has_completed_onboarding
+                    ? "done"
+                    : null;
+        const hasCompletedVenueOwnerOnboarding =
+            hasPaymentMethod ||
+            onboardingStep === "paiement_method_skipped" ||
+            onboardingStep === "done";
+
         return {
             ...baseProfile,
             has_payment_method: hasPaymentMethod,
             has_completed_onboarding:
                 baseProfile.role === "venue_owner"
-                    ? hasPaymentMethod
+                    ? hasCompletedVenueOwnerOnboarding
                     : baseProfile.has_completed_onboarding,
+            onboarding_step: onboardingStep,
         };
     }
 
@@ -84,6 +127,7 @@ export class UserLogic {
             budget?: string;
             home_lat?: number;
             home_lng?: number;
+            onboarding_step?: PartnerOnboardingStep;
         },
     ) {
         const {
@@ -94,6 +138,7 @@ export class UserLogic {
             budget,
             home_lat,
             home_lng,
+            onboarding_step,
             ...profileUpdates
         } = data;
 
@@ -130,11 +175,15 @@ export class UserLogic {
             });
         }
 
+        if (onboarding_step !== undefined && onboarding_step !== null) {
+            await this.userRepository.setPartnerOnboardingStep(userId, onboarding_step);
+        }
+
         const fullProfile = await this.getUserProfile(userId);
         
         // Beta Challenge: Profile Completed (+1 but)
         // Requis: Bio + Avatar + Fav Sports
-        if (fullProfile.bio && fullProfile.avatar_url && fullProfile.fav_sports?.length > 0) {
+        if (fullProfile.bio && fullProfile.avatar && fullProfile.preferences.sports.length > 0) {
             await this.fidelityLogic.awardPoints({
                 userId,
                 actionKey: "BETA_PROFILE_COMPLETED",

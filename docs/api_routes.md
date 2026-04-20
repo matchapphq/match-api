@@ -233,9 +233,20 @@ Headers: Authorization: Bearer <token>
 
 Response: 200
 {
-  user: User;
+  user: {
+    // ...existing user fields
+    has_completed_onboarding: boolean;
+    onboarding_step?: "first_venue" | "paiement_method" | "paiement_method_skipped" | "done" | null;
+  };
 }
 ```
+
+> Implementation note (April 2026): `onboarding_step` is persisted on `users.onboarding_step`.
+> Source of truth for onboarding step is no longer stored in `user_preferences.notification_settings`.
+>
+> Legacy users note:
+> - Users created before the `users.onboarding_step` rollout can have `onboarding_step = null`.
+> - Until a full backfill is completed, clients and guards must treat `null` as a legacy state and apply the product fallback policy (do not read onboarding step from `user_preferences.notification_settings` anymore).
 
 ### PUT /api/users/me
 **Update current user profile**
@@ -250,6 +261,7 @@ Request body:
   phone?: string;
   avatar_url?: string;
   bio?: string;
+  onboarding_step?: "first_venue" | "paiement_method" | "paiement_method_skipped" | "done";
 }
 
 Response: 200
@@ -833,6 +845,8 @@ Response: 201
 Rules:
 - First venue without payment method: created with `is_active=false`, `status='pending'`, `requires_payment_setup=true`.
 - Additional venues without payment method: `403 PAYMENT_METHOD_REQUIRED`.
+- On first venue creation, onboarding step moves to `paiement_method` (for `venue_owner`).
+- Existing venue owners with `users.onboarding_step = null` remain supported through legacy fallback handling until backfill.
 
 ### POST /api/partners/venues/verify-checkout
 **Deprecated — returns `410 Gone`**

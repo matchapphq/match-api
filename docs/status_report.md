@@ -10,7 +10,7 @@
 
 | Module | Status | Completion | Notes |
 | :--- | :--- | :--- | :--- |
-| **Auth & Identity** | ✅ Production-ready | 100% | Includes onboarding preferences, referral registration, session-bound JWTs, logout revocation, and inactivity expiry. |
+| **Auth & Identity** | ✅ Production-ready | 100% | Includes onboarding state on `users.onboarding_step`, referral registration, session-bound JWTs, logout revocation, and inactivity expiry. |
 | **Fidelity System** | ✅ Production-ready | 100% | Levels, badges, points history, and challenges fully implemented. |
 | **Referral System** | ✅ Production-ready | 100% | Codes, tracking, and reward conversion (Boosts) active. |
 | **Boost System** | ✅ Production-ready | 100% | Purchasing, activation, and analytics for venue owners. |
