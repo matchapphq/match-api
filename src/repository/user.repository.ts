@@ -95,8 +95,6 @@ const DEFAULT_PRIVACY_PREFERENCES: PrivacyPreferences = {
     legal_updates_email: true,
 };
 
-const PARTNER_ONBOARDING_STEP_KEY = "onboarding_step";
-
 const asRecord = (value: unknown): Record<string, unknown> => {
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
     return value as Record<string, unknown>;
@@ -212,6 +210,7 @@ class UserRepository {
             google_id: usersTable.google_id,
             apple_id: usersTable.apple_id,
             stripe_customer_id: usersTable.stripe_customer_id,
+            onboarding_step: usersTable.onboarding_step,
             created_at: usersTable.created_at,
             fav_sports: userPreferencesTable.fav_sports,
             fav_team_ids: userPreferencesTable.fav_team_ids,
@@ -505,29 +504,22 @@ class UserRepository {
     }
 
     public async getPartnerOnboardingStep(userId: string): Promise<PartnerOnboardingStep | null> {
-        const existing = await this.getUserPreferenceRow(userId);
-        const existingSettings = asRecord(existing?.notification_settings);
-        return normalizePartnerOnboardingStep(existingSettings[PARTNER_ONBOARDING_STEP_KEY]);
+        const [user] = await db.select({
+            onboarding_step: usersTable.onboarding_step,
+        }).from(usersTable).where(eq(usersTable.id, userId));
+
+        return normalizePartnerOnboardingStep(user?.onboarding_step ?? null);
     }
 
     public async setPartnerOnboardingStep(userId: string, step: PartnerOnboardingStep): Promise<void> {
-        const existing = await this.getUserPreferenceRow(userId);
-        const existingSettings = asRecord(existing?.notification_settings);
-
-        await this.upsertPreferenceSettings(userId, {
-            ...existingSettings,
-            [PARTNER_ONBOARDING_STEP_KEY]: step,
-        });
+        await db.update(usersTable).set({
+            onboarding_step: step,
+            updated_at: new Date(),
+        }).where(eq(usersTable.id, userId));
     }
 
     public async initializePartnerOnboardingStep(userId: string): Promise<void> {
-        const existing = await this.getUserPreferenceRow(userId);
-        const existingSettings = asRecord(existing?.notification_settings);
-
-        await this.upsertPreferenceSettings(userId, {
-            ...existingSettings,
-            [PARTNER_ONBOARDING_STEP_KEY]: "first_venue",
-        });
+        await this.setPartnerOnboardingStep(userId, "first_venue");
     }
 
     public async getOwnedVenueCount(userId: string): Promise<number> {

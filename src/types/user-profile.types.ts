@@ -15,6 +15,7 @@ export interface UserProfileSource {
     google_id: string | null;
     apple_id: string | null;
     stripe_customer_id: string | null;
+    onboarding_step: PartnerOnboardingStep;
     created_at: Date | string;
     fav_sports: unknown;
     ambiances: unknown;

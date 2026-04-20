@@ -241,8 +241,8 @@ Response: 200
 }
 ```
 
-> Implementation note (April 2026): `onboarding_step` for `venue_owner` is currently being rolled out.
-> Source of truth is moving from payment-method-only checks to explicit onboarding state.
+> Implementation note (April 2026): `onboarding_step` is persisted on `users.onboarding_step`.
+> Source of truth for onboarding step is no longer stored in `user_preferences.notification_settings`.
 
 ### PUT /api/users/me
 **Update current user profile**
