@@ -30,28 +30,33 @@ export class MatchesLogic {
     private sportsRepo = new SportsRepository();
     private syncInProgress = false;
 
-    private getUtcDayBounds(date: string): { startOfDay: Date; endOfDay: Date } | null {
+    private isValidIsoDate(date: string): boolean {
         const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
-        if (!match) return null;
+        if (!match) return false;
 
         const year = Number(match[1]);
         const month = Number(match[2]);
         const day = Number(match[3]);
 
-        const startOfDay = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
-        const endOfDay = new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999));
+        const parsed = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
 
         // Guard against invalid calendar dates like 2026-02-31.
         if (
-            Number.isNaN(startOfDay.getTime()) ||
-            startOfDay.getUTCFullYear() !== year ||
-            startOfDay.getUTCMonth() !== month - 1 ||
-            startOfDay.getUTCDate() !== day
+            Number.isNaN(parsed.getTime()) ||
+            parsed.getUTCFullYear() !== year ||
+            parsed.getUTCMonth() !== month - 1 ||
+            parsed.getUTCDate() !== day
         ) {
-            return null;
+            return false;
         }
 
-        return { startOfDay, endOfDay };
+        return true;
+    }
+
+    private getParisDateCondition(date: string) {
+        if (!this.isValidIsoDate(date)) return null;
+
+        return sql`(${matchesTable.scheduled_at} AT TIME ZONE 'Europe/Paris')::date = ${date}::date`;
     }
 
     // ============================================
@@ -315,11 +320,8 @@ export class MatchesLogic {
         }
 
         if (date) {
-            const bounds = this.getUtcDayBounds(date);
-            if (bounds) {
-                conditions.push(gte(matchesTable.scheduled_at, bounds.startOfDay));
-                conditions.push(sql`${matchesTable.scheduled_at} <= ${bounds.endOfDay}`);
-            }
+            const dateCondition = this.getParisDateCondition(date);
+            if (dateCondition) conditions.push(dateCondition);
         }
 
         if (sportId) {
@@ -449,11 +451,8 @@ export class MatchesLogic {
         const conditions = [gte(matchesTable.scheduled_at, new Date())];
 
         if (date) {
-            const bounds = this.getUtcDayBounds(date);
-            if (bounds) {
-                conditions.push(gte(matchesTable.scheduled_at, bounds.startOfDay));
-                conditions.push(sql`${matchesTable.scheduled_at} <= ${bounds.endOfDay}`);
-            }
+            const dateCondition = this.getParisDateCondition(date);
+            if (dateCondition) conditions.push(dateCondition);
         }
 
         if (search) {
