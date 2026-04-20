@@ -30,6 +30,35 @@ export class MatchesLogic {
     private sportsRepo = new SportsRepository();
     private syncInProgress = false;
 
+    private isValidIsoDate(date: string): boolean {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+        if (!match) return false;
+
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+
+        const parsed = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
+
+        // Guard against invalid calendar dates like 2026-02-31.
+        if (
+            Number.isNaN(parsed.getTime()) ||
+            parsed.getUTCFullYear() !== year ||
+            parsed.getUTCMonth() !== month - 1 ||
+            parsed.getUTCDate() !== day
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private getParisDateCondition(date: string) {
+        if (!this.isValidIsoDate(date)) return null;
+
+        return sql`(${matchesTable.scheduled_at} AT TIME ZONE 'Europe/Paris')::date = ${date}::date`;
+    }
+
     // ============================================
     // SYNC LOGIC
     // ============================================
@@ -291,14 +320,8 @@ export class MatchesLogic {
         }
 
         if (date) {
-            const startOfDay = new Date(date);
-            startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(date);
-            endOfDay.setHours(23, 59, 59, 999);
-            conditions.push(and(
-                gte(matchesTable.scheduled_at, startOfDay),
-                sql`${matchesTable.scheduled_at} <= ${endOfDay}`,
-            ));
+            const dateCondition = this.getParisDateCondition(date);
+            if (dateCondition) conditions.push(dateCondition);
         }
 
         if (sportId) {
@@ -428,14 +451,8 @@ export class MatchesLogic {
         const conditions = [gte(matchesTable.scheduled_at, new Date())];
 
         if (date) {
-            const startOfDay = new Date(date);
-            startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(date);
-            endOfDay.setHours(23, 59, 59, 999);
-            conditions.push(and(
-                gte(matchesTable.scheduled_at, startOfDay),
-                sql`${matchesTable.scheduled_at} <= ${endOfDay}`,
-            ));
+            const dateCondition = this.getParisDateCondition(date);
+            if (dateCondition) conditions.push(dateCondition);
         }
 
         if (search) {
