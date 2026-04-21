@@ -11,7 +11,6 @@ const getRedisConfig = (): ConnectionOptions => {
     return {
         host,
         port,
-        password,
         lazyConnect: true,
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
