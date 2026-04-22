@@ -37,6 +37,12 @@ export function mapToClientUserProfile(
 
     const hasCompletedOnboarding =
         user.role === "venue_owner" ? hasPaymentMethod : hasCompletedStandardOnboarding;
+    const onboardingStep =
+        user.role === "venue_owner"
+            ? user.onboarding_step ?? (hasPaymentMethod ? "done" : null)
+            : hasCompletedOnboarding
+                ? "done"
+                : null;
 
     return {
         id: user.id,
@@ -57,6 +63,6 @@ export function mapToClientUserProfile(
         created_at: user.created_at,
         has_payment_method: hasPaymentMethod,
         has_completed_onboarding: hasCompletedOnboarding,
+        onboarding_step: onboardingStep,
     };
 }
-

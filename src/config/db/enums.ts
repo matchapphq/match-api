@@ -2,6 +2,12 @@ import { pgEnum } from 'drizzle-orm/pg-core';
 
 export const userRoleEnum = pgEnum('user_role', ['venue_owner', 'user', 'admin']);
 export const userStatusEnum = pgEnum('user_status', ['active', 'suspended', 'deleted']);
+export const partnerOnboardingStepEnum = pgEnum('partner_onboarding_step', [
+    'first_venue',
+    'paiement_method',
+    'paiement_method_skipped',
+    'done',
+]);
 
 export const venueTypeEnum = pgEnum('venue_type', [
     'bar',

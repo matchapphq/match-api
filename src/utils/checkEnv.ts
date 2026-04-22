@@ -28,6 +28,8 @@ function isEnvsDefined(): boolean {
         "S3_ACCESS_KEY_ID",
         "S3_SECRET_ACCESS_KEY",
         "S3_BUCKET",
+        "REDIS_HOST",
+        "REDIS_PORT",
     ];
 
     const missingEnvs = requiredEnvs.filter((env) => process.env[env] === undefined);

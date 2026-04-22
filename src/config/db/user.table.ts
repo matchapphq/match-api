@@ -1,5 +1,5 @@
 import { boolean, doublePrecision, index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
-import { userRoleEnum } from './enums';
+import { partnerOnboardingStepEnum, userRoleEnum } from './enums';
 
 // ============================================
 // 1. USERS TABLE
@@ -32,6 +32,7 @@ export const usersTable = pgTable(
 
         // Stripe
         stripe_customer_id: varchar('stripe_customer_id', { length: 255 }),
+        onboarding_step: partnerOnboardingStepEnum('onboarding_step'),
 
         // Metadata
         last_login_at: timestamp('last_login_at', { withTimezone: true }),

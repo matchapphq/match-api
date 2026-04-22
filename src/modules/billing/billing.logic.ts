@@ -1,10 +1,13 @@
 import { BillingRepository } from "../../repository/billing.repository";
 import { getCommissionPricing } from "../../config/billing";
 import subscriptionsRepository from "../../repository/subscriptions.repository";
+import { PartnerRepository } from "../../repository/partner/partner.repository";
 import Stripe from "stripe";
 import { resolvePaymentMethodStateLive } from "../../utils/stripe-payment-method";
 
 export class BillingLogic {
+    private readonly partnerRepository = new PartnerRepository();
+
     constructor(private readonly billingRepo: BillingRepository) {}
 
     getPricing() {
@@ -121,6 +124,17 @@ export class BillingLogic {
     async getPaymentMethod(userId: string) {
         const stripeCustomerId = await subscriptionsRepository.getStripeCustomerId(userId);
         const state = await resolvePaymentMethodStateLive(stripeCustomerId);
+
+        if (state.has_payment_method) {
+            try {
+                await this.partnerRepository.activatePendingVenuesByOwner(userId);
+            } catch (error) {
+                console.warn(
+                    `[Billing] Unable to activate pending venues for user ${userId} after payment method detection:`,
+                    error,
+                );
+            }
+        }
 
         return {
             has_payment_method: state.has_payment_method,
