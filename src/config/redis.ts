@@ -7,10 +7,17 @@ const getRedisConfig = (): ConnectionOptions => {
     const password = process.env.REDIS_PASSWORD || Bun.env.REDIS_PASSWORD;
 
     console.log(`[Redis] Connecting to ${host}:${port}`);
-
+    if (process.env.NODE_ENV === "production") {
+        const url = process.env.REDIS_URL || Bun.env.REDIS_URL;
+        return {
+            url,
+        }
+    }
+    
     return {
         host,
         port,
+        password,
         lazyConnect: true,
         maxRetriesPerRequest: null,
         enableReadyCheck: false,
