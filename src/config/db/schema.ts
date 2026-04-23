@@ -24,4 +24,5 @@ export * from "./fidelity.table";
 export * from "./beta-challenge.table";
 export * from "./user-history.table";
 export * from "./curation.table";
+export * from "./notification-logs.table";
 export * from "./relations";
