@@ -11,6 +11,7 @@ import { mapToClientUserProfile } from "../../utils/user-profile";
 import type { ClientUserProfile } from "../../types/user-profile.types";
 import { resolveHasPaymentMethodLive } from "../../utils/stripe-payment-method";
 import { FidelityLogic } from "../fidelity/fidelity.logic";
+import stripe from "../../config/stripe";
 
 const parsePositiveDays = (envValue: string | undefined, defaultDays: number): number => {
     const parsed = Number(envValue);
@@ -248,13 +249,36 @@ export class UserLogic {
         }
 
         const rawPassword = typeof password === "string" ? password : "";
-        if (!rawPassword.trim()) {
-            throw new Error("PASSWORD_REQUIRED");
-        }
+        const isUserRole = user.role === "user";
+        const hasSocialProvider = Boolean(user.google_id || user.apple_id);
 
-        const isPasswordValid = await BunPassword.verify(rawPassword, user.password_hash);
-        if (!isPasswordValid) {
-            throw new Error("INVALID_PASSWORD");
+        // Only bypass password for role 'user' with social auth
+        const shouldBypassPassword = isUserRole && hasSocialProvider;
+
+        if (!shouldBypassPassword) {
+            if (!rawPassword.trim()) {
+                throw new Error("PASSWORD_REQUIRED");
+            }
+
+            const isPasswordValid = await BunPassword.verify(rawPassword, user.password_hash);
+            if (!isPasswordValid) {
+                throw new Error("INVALID_PASSWORD");
+            }
+        }
+        
+        // Cancel stripe subscriptions ONLY for 'user' role as requested
+        if (isUserRole && user.stripe_customer_id) {
+            try {
+                const subscriptions = await stripe.subscriptions.list({
+                    customer: user.stripe_customer_id,
+                    status: 'active',
+                });
+                for (const sub of subscriptions.data) {
+                    await stripe.subscriptions.cancel(sub.id);
+                }
+            } catch (err) {
+                console.error("[USER] Failed to cancel stripe subscriptions for user:", err);
+            }
         }
 
         await this.userRepository.deleteUser(userId, reason, details);
