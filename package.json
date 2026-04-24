@@ -48,7 +48,7 @@
     "expo-server-sdk": "^5.0.0",
     "geolib": "^3.3.4",
     "handlebars": "^4.7.9",
-    "hono": "^4.9.6",
+    "hono": "^4.11.4",
     "hono-rate-limiter": "^0.5.3",
     "ioredis": "^5.9.2",
     "nodemailer": "^8.0.5",
