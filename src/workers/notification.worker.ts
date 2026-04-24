@@ -15,7 +15,6 @@ const notificationWorker = new Worker<NotificationPayload>("notification", async
         case NotificationType.SYSTEM_UPCOMING_MATCH_CRON:
             await triggerUpcomingMatchNotifications();
             break;
-        case NotificationType.PUSH:
         case NotificationType.PUSH_NOTIFICATION:
             if (data && 'tokens' in data && data.tokens.length > 0) {
                 await pushNotificationService.sendNotifications(data.tokens, data.title, data.body, data.data);
