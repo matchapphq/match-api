@@ -9,6 +9,27 @@ import stripe, {
 } from "../../config/stripe";
 import Stripe from "stripe";
 
+type LegacySubscriptionLike = {
+    id: string;
+    plan?: string | null;
+    status?: string | null;
+    current_period_start?: string | Date | null;
+    current_period_end?: string | Date | null;
+    auto_renew?: boolean | null;
+    price?: string | null;
+    currency?: string | null;
+    canceled_at?: string | Date | null;
+    commitment_end_date?: string | Date | null;
+    stripe_subscription_id?: string | null;
+};
+
+function asLegacySubscription(value: unknown): LegacySubscriptionLike | null {
+    if (!value || typeof value !== "object") return null;
+    const candidate = value as Record<string, unknown>;
+    if (typeof candidate.id !== "string") return null;
+    return candidate as LegacySubscriptionLike;
+}
+
 export class SubscriptionsLogic {
     private readonly userRepository = new UserRepository();
     private readonly partnerRepository = new PartnerRepository();
@@ -172,7 +193,8 @@ export class SubscriptionsLogic {
     }
 
     async getMySubscription(userId: string) {
-        const subscription = await subscriptionsRepository.getSubscriptionByUserId(userId);
+        const subscriptionRaw = await subscriptionsRepository.getSubscriptionByUserId(userId);
+        const subscription = asLegacySubscription(subscriptionRaw);
 
         if (!subscription) {
             return null;
@@ -183,19 +205,19 @@ export class SubscriptionsLogic {
 
         const now = new Date();
         const commitmentEnd = subscription.commitment_end_date
-            ? new Date(subscription.commitment_end_date)
+            ? new Date(subscription.commitment_end_date as string | Date)
             : null;
         const canCancel = !commitmentEnd || now >= commitmentEnd;
 
         return {
             id: subscription.id,
             plan: subscription.plan,
-            status: subscription.status,
+            status: subscription.status ?? "unknown",
             current_period_start: subscription.current_period_start,
             current_period_end: subscription.current_period_end,
-            auto_renew: subscription.auto_renew,
-            price: subscription.price,
-            currency: subscription.currency,
+            auto_renew: subscription.auto_renew ?? false,
+            price: subscription.price ?? null,
+            currency: subscription.currency ?? null,
             canceled_at: subscription.canceled_at,
             commitment_end_date: subscription.commitment_end_date,
             can_cancel: canCancel,
@@ -228,7 +250,8 @@ export class SubscriptionsLogic {
     }
 
     async cancelSubscription(userId: string) {
-        const subscription = await subscriptionsRepository.getSubscriptionByUserId(userId);
+        const subscriptionRaw = await subscriptionsRepository.getSubscriptionByUserId(userId);
+        const subscription = asLegacySubscription(subscriptionRaw);
 
         if (!subscription) {
             throw new Error("NO_ACTIVE_SUBSCRIPTION");
@@ -240,7 +263,7 @@ export class SubscriptionsLogic {
 
         if (subscription.commitment_end_date) {
             const now = new Date();
-            const commitmentEnd = new Date(subscription.commitment_end_date);
+            const commitmentEnd = new Date(subscription.commitment_end_date as string | Date);
 
             if (now < commitmentEnd) {
                 const remainingMonths = Math.ceil(
@@ -284,7 +307,8 @@ export class SubscriptionsLogic {
             throw new Error("INVALID_PLAN");
         }
 
-        const subscription = await subscriptionsRepository.getSubscriptionByUserId(userId);
+        const subscriptionRaw = await subscriptionsRepository.getSubscriptionByUserId(userId);
+        const subscription = asLegacySubscription(subscriptionRaw);
 
         if (!subscription) {
             throw new Error("NO_ACTIVE_SUBSCRIPTION");
