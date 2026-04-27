@@ -76,11 +76,11 @@ export class ReferralLogic {
                 referenceId: result.referral_id!,
                 referenceType: "referral",
                 metadata: { referredUserId }
-            }).catch(err => console.error("[BetaChallenge] Referral award failed:", err));
+            }).catch((err: unknown) => console.error("[BetaChallenge] Referral award failed:", err));
             
             // Increment stat for leaderboard tie-breaker
             await this.fidelityLogic.incrementUserStat(referrerId, "total_invites_completed")
-                .catch(err => console.error("[BetaChallenge] Stat increment failed:", err));
+                .catch((err: unknown) => console.error("[BetaChallenge] Stat increment failed:", err));
         }
 
         return {

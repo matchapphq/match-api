@@ -11,7 +11,7 @@ import type {
     FidelityEvent,
     FidelityEventResult,
     FidelityActionKey,
-} from "../../controllers/fidelity/fidelity.types";
+} from "./fidelity.types";
 
 export class FidelityLogic {
     async awardPoints(context: PointsAwardContext): Promise<PointsResult> {
@@ -588,5 +588,13 @@ export class FidelityLogic {
 
     async getPointsHistory(userId: string, limit: number, offset: number) {
         return await fidelityRepository.getUserPointTransactions(userId, limit, offset);
+    }
+
+    async incrementUserStat(
+        userId: string,
+        field: "total_check_ins" | "total_invites_completed" | "total_reviews",
+        amount = 1,
+    ): Promise<void> {
+        await fidelityRepository.incrementUserStat(userId, field as any, amount);
     }
 }
