@@ -143,7 +143,7 @@ export class BoostRepository {
                 status: 'available',
                 source,
                 purchase_id: purchaseId,
-            }).returning({ id: boostsTable.id });
+            }).returning();
 
             if (result[0]) {
                 boostIds.push(result[0].id);
@@ -429,7 +429,7 @@ export class BoostRepository {
                 eq(boostsTable.purchase_id, purchaseId),
                 eq(boostsTable.status, 'available'),
             ))
-            .returning({ id: boostsTable.id });
+            .returning();
 
         return result.length;
     }
