@@ -11,6 +11,14 @@ class DiscoveryController {
 
     constructor(private readonly discoveryLogic: DiscoveryLogic) {}
 
+    private getRequiredParam(ctx: any, key: string): string {
+        const value = ctx.req.param(key);
+        if (!value) {
+            throw new Error(`MISSING_PARAM:${key}`);
+        }
+        return value;
+    }
+
     readonly getNearby = this.factory.createHandlers(async (ctx) => {
         const { lat, lng, radius_km, radius } = ctx.req.query();
         
@@ -39,12 +47,13 @@ class DiscoveryController {
     });
 
     readonly getVenueDetails = this.factory.createHandlers(async (ctx) => {
-        const venueId = ctx.req.param("venueId");
+        const venueId = this.getRequiredParam(ctx, "venueId");
         const userId = ctx.get("user")?.id;
         try {
             const result = await this.discoveryLogic.getVenueDetails(venueId, userId);
             return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "MISSING_PARAM:venueId") return ctx.json({ error: "Venue ID is required" }, 400);
             if (error.message === "VENUE_NOT_FOUND") return ctx.json({ error: "Venue not found" }, 404);
             console.error("Error fetching venue details:", error);
             return ctx.json({ error: "Failed to fetch venue details" }, 500);
@@ -104,11 +113,12 @@ class DiscoveryController {
         const userId = ctx.get("user")?.id;
         if (!userId) return ctx.json({ error: "Unauthorized" }, 401);
 
-        const leagueId = ctx.req.param("leagueId");
+        const leagueId = this.getRequiredParam(ctx, "leagueId");
         try {
             const result = await this.discoveryLogic.toggleLeagueFollow(userId, leagueId);
             return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "MISSING_PARAM:leagueId") return ctx.json({ error: "League ID is required" }, 400);
             console.error("Error toggling league follow:", error);
             return ctx.json({ error: "Failed to toggle league follow" }, 500);
         }
@@ -118,11 +128,12 @@ class DiscoveryController {
         const userId = ctx.get("user")?.id;
         if (!userId) return ctx.json({ error: "Unauthorized" }, 401);
 
-        const teamId = ctx.req.param("teamId");
+        const teamId = this.getRequiredParam(ctx, "teamId");
         try {
             const result = await this.discoveryLogic.toggleTeamFollow(userId, teamId);
             return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "MISSING_PARAM:teamId") return ctx.json({ error: "Team ID is required" }, 400);
             console.error("Error toggling team follow:", error);
             return ctx.json({ error: "Failed to toggle team follow" }, 500);
         }
@@ -155,12 +166,13 @@ class DiscoveryController {
     });
 
     readonly getCompetitionDetails = this.factory.createHandlers(async (ctx) => {
-        const competitionId = ctx.req.param("competitionId") as string;
+        const competitionId = this.getRequiredParam(ctx, "competitionId");
         const userId = ctx.get("user")?.id;
         try {
             const result = await this.discoveryLogic.getCompetitionDetails(competitionId, userId);
             return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "MISSING_PARAM:competitionId") return ctx.json({ error: "Competition ID is required" }, 400);
             if (error.message === "COMPETITION_NOT_FOUND") return ctx.json({ error: "Competition not found" }, 404);
             console.error("Error fetching competition details:", error);
             return ctx.json({ error: "Failed to fetch competition details" }, 500);
@@ -168,22 +180,24 @@ class DiscoveryController {
     });
 
     readonly getVenueMenu = this.factory.createHandlers(async (ctx) => {
-        const venueId = ctx.req.param("venueId");
+        const venueId = this.getRequiredParam(ctx, "venueId");
         try {
             const result = await this.discoveryLogic.getVenueMenu(venueId);
             return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "MISSING_PARAM:venueId") return ctx.json({ error: "Venue ID is required" }, 400);
             console.error("Error fetching venue menu:", error);
             return ctx.json({ error: "Failed to fetch venue menu" }, 500);
         }
     });
 
     readonly getVenueHours = this.factory.createHandlers(async (ctx) => {
-        const venueId = ctx.req.param("venueId");
+        const venueId = this.getRequiredParam(ctx, "venueId");
         try {
             const result = await this.discoveryLogic.getVenueHours(venueId);
             return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "MISSING_PARAM:venueId") return ctx.json({ error: "Venue ID is required" }, 400);
             console.error("Error fetching venue hours:", error);
             return ctx.json({ error: "Failed to fetch venue hours" }, 500);
         }
@@ -253,12 +267,13 @@ class DiscoveryController {
     });
 
     public readonly getTeamDetails = this.factory.createHandlers(async (ctx) => {
-        const teamId = ctx.req.param("teamId") as string;
+        const teamId = this.getRequiredParam(ctx, "teamId");
         const userId = ctx.get("user")?.id;
         try {
             const result = await this.discoveryLogic.getTeamDetails(teamId, userId);
             return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "MISSING_PARAM:teamId") return ctx.json({ error: "Team ID is required" }, 400);
             if (error.message === "TEAM_NOT_FOUND") return ctx.json({ error: "Team not found" }, 404);
             console.error("Error fetching team details:", error);
             return ctx.json({ error: "Failed to fetch team details" }, 500);

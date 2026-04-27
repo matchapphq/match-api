@@ -1,19 +1,14 @@
-import { rateLimiter, RedisStore } from "hono-rate-limiter"
+import { rateLimiter } from "hono-rate-limiter";
 import type { HonoEnv } from "../types/hono.types";
-import IORedis from "ioredis";
-import { getConnInfo } from "hono/bun"
-import { redisConnection } from "../config/redis";
 
-export const redisCli = new IORedis(process.env.REDIS_URL!);
-
-const redisStore = new RedisStore({
-    sendCommand: (...args: string[]) => redis.sendCommand(args as any),
-});
-
-const authLimiter = rateLimiter<HonoEnv>({
-  windowMs: 60 * 1000,  // 1 min
-  limit: 10,
-  store: yourRedisStore,
-  keyGenerator: (c) => `auth:${getClientIp(c)}`,
-  standardHeaders: 'draft-7',
+// Conservative auth limiter; can be mounted on auth routes.
+export const authLimiter = rateLimiter<HonoEnv>({
+    windowMs: 60 * 1000,
+    limit: 10,
+    standardHeaders: "draft-7",
+    keyGenerator: (c) => {
+        const forwardedFor = c.req.header("x-forwarded-for")?.split(",")[0]?.trim();
+        const realIp = c.req.header("x-real-ip")?.trim();
+        return `auth:${forwardedFor || realIp || "unknown"}`;
+    },
 });

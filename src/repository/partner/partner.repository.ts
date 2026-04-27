@@ -378,7 +378,7 @@ export class PartnerRepository {
         return venue;
     }
 
-    async getVenueBySubscriptionId(_subscriptionId: string) {
+    async getVenueBySubscriptionId(_subscriptionId: string): Promise<{ id: string } | null> {
         return null;
     }
 

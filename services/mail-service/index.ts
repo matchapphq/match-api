@@ -14,7 +14,9 @@ mailWorker.on("completed", async (job) => {
 });
 
 mailWorker.on("failed", async (job, err) => {
-    console.error(`[MAIL WORKER]: Job with id: ${job.id} failed with error: ${err.message}`);
+    const jobId = job?.id ?? "unknown";
+    const errorMessage = err?.message ?? "Unknown error";
+    console.error(`[MAIL WORKER]: Job with id: ${jobId} failed with error: ${errorMessage}`);
 });
 
 process.on('SIGTERM', async () => {
