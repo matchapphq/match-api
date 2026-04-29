@@ -23,11 +23,16 @@ const OpeningHoursDaySchema = z.object({
     open: z.string().regex(/^\d{2}:\d{2}$/),
     close: z.string().regex(/^\d{2}:\d{2}$/),
     closed: z.boolean(),
+    close_next_day: z.boolean().optional(),
+    second_open: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    second_close: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    second_close_next_day: z.boolean().optional(),
 });
 
 export const UpdateVenueSchema = CreateVenueSchema.partial().extend({
     booking_mode: z.enum(["INSTANT", "REQUEST"]).optional(),
     opening_hours: z.record(z.string(), OpeningHoursDaySchema).optional(),
+    happy_hours: z.record(z.string(), OpeningHoursDaySchema).optional(),
 });
 
 export const GetVenuesSchema = z.object({

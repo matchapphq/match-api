@@ -93,6 +93,7 @@ export const venuesTable = pgTable('venues', {
 
         // Operating Info
         opening_hours: jsonb('opening_hours').$type<OpeningHours>(),
+        happy_hours: jsonb('happy_hours').$type<OpeningHours>(),
         capacity: integer('capacity'),
         has_terrace: boolean('has_terrace').default(false),
         has_wifi: boolean('has_wifi').default(false),
