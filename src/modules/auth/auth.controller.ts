@@ -99,13 +99,14 @@ class AuthController {
     public readonly googleLogin = this.factory.createHandlers(
         zValidator("json", GoogleLoginRequestSchema),
         async (ctx) => {
-            const { id_token } = ctx.req.valid("json");
+            const { id_token, referralCode } = ctx.req.valid("json");
             const sessionDevice = await this.resolveSessionDeviceDescriptor(ctx);
 
             try {
                 const { user, accessToken, refreshToken, isNewUser } = await this.authLogic.googleLogin(
                     id_token,
                     sessionDevice,
+                    referralCode
                 );
 
                 await this.setAuthCookies(ctx, accessToken, refreshToken);
@@ -146,7 +147,7 @@ class AuthController {
     public readonly appleLogin = this.factory.createHandlers(
         zValidator("json", AppleLoginRequestSchema),
         async (ctx) => {
-            const { id_token, first_name, last_name } = ctx.req.valid("json");
+            const { id_token, first_name, last_name, referralCode } = ctx.req.valid("json");
             const sessionDevice = await this.resolveSessionDeviceDescriptor(ctx);
 
             try {
@@ -157,6 +158,7 @@ class AuthController {
                         firstName: first_name,
                         lastName: last_name,
                     },
+                    referralCode
                 );
 
                 await this.setAuthCookies(ctx, accessToken, refreshToken);

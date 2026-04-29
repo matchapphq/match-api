@@ -10,8 +10,9 @@ export const RegisterRequestSchema = z.object({
     role: z.enum(['user', 'venue_owner', 'admin']).optional(),
     referralCode: z.string()
         .trim()
-        .regex(/^MATCH-RESTO-[A-Z0-9]{6}$/, { message: "Invalid referral code format" })
-        .optional(),
+        .regex(/^MATCH-(RESTO|FAN)-[A-Z0-9]{6}$/, { message: "Invalid referral code format" })
+        .optional()
+        .or(z.literal('')),
     phone: z.string().optional(),
     fav_sports: z.array(z.string()).optional(),
     fav_team_ids: z.array(z.string()).optional(),
@@ -29,12 +30,22 @@ export const LoginRequestSchema = z.object({
 
 export const GoogleLoginRequestSchema = z.object({
     id_token: z.string().min(1, { message: "Google id_token is required" }),
+    referralCode: z.string()
+        .trim()
+        .regex(/^MATCH-(RESTO|FAN)-[A-Z0-9]{6}$/, { message: "Invalid referral code format" })
+        .optional()
+        .or(z.literal('')),
 })
 
 export const AppleLoginRequestSchema = z.object({
     id_token: z.string().min(1, { message: "Apple id_token is required" }),
     first_name: z.string().trim().min(1).optional(),
     last_name: z.string().trim().min(1).optional(),
+    referralCode: z.string()
+        .trim()
+        .regex(/^MATCH-(RESTO|FAN)-[A-Z0-9]{6}$/, { message: "Invalid referral code format" })
+        .optional()
+        .or(z.literal('')),
 })
 
 export const ForgotPasswordRequestSchema = z.object({

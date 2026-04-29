@@ -159,7 +159,7 @@ export class AuthLogic {
      * Authenticate user with Google ID token.
      * Creates a user record if no account exists for the Google email.
      */
-    async googleLogin(idToken: string, sessionDevice: string) {
+    async googleLogin(idToken: string, sessionDevice: string, referralCode?: string) {
         await this.purgeExpiredDeletedAccounts();
 
         const googleProfile = await verifyGoogleIdToken(idToken);
@@ -184,6 +184,29 @@ export class AuthLogic {
                 googleId: googleProfile.sub,
                 role: "user",
             });
+
+            // Beta Challenge: +2 for signup
+            await this.fidelityLogic.awardPoints({
+                userId: createdUser.id,
+                actionKey: "BETA_SIGNUP",
+                referenceId: createdUser.id,
+                referenceType: "user"
+            }).catch(err => console.error("[BetaChallenge] Signup points failed:", err));
+
+            // Check for referral
+            if (referralCode) {
+                await this.referralRepo.registerReferral(referralCode, createdUser.id).catch(err => {
+                    console.error("Referral registration failed:", err);
+                });
+
+                // Award points to the referred user (+1)
+                await this.fidelityLogic.awardPoints({
+                    userId: createdUser.id,
+                    actionKey: "BETA_REFERRAL_SIGNUP",
+                    referenceId: referralCode,
+                    referenceType: "referral"
+                }).catch(err => console.error("[BetaChallenge] Referral signup points failed:", err));
+            }
 
             try {
                 await this.authRepository.savePreferences(createdUser.id, {
@@ -255,6 +278,7 @@ export class AuthLogic {
             firstName?: string;
             lastName?: string;
         },
+        referralCode?: string,
     ) {
         await this.purgeExpiredDeletedAccounts();
 
@@ -292,6 +316,29 @@ export class AuthLogic {
                 appleId: appleProfile.sub,
                 role: "user",
             });
+
+            // Beta Challenge: +2 for signup
+            await this.fidelityLogic.awardPoints({
+                userId: user.id,
+                actionKey: "BETA_SIGNUP",
+                referenceId: user.id,
+                referenceType: "user"
+            }).catch(err => console.error("[BetaChallenge] Signup points failed:", err));
+
+            // Check for referral
+            if (referralCode) {
+                await this.referralRepo.registerReferral(referralCode, user.id).catch(err => {
+                    console.error("Referral registration failed:", err);
+                });
+
+                // Award points to the referred user (+1)
+                await this.fidelityLogic.awardPoints({
+                    userId: user.id,
+                    actionKey: "BETA_REFERRAL_SIGNUP",
+                    referenceId: referralCode,
+                    referenceType: "referral"
+                }).catch(err => console.error("[BetaChallenge] Referral signup points failed:", err));
+            }
 
             try {
                 await this.authRepository.savePreferences(user.id, {
