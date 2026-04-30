@@ -258,6 +258,7 @@ export class PartnerRepository {
         country: string;
         phone?: string;
         email?: string;
+        website?: string;
         capacity?: number;
         type?: 'bar' | 'restaurant' | 'fast_food' | 'nightclub' | 'cafe' | 'lounge' | 'pub' | 'sports_bar';
         coords?: { lat: number, lng: number };
@@ -304,6 +305,7 @@ export class PartnerRepository {
             country: data.country,
             phone: data.phone || null,
             email: data.email || null,
+            website: data.website || null,
             capacity: data.capacity ?? null,
             location: sql`ST_SetSRID(ST_MakePoint(${finalLng}, ${finalLat}), 4326)`,
             formatted_address: formatted_address,

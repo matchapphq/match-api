@@ -7,6 +7,13 @@ Document de référence pour les mises à jour de venue via `PUT /api/venues/:id
 - `opening_hours` (objet par jour)
 - `happy_hours` (objet par jour)
 
+## Règles `website`
+- URL optionnelle (vide autorisé)
+- Doit commencer par `http://` ou `https://`
+- Identifiants intégrés interdits (`user:pass@...`)
+- Domaines locaux interdits (`localhost`, `*.localhost`)
+- IP privées/locales interdites (IPv4/IPv6)
+
 ## Format d'un jour (`opening_hours.<day>`)
 ```json
 {

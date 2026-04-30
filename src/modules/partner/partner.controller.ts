@@ -3,6 +3,7 @@ import { validator } from "hono/validator";
 import { z } from "zod";
 import type { HonoEnv } from "../../types/hono.types";
 import { PartnerLogic } from "./partner.logic";
+import { validateWebsiteUrl } from "../../utils/website.security";
 
 class PartnerController {
     private readonly factory = createFactory<HonoEnv>();
@@ -28,13 +29,26 @@ class PartnerController {
 
         try {
             const body = await ctx.req.json();
+            const website = typeof body.website === "string" ? body.website.trim() : "";
 
             // Basic validation
             if (!body.name || !body.street_address || !body.city || !body.postal_code || !body.country) {
                 return ctx.json({ error: "Missing required address fields" }, 400);
-            }            
+            }
+            if (website) {
+                const websiteValidation = validateWebsiteUrl(website);
+                if (!websiteValidation.isValid) {
+                    return ctx.json({
+                        error: "INVALID_WEBSITE_URL",
+                        message: websiteValidation.reason || "Invalid website URL.",
+                    }, 400);
+                }
+            }
             
-            const result = await this.partnerLogic.createVenue(userId, body);
+            const result = await this.partnerLogic.createVenue(userId, {
+                ...body,
+                website: website || undefined,
+            });
             return ctx.json(result, 201);
         } catch (error: any) {
             if (error.message === "PAYMENT_METHOD_REQUIRED") {
