@@ -201,6 +201,7 @@ class UserRepository {
         return await db.select({
             id: usersTable.id,
             email: usersTable.email,
+            username: usersTable.username,
             role: usersTable.role,
             first_name: usersTable.first_name,
             last_name: usersTable.last_name,
@@ -349,7 +350,6 @@ class UserRepository {
         const now = new Date();
 
         const payload: {
-            username: null;
             first_name?: string;
             last_name: string | null;
             phone?: string;
@@ -358,7 +358,6 @@ class UserRepository {
             google_id?: string;
             updated_at: Date;
         } = {
-            username: null,
             last_name: data.lastName ?? null,
             is_verified: true,
             updated_at: now,
@@ -383,14 +382,12 @@ class UserRepository {
         const now = new Date();
 
         const payload: {
-            username: null;
-            first_name?: string;
             is_verified: true;
             apple_id: string;
             updated_at: Date;
             last_name?: string;
+            first_name?: string;
         } = {
-            username: null,
             is_verified: true,
             apple_id: data.appleId,
             updated_at: now,
@@ -402,7 +399,7 @@ class UserRepository {
         await db.update(usersTable).set(payload).where(eq(usersTable.id, userId));
     }
 
-    public async updateUser(userId: string, data: { first_name?: string; last_name?: string; email?: string; phone?: string; bio?: string; avatar?: string; push_token?: string }) {
+    public async updateUser(userId: string, data: { username?: string; first_name?: string; last_name?: string; email?: string; phone?: string; bio?: string; avatar?: string; push_token?: string }) {
         const { avatar, push_token, ...rest } = data;
         const payload = {
             ...rest,

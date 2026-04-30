@@ -6,6 +6,7 @@ export type PartnerOnboardingStep = "first_venue" | "paiement_method" | "paiemen
 export interface UserProfileSource {
     id: string;
     email: string;
+    username: string | null;
     role: UserRole;
     first_name: string | null;
     last_name: string | null;
@@ -33,6 +34,7 @@ export interface UserProfilePreferences {
 export interface ClientUserProfile {
     id: string;
     email: string;
+    username: string | null;
     role: UserRole;
     first_name: string | null;
     last_name: string | null;
