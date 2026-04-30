@@ -65,8 +65,24 @@ export class VenuesLogic {
         const existing = await this.venueRepository.findById(venueId);
         if (!existing) throw new Error("VENUE_NOT_FOUND");
         if (existing.owner_id !== userId) throw new Error("FORBIDDEN");
+        const nextBody: UpdateVenueInput & { is_active?: boolean } = { ...body };
 
-        return await this.venueRepository.update(venueId, body);
+        if (Object.prototype.hasOwnProperty.call(body, "opening_hours")) {
+            const hasOpeningHours =
+                !!body.opening_hours &&
+                typeof body.opening_hours === "object" &&
+                Object.keys(body.opening_hours).length > 0;
+
+            if (hasOpeningHours && existing.status === "approved") {
+                nextBody.is_active = true;
+            }
+
+            if (!hasOpeningHours) {
+                nextBody.is_active = false;
+            }
+        }
+
+        return await this.venueRepository.update(venueId, nextBody as any);
     }
 
     async delete(userId: string, venueId: string) {
