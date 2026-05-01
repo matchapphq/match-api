@@ -23,6 +23,16 @@ export type Venue = {
 }
 
 export type BookingMode = "INSTANT" | "REQUEST";
+export type DayHoursInput = {
+    open: string;
+    close: string;
+    closed: boolean;
+    close_next_day?: boolean;
+    second_open?: string;
+    second_close?: string;
+    second_close_next_day?: boolean;
+};
+export type WeeklyHoursInput = Record<string, DayHoursInput>;
 
 export type CreateVenueInput = {
     name: string
@@ -48,7 +58,11 @@ export type CreateVenueInput = {
     }[]
 }
 
-export type UpdateVenueInput = Partial<CreateVenueInput>
+export type UpdateVenueInput = Partial<CreateVenueInput> & {
+    booking_mode?: BookingMode;
+    opening_hours?: WeeklyHoursInput;
+    happy_hours?: WeeklyHoursInput;
+}
 
 export type AddBroadcastInput = {
     name: string

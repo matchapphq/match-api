@@ -60,12 +60,13 @@ export class PartnerLogic {
             country: data.country,
             phone: data.phone || '',
             email: data.email || '',
+            website: data.website || '',
             capacity: data.capacity || 0,
             type: data.type || 'sports_bar',
             description: data.description || null,
             commission_override: data.commission_override,
             status: requiresPaymentSetup ? "pending" : "approved",
-            is_active: !requiresPaymentSetup,
+            is_active: false,
         });
 
         if (!venue) {
