@@ -2,6 +2,7 @@ import { and, count, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { db } from "../config/config.db";
 import { userDeleteReasonsTable, userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
 import { venuesTable } from "../config/db/venues.table";
+import { fidelityLevelsTable, fidelityUserStatsTable } from "../config/db/fidelity.table";
 import type { userRegisterData } from "../utils/userData";
 import { password, randomUUIDv7 } from "bun";
 
@@ -218,8 +219,12 @@ class UserRepository {
             ambiances: userPreferencesTable.ambiances,
             venue_types: userPreferencesTable.venue_types,
             budget: userPreferencesTable.budget,
+            buts: fidelityUserStatsTable.total_points,
+            tier: fidelityLevelsTable.name,
         }).from(usersTable)
             .leftJoin(userPreferencesTable, eq(userPreferencesTable.user_id, usersTable.id))
+            .leftJoin(fidelityUserStatsTable, eq(fidelityUserStatsTable.user_id, usersTable.id))
+            .leftJoin(fidelityLevelsTable, eq(fidelityLevelsTable.id, fidelityUserStatsTable.current_level_id))
             .where(eq(usersTable.id, user.id));
     }
     

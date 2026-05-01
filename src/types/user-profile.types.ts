@@ -22,6 +22,8 @@ export interface UserProfileSource {
     ambiances: unknown;
     venue_types: unknown;
     budget: string | null;
+    buts: number | null;
+    tier: string | null;
 }
 
 export interface UserProfilePreferences {
@@ -47,4 +49,6 @@ export interface ClientUserProfile {
     has_payment_method: boolean;
     has_completed_onboarding: boolean;
     onboarding_step: PartnerOnboardingStep;
+    buts: number;
+    tier: string;
 }

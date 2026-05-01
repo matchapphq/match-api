@@ -65,5 +65,7 @@ export function mapToClientUserProfile(
         has_payment_method: hasPaymentMethod,
         has_completed_onboarding: hasCompletedOnboarding,
         onboarding_step: onboardingStep,
+        buts: user.buts ?? 0,
+        tier: user.tier || "Rookie",
     };
 }
