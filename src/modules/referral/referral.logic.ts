@@ -1,7 +1,7 @@
 import referralRepository from "../../repository/referral.repository";
 import { FidelityLogic } from "../fidelity/fidelity.logic";
 
-const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://match.app/register?ref=';
+const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://matchapp.fr/join/';
 
 export class ReferralLogic {
     private readonly fidelityLogic: FidelityLogic = new FidelityLogic();
@@ -37,7 +37,7 @@ export class ReferralLogic {
     }
 
     async validateCode(referralCode: string) {
-        if (!/^MATCH-RESTO-[A-Z0-9]{6}$/.test(referralCode)) {
+        if (!/^MATCH-(RESTO|FAN)-[A-Z0-9]{6}$/.test(referralCode)) {
             return { 
                 valid: false, 
                 message: "Format de code invalide", 

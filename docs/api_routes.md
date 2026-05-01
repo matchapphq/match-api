@@ -234,7 +234,13 @@ Headers: Authorization: Bearer <token>
 Response: 200
 {
   user: {
-    // ...existing user fields
+    id: string;
+    email: string;
+    username: string | null;
+    first_name: string | null;
+    last_name: string | null;
+    role: 'user' | 'venue_owner' | 'admin';
+    avatar_url: string | null;
     has_completed_onboarding: boolean;
     onboarding_step?: "first_venue" | "paiement_method" | "paiement_method_skipped" | "done" | null;
   };

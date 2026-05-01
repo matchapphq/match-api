@@ -2,6 +2,7 @@ import { and, count, eq, isNotNull, isNull, lte } from "drizzle-orm";
 import { db } from "../config/config.db";
 import { userDeleteReasonsTable, userPreferencesTable, usersTable, type NewUserPreferences } from "../config/db/user.table";
 import { venuesTable } from "../config/db/venues.table";
+import { fidelityLevelsTable, fidelityUserStatsTable } from "../config/db/fidelity.table";
 import type { userRegisterData } from "../utils/userData";
 import { password, randomUUIDv7 } from "bun";
 
@@ -201,6 +202,7 @@ class UserRepository {
         return await db.select({
             id: usersTable.id,
             email: usersTable.email,
+            username: usersTable.username,
             role: usersTable.role,
             first_name: usersTable.first_name,
             last_name: usersTable.last_name,
@@ -217,8 +219,12 @@ class UserRepository {
             ambiances: userPreferencesTable.ambiances,
             venue_types: userPreferencesTable.venue_types,
             budget: userPreferencesTable.budget,
+            buts: fidelityUserStatsTable.total_points,
+            tier: fidelityLevelsTable.name,
         }).from(usersTable)
             .leftJoin(userPreferencesTable, eq(userPreferencesTable.user_id, usersTable.id))
+            .leftJoin(fidelityUserStatsTable, eq(fidelityUserStatsTable.user_id, usersTable.id))
+            .leftJoin(fidelityLevelsTable, eq(fidelityLevelsTable.id, fidelityUserStatsTable.current_level_id))
             .where(eq(usersTable.id, user.id));
     }
     
@@ -349,7 +355,6 @@ class UserRepository {
         const now = new Date();
 
         const payload: {
-            username: null;
             first_name?: string;
             last_name: string | null;
             phone?: string;
@@ -358,7 +363,6 @@ class UserRepository {
             google_id?: string;
             updated_at: Date;
         } = {
-            username: null,
             last_name: data.lastName ?? null,
             is_verified: true,
             updated_at: now,
@@ -383,14 +387,12 @@ class UserRepository {
         const now = new Date();
 
         const payload: {
-            username: null;
-            first_name?: string;
             is_verified: true;
             apple_id: string;
             updated_at: Date;
             last_name?: string;
+            first_name?: string;
         } = {
-            username: null,
             is_verified: true,
             apple_id: data.appleId,
             updated_at: now,
@@ -402,7 +404,7 @@ class UserRepository {
         await db.update(usersTable).set(payload).where(eq(usersTable.id, userId));
     }
 
-    public async updateUser(userId: string, data: { first_name?: string; last_name?: string; email?: string; phone?: string; bio?: string; avatar?: string; push_token?: string }) {
+    public async updateUser(userId: string, data: { username?: string; first_name?: string; last_name?: string; email?: string; phone?: string; bio?: string; avatar?: string; push_token?: string }) {
         const { avatar, push_token, ...rest } = data;
         const payload = {
             ...rest,
