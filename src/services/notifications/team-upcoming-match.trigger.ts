@@ -7,7 +7,7 @@ import { teamsTable } from "../../config/db/sports.table";
 import { notificationLogsTable } from "../../config/db/notification-logs.table";
 import { notificationQueue } from "../../queue/notification.queue";
 import { NotificationType } from "../../types/jobs.type";
-import { v4 as uuidv4 } from "uuid";
+import { randomUUIDv7 } from "bun";
 
 /**
  * Checks for matches starting in the next 24 and 48 hours.
@@ -118,7 +118,7 @@ export async function triggerUpcomingMatchNotifications() {
                     {
                         type: NotificationType.PUSH_NOTIFICATION,
                         recipientId: follower.userId,
-                        traceId: uuidv4(),
+                        traceId: randomUUIDv7(),
                         data: {
                             tokens: [follower.pushToken],
                             title,
