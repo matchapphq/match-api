@@ -15,11 +15,11 @@ const BOOST_VALUE = Number(process.env.BOOST_VALUE) || 30;
 export class ReferralRepository {
 
     /**
-     * Generate a unique referral code in format MATCH-RESTO-XXXXXX
+     * Generate a unique referral code with a specific prefix
      */
-    private generateReferralCode(): string {
+    private generateReferralCode(prefix: string): string {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-        let code = 'MATCH-RESTO-';
+        let code = prefix;
         for (let i = 0; i < 6; i++) {
             code += chars.charAt(Math.floor(Math.random() * chars.length));
         }
@@ -45,12 +45,21 @@ export class ReferralRepository {
         const existing = await this.getReferralCode(userId);
         if (existing) return existing;
 
+        // Fetch user role to determine prefix
+        const user = await db.select({ role: usersTable.role })
+            .from(usersTable)
+            .where(eq(usersTable.id, userId))
+            .limit(1);
+        
+        const role = user[0]?.role || 'user';
+        const prefix = role === 'venue_owner' ? 'MATCH-RESTO-' : 'MATCH-FAN-';
+
         let referralCode: string;
         let attempts = 0;
         const maxAttempts = 10;
 
         do {
-            referralCode = this.generateReferralCode();
+            referralCode = this.generateReferralCode(prefix);
             const existingCode = await db.select({ id: referralCodesTable.id })
                 .from(referralCodesTable)
                 .where(eq(referralCodesTable.referral_code, referralCode))

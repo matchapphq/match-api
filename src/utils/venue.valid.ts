@@ -1,4 +1,19 @@
 import { z } from "zod";
+import { validateWebsiteUrl } from "./website.security";
+
+const WebsiteFieldSchema = z
+    .string()
+    .trim()
+    .max(255, "Website URL is too long (max 255 characters).")
+    .superRefine((value, ctx) => {
+        const result = validateWebsiteUrl(value);
+        if (!result.isValid) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: result.reason || "Invalid website URL.",
+            });
+        }
+    });
 
 export const CreateVenueSchema = z.object({
     name: z.string().min(3, "Name must be at least 3 characters"),
@@ -11,7 +26,7 @@ export const CreateVenueSchema = z.object({
     description: z.string().optional(),
     phone: z.string().optional(),
     email: z.string().email().optional(),
-    website: z.string().url().optional(),
+    website: WebsiteFieldSchema.optional(),
     photos: z.array(z.object({
         url: z.string().url(),
         altText: z.string().optional(),
@@ -23,11 +38,16 @@ const OpeningHoursDaySchema = z.object({
     open: z.string().regex(/^\d{2}:\d{2}$/),
     close: z.string().regex(/^\d{2}:\d{2}$/),
     closed: z.boolean(),
+    close_next_day: z.boolean().optional(),
+    second_open: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    second_close: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+    second_close_next_day: z.boolean().optional(),
 });
 
 export const UpdateVenueSchema = CreateVenueSchema.partial().extend({
     booking_mode: z.enum(["INSTANT", "REQUEST"]).optional(),
     opening_hours: z.record(z.string(), OpeningHoursDaySchema).optional(),
+    happy_hours: z.record(z.string(), OpeningHoursDaySchema).optional(),
 });
 
 export const GetVenuesSchema = z.object({

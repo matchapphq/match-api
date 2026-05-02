@@ -25,12 +25,12 @@ export async function triggerUpcomingMatchNotifications() {
         { 
             label: "24h", 
             start: new Date(now.getTime() + 22 * 60 * 60 * 1000), 
-            end: new Date(now.getTime() + 26 * 60 * 60 * 1000) 
+            end: new Date(now.getTime() + 26 * 60 * 60 * 1000),
         },
         { 
             label: "48h", 
             start: new Date(now.getTime() + 46 * 60 * 60 * 1000), 
-            end: new Date(now.getTime() + 50 * 60 * 60 * 1000) 
+            end: new Date(now.getTime() + 50 * 60 * 60 * 1000),
         }
     ];
 
@@ -116,7 +116,7 @@ export async function triggerUpcomingMatchNotifications() {
                 await notificationQueue.add(
                     "send_push",
                     {
-                        type: NotificationType.PUSH,
+                        type: NotificationType.PUSH_NOTIFICATION,
                         recipientId: follower.userId,
                         traceId: uuidv4(),
                         data: {

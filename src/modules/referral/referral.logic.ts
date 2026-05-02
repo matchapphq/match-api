@@ -1,7 +1,7 @@
 import referralRepository from "../../repository/referral.repository";
 import { FidelityLogic } from "../fidelity/fidelity.logic";
 
-const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://match.app/register?ref=';
+const REFERRAL_BASE_URL = process.env.REFERRAL_BASE_URL || 'https://matchapp.fr/join/';
 
 export class ReferralLogic {
     private readonly fidelityLogic: FidelityLogic = new FidelityLogic();
@@ -37,7 +37,7 @@ export class ReferralLogic {
     }
 
     async validateCode(referralCode: string) {
-        if (!/^MATCH-RESTO-[A-Z0-9]{6}$/.test(referralCode)) {
+        if (!/^MATCH-(RESTO|FAN)-[A-Z0-9]{6}$/.test(referralCode)) {
             return { 
                 valid: false, 
                 message: "Format de code invalide", 
@@ -76,11 +76,11 @@ export class ReferralLogic {
                 referenceId: result.referral_id!,
                 referenceType: "referral",
                 metadata: { referredUserId }
-            }).catch(err => console.error("[BetaChallenge] Referral award failed:", err));
+            }).catch((err: unknown) => console.error("[BetaChallenge] Referral award failed:", err));
             
             // Increment stat for leaderboard tie-breaker
             await this.fidelityLogic.incrementUserStat(referrerId, "total_invites_completed")
-                .catch(err => console.error("[BetaChallenge] Stat increment failed:", err));
+                .catch((err: unknown) => console.error("[BetaChallenge] Stat increment failed:", err));
         }
 
         return {

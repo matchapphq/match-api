@@ -1,111 +1,143 @@
-[🏠 Home](./index.md) | [🏗️ Architecture](./architecture.md) | [🔌 API Routes](./api_routes.md) | [📊 Status](./status_report.md)
+# Environment Variables (Backend)
 
----
+Ce document référence les variables utiles au runtime backend final.
 
-# Environment Variables Reference
+## Variables requises (boot bloqué si absentes)
+Selon `src/utils/checkEnv.ts`:
 
-This document lists all environment variables required to run the Match API.
+### Core
+- `NODE_ENV`
+- `PORT`
+- `FRONTEND_URL`
 
-## 🛠️ Core Configuration
+### Database
+- `DATABASE_URL`
+- `DATABASE_HOST`
+- `DATABASE_PORT`
+- `DATABASE_USER`
+- `DATABASE_PASSWORD`
+- `DATABASE_NAME`
 
-| Variable | Description | Example |
-| :--- | :--- | :--- |
-| `NODE_ENV` | Application environment | `development` or `production` |
-| `PORT` | API Port | `8008` |
-| `FRONTEND_URL` | URL of the React dashboard | `https://matchapp.fr` |
+### Auth / Security
+- `SECRET_KEY`
+- `REFRESH_SECRET_KEY`
+- `ACCESS_JWT_SIGN_KEY`
+- `REFRESH_JWT_SIGN_KEY`
+- `QR_SECRET`
 
-## 🗄️ Database (PostgreSQL + PostGIS)
+### Stripe
+- `STRIPE_SECRET_KEY`
+- `STRIPE_PUBLISHABLE_KEY`
+- `STRIPE_WEBHOOK_SECRET`
 
-| Variable | Description |
-| :--- | :--- |
-| `DATABASE_URL` | Full connection string (Neon or local) |
-| `DATABASE_HOST` | Database hostname |
-| `DATABASE_PORT` | Database port (Default: 5432) |
-| `DATABASE_USER` | Database username |
-| `DATABASE_PASSWORD` | Database password |
-| `DATABASE_NAME` | Database name |
+### Geocoding
+- `LOCATIONIQ_KEY`
 
-## 🔐 Security & Auth
+### SMTP
+- `SMTP_HOST`
+- `SMTP_PORT`
+- `SMTP_SECURE`
+- `SMTP_USER`
+- `SMTP_PASSWORD`
+- `SMTP_SEND_MAIL`
+- `SMTP_SEND_NAME`
 
-| Variable | Description |
-| :--- | :--- |
-| `SECRET_KEY` | Key for signing Access JWTs |
-| `REFRESH_SECRET_KEY` | Key for signing Refresh JWTs |
-| `ACCESS_JWT_SIGN_KEY` | Signed cookie key for Access tokens |
-| `REFRESH_JWT_SIGN_KEY` | Signed cookie key for Refresh tokens |
-| `SESSION_INACTIVITY_DAYS` | Max inactivity window before a session is auto-revoked (default: `7`) |
-| `ACCOUNT_DELETION_GRACE_DAYS` | Soft-delete grace period before permanent account purge (default: `30`) |
-| `ACCOUNT_DELETION_CLEANUP_INTERVAL_HOURS` | Interval between deleted-account purge runs (default: `6`) |
-| `QR_SECRET` | Secret for HMAC-signing reservation QRs |
-| `GOOGLE_CLIENT_ID` | Google OAuth Client ID (primary audience accepted for `POST /auth/google`) |
-| `GOOGLE_CLIENT_IDS` | Optional comma-separated list of additional accepted Google client IDs (web/ios/android) |
-| `APPLE_CLIENT_ID` | Apple OAuth audience (Bundle ID or Service ID accepted for `POST /auth/apple`) |
-| `APPLE_CLIENT_IDS` | Optional comma-separated list of additional Apple audiences (e.g. iOS Bundle ID + Service ID) |
+### Storage
+- `S3_ACCESS_KEY_ID`
+- `S3_SECRET_ACCESS_KEY`
+- `S3_BUCKET`
 
-## 💳 Stripe Integration
+### Redis
+- `REDIS_HOST`
+- `REDIS_PORT`
 
-| Variable | Description |
-| :--- | :--- |
-| `STRIPE_SECRET_KEY` | Stripe API Secret (sk_test_...) |
-| `STRIPE_PUBLISHABLE_KEY`| Stripe Public Key (pk_test_...) |
-| `STRIPE_WEBHOOK_SECRET` | Webhook signing secret (whsec_...) |
-| `STRIPE_PRICE_MONTHLY` | Price ID for Monthly Plan |
-| `STRIPE_PRICE_ANNUAL` | Price ID for Annual Plan |
+## Variables optionnelles/recommandées
 
-## 📧 Mail (SMTP)
+### Auth sessions & privacy
+- `SESSION_INACTIVITY_DAYS` (default logique: 7)
+- `ACCOUNT_DELETION_GRACE_DAYS` (default logique: 30)
+- `ACCOUNT_DELETION_CLEANUP_INTERVAL_HOURS` (default logique: 6)
+- `SESSION_GEOIP_ENABLED`
+- `SESSION_GEOIP_PROVIDER_URL`
 
-| Variable | Description |
-| :--- | :--- |
-| `SMTP_HOST` | SMTP server address |
-| `SMTP_PORT` | SMTP port (e.g., 587 or 465) |
-| `SMTP_SECURE` | Use SSL/TLS (`true` or `false`) |
-| `SMTP_USER` | SMTP username |
-| `SMTP_PASSWORD` | SMTP password |
-| `SMTP_SEND_MAIL` | Default "from" email address |
-| `SMTP_SEND_NAME` | Default "from" name |
-| `SMTP_NO_REPLY` | Optional override for the SMTP sender address used as the visible `from` |
-| `SUPPORT_EMAIL` | Reply-to mailbox used for all outgoing emails (default: `support@matchapp.fr`) |
-| `BUG_REPORT_EMAIL` | Destination mailbox for bug reports (default: `dev@matchapp.fr`) |
-| `DATA_EXPORT_EMAIL` | Destination mailbox for GDPR export requests (default: `data@matchapp.fr`) |
+### OAuth
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_IDS`
+- `GOOGLE_WEB_CLIENT_ID`
+- `GOOGLE_IOS_CLIENT_ID`
+- `GOOGLE_ANDROID_CLIENT_ID`
+- `APPLE_CLIENT_ID`
+- `APPLE_CLIENT_IDS`
+- `APPLE_IOS_CLIENT_ID`
+- `APPLE_SERVICE_ID`
 
-## 📍 Services
+### Stripe pricing
+- `STRIPE_PRICE_MONTHLY`
+- `STRIPE_PRICE_ANNUAL`
 
-| Variable | Description |
-| :--- | :--- |
-| `REDIS_URL` | Redis connection for BullMQ |
-| `LOCATIONIQ_KEY` | API Key for Geocoding (Address to Lat/Lng) |
-| `SESSION_GEOIP_ENABLED` | Enable server-side IP-to-location fallback when proxy geo headers are missing (default: enabled unless set to `false`) |
-| `SESSION_GEOIP_PROVIDER_URL` | Optional single GeoIP provider template using `{ip}` placeholder |
+### Redis avancé
+- `REDIS_URL`
+- `REDIS_PASSWORD`
 
-## 🧾 Account Deactivation Notes
+### Storage avancé
+- `S3_REGION`
+- `S3_ENDPOINT`
+- `S3_PUBLIC_URL`
 
-- `ACCOUNT_DELETION_GRACE_DAYS` is the source of truth for:
-  - API responses from `GET/PUT /api/users/me/privacy-preferences`
-  - account-deactivation emails
-  - web/mobile account-deactivation UI copy
-- Clients do not define this value locally. Change it in the backend env and restart the API.
+### Référencement / produit
+- `REFERRAL_BASE_URL`
+- `BOOST_VALUE`
 
-## 📁 Media Storage (S3 / Cloudflare R2)
+### API Sports / seed
+- `API_SPORTS_KEY`
 
-| Variable | Description | Example |
-| :--- | :--- | :--- |
-| `S3_ACCESS_KEY_ID` | S3 Access Key | `AKIA...` |
-| `S3_SECRET_ACCESS_KEY` | S3 Secret Key | `secret...` |
-| `S3_BUCKET` | S3 Bucket Name | `match-media` |
-| `S3_REGION` | S3 Region (default: us-east-1) | `eu-west-3` |
-| `S3_ENDPOINT` | Optional custom endpoint (for R2/Minio) | `https://<id>.r2.cloudflarestorage.com` |
-| `S3_PUBLIC_URL` | Optional custom public URL / CDN | `https://cdn.matchapp.fr` |
+### Mails support
+- `SMTP_NO_REPLY`
+- `SUPPORT_EMAIL`
+- `BUG_REPORT_EMAIL`
+- `DATA_EXPORT_EMAIL`
 
-## 📁 Media Storage (S3 / Cloudflare R2)
+## Exemple minimal local (`.env.dev`)
+```env
+NODE_ENV=development
+PORT=8008
+FRONTEND_URL=http://localhost:5173
 
-| Variable | Description | Example |
-| :--- | :--- | :--- |
-| `S3_ACCESS_KEY_ID` | S3 Access Key | `AKIA...` |
-| `S3_SECRET_ACCESS_KEY` | S3 Secret Key | `secret...` |
-| `S3_BUCKET` | S3 Bucket Name | `match-media` |
-| `S3_REGION` | S3 Region (default: us-east-1) | `eu-west-3` |
-| `S3_ENDPOINT` | Optional custom endpoint (for R2/Minio) | `https://<id>.r2.cloudflarestorage.com` |
-| `S3_PUBLIC_URL` | Optional custom public URL / CDN | `https://cdn.matchapp.fr` |
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/postgres
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+DATABASE_USER=postgres
+DATABASE_PASSWORD=postgres
+DATABASE_NAME=postgres
 
----
-[« Back to Documentation Index](./index.md)
+SECRET_KEY=change-me
+REFRESH_SECRET_KEY=change-me
+ACCESS_JWT_SIGN_KEY=change-me
+REFRESH_JWT_SIGN_KEY=change-me
+QR_SECRET=change-me
+
+STRIPE_SECRET_KEY=sk_test_xxx
+STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+STRIPE_PRICE_MONTHLY=price_xxx
+STRIPE_PRICE_ANNUAL=price_xxx
+
+LOCATIONIQ_KEY=xxx
+
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_URL=redis://127.0.0.1:6379
+
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER=user
+SMTP_PASSWORD=pass
+SMTP_SEND_MAIL=noreply@matchapp.fr
+SMTP_SEND_NAME=Match
+
+S3_ACCESS_KEY_ID=xxx
+S3_SECRET_ACCESS_KEY=xxx
+S3_BUCKET=match-media
+S3_REGION=eu-west-3
+```

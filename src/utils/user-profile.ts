@@ -47,6 +47,7 @@ export function mapToClientUserProfile(
     return {
         id: user.id,
         email: user.email,
+        username: user.username,
         role: user.role,
         first_name: user.first_name,
         last_name: user.last_name,
@@ -64,5 +65,7 @@ export function mapToClientUserProfile(
         has_payment_method: hasPaymentMethod,
         has_completed_onboarding: hasCompletedOnboarding,
         onboarding_step: onboardingStep,
+        buts: user.buts ?? 0,
+        tier: user.tier || "Rookie",
     };
 }

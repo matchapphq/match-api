@@ -21,6 +21,7 @@ import { referralCodesTable, referralsTable, referralStatsTable, boostsTable } f
 import { boostPurchasesTable, boostPricesTable, boostAnalyticsTable } from './boost.table';
 
 import { userVenueHistoryTable } from './user-history.table';
+import { amenitiesTable, venueAmenitiesTable } from './venue-amenities.table';
 
 export const usersRelations = relations(usersTable, ({ one, many }) => ({
     preferences: one(userPreferencesTable, {
@@ -104,6 +105,7 @@ export const venuesRelations = relations(venuesTable, ({ one, many }) => ({
     photos: many(venuePhotosTable),
     venueMatches: many(venueMatchesTable),
     reviews: many(reviewsTable),
+    amenities: many(venueAmenitiesTable),
 }));
 
 export const venuePhotosRelations = relations(venuePhotosTable, ({ one }) => ({
@@ -463,5 +465,24 @@ export const boostAnalyticsRelations = relations(boostAnalyticsTable, ({ one }) 
     user: one(usersTable, {
         fields: [boostAnalyticsTable.user_id],
         references: [usersTable.id],
+    }),
+}));
+
+// ============================================
+// AMENITIES RELATIONS
+// ============================================
+
+export const amenitiesRelations = relations(amenitiesTable, ({ many }) => ({
+    venueAmenities: many(venueAmenitiesTable),
+}));
+
+export const venueAmenitiesRelations = relations(venueAmenitiesTable, ({ one }) => ({
+    venue: one(venuesTable, {
+        fields: [venueAmenitiesTable.venue_id],
+        references: [venuesTable.id],
+    }),
+    amenity: one(amenitiesTable, {
+        fields: [venueAmenitiesTable.amenity_id],
+        references: [amenitiesTable.id],
     }),
 }));

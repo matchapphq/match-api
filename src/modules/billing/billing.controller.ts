@@ -18,6 +18,14 @@ class BillingController {
 
     constructor(private readonly billingLogic: BillingLogic) {}
 
+    private getRequiredParam(ctx: any, key: string): string {
+        const value = ctx.req.param(key);
+        if (!value) {
+            throw new Error(`MISSING_PARAM:${key}`);
+        }
+        return value;
+    }
+
     readonly getPricing = this.factory.createHandlers(async (ctx) => {
         const pricing = this.billingLogic.getPricing();
         return ctx.json(pricing);
@@ -81,12 +89,13 @@ class BillingController {
 
     readonly getInvoiceDetails = this.factory.createHandlers(async (ctx) => {
         const user = ctx.get("user");
-        const invoiceId = ctx.req.param("invoiceId");
+        const invoiceId = this.getRequiredParam(ctx, "invoiceId");
         
         try {
             const result = await this.billingLogic.getInvoiceDetails(invoiceId, user.id);
             return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "MISSING_PARAM:invoiceId") return ctx.json({ error: "Invoice ID is required" }, 400);
             if (error.message === "INVOICE_NOT_FOUND") return ctx.json({ error: "Invoice not found" }, 404);
             throw error;
         }
@@ -94,12 +103,13 @@ class BillingController {
 
     readonly getInvoicePdf = this.factory.createHandlers(async (ctx) => {
         const user = ctx.get("user");
-        const invoiceId = ctx.req.param("invoiceId");
+        const invoiceId = this.getRequiredParam(ctx, "invoiceId");
         
         try {
             const result = await this.billingLogic.getInvoicePdf(invoiceId, user.id);
             return ctx.json(result);
         } catch (error: any) {
+             if (error.message === "MISSING_PARAM:invoiceId") return ctx.json({ error: "Invoice ID is required" }, 400);
              if (error.message === "INVOICE_NOT_FOUND") return ctx.json({ error: "Invoice not found" }, 404);
              if (error.message === "PDF_NOT_AVAILABLE") return ctx.json({ error: "PDF not available" }, 404);
              throw error;
@@ -118,12 +128,13 @@ class BillingController {
 
     readonly getTransactionDetails = this.factory.createHandlers(async (ctx) => {
         const user = ctx.get("user");
-        const transactionId = ctx.req.param("transactionId");
+        const transactionId = this.getRequiredParam(ctx, "transactionId");
         
         try {
             const result = await this.billingLogic.getTransactionDetails(transactionId, user.id);
             return ctx.json(result);
         } catch (error: any) {
+            if (error.message === "MISSING_PARAM:transactionId") return ctx.json({ error: "Transaction ID is required" }, 400);
             if (error.message === "TRANSACTION_NOT_FOUND") return ctx.json({ error: "Transaction not found" }, 404);
             throw error;
         }

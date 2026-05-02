@@ -151,6 +151,10 @@ export class AnalyticsRepository {
                 checkedInReservations: 0,
                 averagePartySize: 0,
                 averageOccupancy: 0,
+                accruedCommission: {
+                    guests: 0,
+                    amount: "0.00",
+                },
                 topMatches: [],
             };
         }

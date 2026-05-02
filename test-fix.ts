@@ -5,7 +5,7 @@ async function testLeaderboard() {
     try {
         const leaderboard = await challengeRepository.getLeaderboard();
         console.log("Leaderboard fetched successfully:", leaderboard.length, "entries");
-        if (leaderboard.length > 0) {
+        if (leaderboard.length > 0 && leaderboard[0]) {
             console.log("First entry name:", leaderboard[0].name);
         }
     } catch (error) {

@@ -117,6 +117,7 @@ export class UserLogic {
         data: {
             first_name?: string;
             last_name?: string;
+            username?: string;
             email?: string;
             phone?: string;
             bio?: string;
@@ -242,7 +243,7 @@ export class UserLogic {
     /**
      * Delete user account after verifying password.
      */
-    public async deleteUser(userId: string, reason: string, details: string | undefined, password: string) {
+    public async deleteUser(userId: string, reason: string, details: string | undefined, password?: string) {
         const user = await this.userRepository.getUserById(userId);
         if (!user) {
             throw new Error("USER_NOT_FOUND");

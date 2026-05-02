@@ -222,6 +222,11 @@ export class DiscoveryLogic {
             ),
             with: {
                 photos: true,
+                amenities: {
+                    with: {
+                        amenity: true,
+                    },
+                },
             },
         });
 

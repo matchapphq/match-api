@@ -6,6 +6,7 @@ export type PartnerOnboardingStep = "first_venue" | "paiement_method" | "paiemen
 export interface UserProfileSource {
     id: string;
     email: string;
+    username: string | null;
     role: UserRole;
     first_name: string | null;
     last_name: string | null;
@@ -21,6 +22,8 @@ export interface UserProfileSource {
     ambiances: unknown;
     venue_types: unknown;
     budget: string | null;
+    buts: number | null;
+    tier: string | null;
 }
 
 export interface UserProfilePreferences {
@@ -33,6 +36,7 @@ export interface UserProfilePreferences {
 export interface ClientUserProfile {
     id: string;
     email: string;
+    username: string | null;
     role: UserRole;
     first_name: string | null;
     last_name: string | null;
@@ -45,4 +49,6 @@ export interface ClientUserProfile {
     has_payment_method: boolean;
     has_completed_onboarding: boolean;
     onboarding_step: PartnerOnboardingStep;
+    buts: number;
+    tier: string;
 }
